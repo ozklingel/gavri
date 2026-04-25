@@ -1,31 +1,43 @@
-function getUsers(groupName) {
-  const spreadsheetId = GROUPS[groupName];
-  if (!spreadsheetId) throw new Error('קבוצה לא נמצאה');
+/**
+ * users.gs — User & roles management (admin only for mutations)
+ */
 
-  const ss    = SpreadsheetApp.openById(spreadsheetId);
-  const sheet = ss.getSheetByName("סבב נוכחי");
-  if (!sheet) throw new Error('גיליון סבב נוכחי לא נמצא');
+function Users_all() {
+  return readSheet('Users');
+}
 
-  const lastRow = sheet.getLastRow();
-  if (lastRow === 0) return [];
+function Users_byTeam(teamId) {
+  teamId = String(teamId);
+  return Users_all().filter(function (u) {
+    return String(u.team_id) === teamId;
+  });
+}
 
-  const data = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+function Users_traineesOfTeam(teamId) {
+  return Users_byTeam(teamId).filter(function (u) { return u.role === 'trainee'; });
+}
 
-  // מצא את תחילת השמות (שורה שמכילה טקסט בעברית ולא תאריך/מספר)
-  const users = data
-    .map(row => (row[0] || '').toString().trim())
-    .filter(val => {
-      if (!val) return false;
+function Users_teamName(teamId) {
+  var t = findById('Teams', teamId);
+  return t ? t.name : '';
+}
 
-      // מסנן תאריכים
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(val)) return false;
+function Users_teams() {
+  return readSheet('Teams');
+}
 
-      // מסנן כותרות/מערכת
-      if (val.includes('סהכ') || val.includes('מספר') || val.includes('בקשה')) return false;
+function Users_handleUpdateRole(session, params) {
+  Auth_requireRole(session, ['admin']);
+  var userId = String(params.userId || '');
+  var role   = String(params.role || '');
+  var teamId = String(params.team_id || '');
 
-      // משאיר רק טקסט (שמות)
-      return /[א-ת]/.test(val);
-    });
+  if (['admin', 'commander', 'trainee'].indexOf(role) === -1) {
+    return Views_message('Invalid role.');
+  }
+  var u = findById('Users', userId);
+  if (!u) return Views_message('User not found.');
 
-  return users.sort();
+  updateRow('Users', u._row, { role: role, team_id: teamId });
+  return Views_redirect('?page=users&msg=Updated');
 }
