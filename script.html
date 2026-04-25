@@ -1,0 +1,711 @@
+<script>
+  var $ = function(id) { return document.getElementById(id); };
+
+  function showError(id, msg) { var el = $(id); el.textContent = msg; el.classList.add('visible'); }
+  function clearError(id) { $(id).classList.remove('visible'); }
+  function setLoading(state) { $('loader').classList.toggle('active', state); $('loginBtn').disabled = state; }
+
+  var ALL_PAGES = ['mainContent','pageMyStatus','pageCommander','pageReport','pageAssign','pageChat','pageRequest','pageAttendance'];
+
+  function showPage(pageId) {
+    ALL_PAGES.forEach(function(id) { $(id).style.display = 'none'; });
+    $(pageId).style.display = 'block';
+    $('memorial').style.display = pageId === 'mainContent' ? 'block' : 'none';
+    window.scrollTo(0, 0);
+    if (pageId === 'pageChat') loadSheetContext();
+  }
+
+  function showMenu() { showPage('mainContent'); }
+
+  function buildMenu(isCommander) {
+    var grid = $('menuGrid');
+    grid.innerHTML = '';
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;';
+    var items = [
+      { label: 'הסטטוס שלי',  page: 'pageMyStatus',  always: true  },
+      { label: 'תצוגת מפקד',  page: 'pageCommander', always: false },
+      { label: 'דוח יומי',    page: 'pageReport',    always: false },
+      { label: 'שיבוץ קרבי', page: 'pageAssign',    always: false },
+      { label: 'שאל AI',      page: 'pageChat',      always: false },
+      { label: 'מי מגיע',    page: 'pageAttendance',always: true },
+    ];
+    items.forEach(function(item) {
+      if (!item.always && !isCommander) return;
+      var btn = document.createElement('button');
+      btn.textContent = item.label;
+      btn.style.cssText = 'padding:22px 10px;font-family:Heebo,sans-serif;font-size:15px;font-weight:600;color:var(--text);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;cursor:pointer;text-align:center;line-height:1.4;backdrop-filter:blur(12px);transition:background 0.2s;';
+      btn.onmouseover = function() { this.style.background = 'rgba(155,109,255,0.2)'; };
+      btn.onmouseout  = function() { this.style.background = 'var(--glass)'; };
+      btn.onclick = (function(p) { return function() { showPage(p); }; })(item.page);
+      grid.appendChild(btn);
+    });
+  }
+
+  function loadGroups() {
+    google.script.run
+      .withSuccessHandler(function(groups) {
+        var sel = $('group');
+        sel.innerHTML = '<option value="">בחר קבוצה</option>';
+        groups.forEach(function(g) {
+          var opt = document.createElement('option');
+          opt.value = opt.textContent = g;
+          sel.appendChild(opt);
+        });
+      })
+      .withFailureHandler(function(err) { showError('groupErrorMsg', 'שגיאה: ' + err.message); })
+      .getGroups();
+  }
+
+  function selectGroup() {
+    clearError('groupErrorMsg');
+    var group = $('group').value;
+    if (!group) { showError('groupErrorMsg', 'נא לבחור קבוצה'); return; }
+    window.selectedGroup = group;
+    $('groupCard').style.display = 'none';
+    $('loginCard').style.display = 'block';
+    loadUsers();
+  }
+
+  var allUsers = [];
+
+  function loadUsers() {
+    google.script.run
+      .withSuccessHandler(function(userList) { allUsers = userList; $('userSearch').placeholder = 'חפש שם משתמש...'; })
+      .withFailureHandler(function(err) { showError('errorMsg', 'שגיאה: ' + err.message); })
+      .getUsers(window.selectedGroup);
+  }
+
+  function filterUsers() {
+    var query = $('userSearch').value.trim();
+    var filtered = query ? allUsers.filter(function(n) { return n.includes(query); }) : allUsers;
+    renderDropdown(filtered);
+    $('user').value = '';
+  }
+
+  function showDropdown() { renderDropdown(allUsers); }
+
+  function renderDropdown(list) {
+    var dd = $('userDropdown');
+    if (!list.length) { dd.style.display = 'none'; return; }
+    dd.innerHTML = '';
+    list.forEach(function(name) {
+      var div = document.createElement('div');
+      div.textContent = name;
+      div.style.cssText = 'padding:12px 16px;cursor:pointer;color:#f0eaff;font-size:15px;border-bottom:1px solid rgba(255,255,255,0.06);';
+      div.onmouseover = function() { this.style.background = 'rgba(155,109,255,0.2)'; };
+      div.onmouseout  = function() { this.style.background = 'transparent'; };
+      div.onclick     = function() { selectUser(name); };
+      dd.appendChild(div);
+    });
+    dd.style.display = 'block';
+  }
+
+  function selectUser(name) {
+    $('userSearch').value = name;
+    $('user').value = name;
+    $('userDropdown').style.display = 'none';
+  }
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#userSearch') && !e.target.closest('#userDropdown')) {
+      $('userDropdown').style.display = 'none';
+    }
+  });
+  function login() {
+  clearError('errorMsg');
+
+  var user = $('user').value,
+      pass = $('pass').value,
+      group = window.selectedGroup;
+
+  if (!user) { showError('errorMsg', 'נא לבחור שם משתמש'); return; }
+  if (!pass) { showError('errorMsg', 'נא להזין סיסמה'); return; }
+
+  setLoading(true);
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      setLoading(false);
+
+      if (!data.success) {
+        showError('errorMsg', 'שם משתמש או סיסמה שגויים');
+        return;
+      }
+
+      // 🔥 שמירה לאפליקציית Flutter
+      try {
+        if (window.SaveLogin) {
+          SaveLogin.postMessage(user + "|" + pass);
+        }
+      } catch (e) {
+        console.log("SaveLogin not available");
+      }
+
+      $('loginCard').style.display = 'none';
+      window.loggedInUser = user;
+$('helloUser').textContent = 'שלום, ' + user ;
+      renderAll(data);
+      showPage('mainContent');
+      buildMenu(data.isCommander);
+    })
+    .withFailureHandler(function(err) {
+      setLoading(false);
+      showError('errorMsg', 'שגיאה: ' + err.message);
+    })
+    .login(user, pass, group);
+}
+
+  document.addEventListener('DOMContentLoaded', function() {
+    $('pass').addEventListener('keydown', function(e) { if (e.key === 'Enter') login(); });
+  });
+
+  function buildTable(header, rows) {
+    function cellClass(val) {
+      if (val === '1') return 'blue';
+      if (val === '0') return 'green';
+      return 'yellow';
+    }
+    var html = '<table><tr>' + header.map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
+    rows.forEach(function(row) {
+      html += '<tr>' + row.map(function(c) { return '<td class="' + cellClass(c) + '">' + c + '</td>'; }).join('') + '</tr>';
+    });
+    return html + '</table>';
+  }
+
+  function buildVerticalTable(header, row, chunkSize) {
+    var html = '<table style="min-width:0;width:100%;table-layout:fixed;">';
+    for (var i = 4; i < header.length; i += chunkSize) {
+      var hChunk = header.slice(i, i + chunkSize);
+      var rChunk = row.slice(i, i + chunkSize);
+      html += '<tr>' + hChunk.map(function(h) { return '<th style="font-size:11px;padding:6px 4px;word-break:break-word;">' + h + '</th>'; }).join('') + '</tr>';
+      html += '<tr>' + rChunk.map(function(c) {
+        var cls = c === '1' ? 'blue' : c === '0' ? 'green' : 'yellow';
+        return '<td class="' + cls + '" style="font-size:12px;padding:6px 4px;text-align:center;">' + c + '</td>';
+      }).join('') + '</tr>';
+    }
+    return html + '</table>';
+  }
+
+  function renderAll(data) {
+    $('myTableContainer').innerHTML = buildVerticalTable(data.header, data.myRow, 7);
+    if (data.isCommander && data.commanderRows.length > 0) {
+      $('commanderTableContainer').innerHTML = buildTable(data.header, data.commanderRows);
+    }
+    if (data.isCommander && data.reportData) {
+      renderReport(data.reportData);
+      initAssignment(data.reportData, data.drivers);
+    }
+  }
+
+  function renderReport(r) {
+    $('reportDate').textContent = r.todayLabel;
+    if (!r.todayValues || r.todayValues.length === 0) {
+      $('reportContainer').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">אין נתונים להיום</p>';
+      return;
+    }
+    var maxLen = Math.max(r.todayValues.length, r.tomorrowValues.length);
+    var html = '<table style="min-width:0;width:100%;table-layout:fixed;"><tr>';
+    html += '<th style="width:50%;word-break:break-word;">' + r.todayLabel + '<br><span style="font-size:12px;font-weight:400;opacity:0.8;">נוכחים: ' + r.todayValues.length + '</span></th>';
+    html += '<th style="width:50%;word-break:break-word;">' + r.tomorrowLabel + '<br><span style="font-size:12px;font-weight:400;opacity:0.8;">נוכחים: ' + r.tomorrowValues.length + '</span></th>';
+    html += '</tr>';
+    for (var i = 0; i < maxLen; i++) {
+      html += '<tr><td style="word-break:break-word;">' + (r.todayValues[i] || '') + '</td>';
+      html += '<td style="word-break:break-word;">' + (r.tomorrowValues[i] || '') + '</td></tr>';
+    }
+    html += '</table>';
+    var hasToday = r.todaySpecial && r.todaySpecial.length > 0;
+    var hasTomorrow = r.tomorrowSpecial && r.tomorrowSpecial.length > 0;
+    if (hasToday || hasTomorrow) {
+      html += '<div style="margin-top:20px;"><p style="color:var(--accent-lit);font-weight:600;margin-bottom:10px;">⚠️ דוח 1 — ערכים חריגים</p>';
+      html += '<table><tr><th>היום — ' + r.todayLabel + '</th><th>מחר — ' + r.tomorrowLabel + '</th></tr>';
+      var maxS = Math.max(hasToday ? r.todaySpecial.length : 0, hasTomorrow ? r.tomorrowSpecial.length : 0);
+      for (var i = 0; i < maxS; i++) {
+        html += '<tr><td>' + (hasToday ? (r.todaySpecial[i] || '') : '') + '</td><td>' + (hasTomorrow ? (r.tomorrowSpecial[i] || '') : '') + '</td></tr>';
+      }
+      html += '</table></div>';
+    }
+    $('reportContainer').innerHTML = html;
+  }
+
+  var MAX_FIGHTERS = 5;
+  var assignState  = { vehicles: [{name:'',fighters:[]},{name:'',fighters:[]},{name:'',fighters:[]},{name:'',fighters:[]}], pool: [] };
+  var savedReportData = null;
+  var savedDrivers    = { drivers: [], commanders: [] };
+
+  function initAssignment(reportData, drivers) {
+    savedReportData = reportData;
+    savedDrivers    = drivers || { drivers: [], commanders: [] };
+    assignState.vehicles = [{name:'',fighters:[]},{name:'',fighters:[]},{name:'',fighters:[]},{name:'',fighters:[]}];
+    selectDay('today');
+    setAutoDay('today');
+  }
+
+  var autoDay = 'today';
+
+  function showAssignMethod(method) {
+    $('assignAutoPanel').style.display   = method === 'auto'   ? 'block' : 'none';
+    $('assignManualPanel').style.display = method === 'manual' ? 'block' : 'none';
+    var btns = $('assignMethodPicker').querySelectorAll('button');
+    btns[0].className = method === 'auto'   ? 'btn btn-primary' : 'btn btn-secondary';
+    btns[1].className = method === 'manual' ? 'btn btn-primary' : 'btn btn-secondary';
+  }
+
+  function setAutoDay(day) {
+    autoDay = day;
+    var todayBtn = $('autoDayToday'), tomorrowBtn = $('autoDayTomorrow');
+    todayBtn.textContent    = savedReportData ? ('היום — '  + savedReportData.todayLabel)    : 'היום';
+    tomorrowBtn.textContent = savedReportData ? ('מחר — '  + savedReportData.tomorrowLabel) : 'מחר';
+    todayBtn.className    = day === 'today'    ? 'btn btn-primary' : 'btn btn-secondary';
+    tomorrowBtn.className = day === 'tomorrow' ? 'btn btn-primary' : 'btn btn-secondary';
+  }
+
+  function resetAssign() {
+    assignState.vehicles = [{name:'',fighters:[]},{name:'',fighters:[]},{name:'',fighters:[]},{name:'',fighters:[]}];
+    $('autoAssignError').classList.remove('visible');
+    renderAssignment();
+  }
+
+  function autoAssign() {
+    var errorEl = $('autoAssignError');
+    errorEl.classList.remove('visible');
+    var count = parseInt($('autoVehicleCount').value);
+    if (isNaN(count) || count < 1 || count > 4) { errorEl.textContent = 'נא להזין מספר רכבים בין 1 ל-4'; errorEl.classList.add('visible'); return; }
+    var allDrivers = savedDrivers.drivers || [], allCommanders = savedDrivers.commanders || [];
+    var autoPool = autoDay === 'today'
+      ? (savedReportData ? (savedReportData.todayValues || []).concat((savedReportData.todaySpecial || []).map(function(v){ return v.split(' — ')[0]; })) : [])
+      : (savedReportData ? (savedReportData.tomorrowValues || []).concat((savedReportData.tomorrowSpecial || []).map(function(v){ return v.split(' — ')[0]; })) : []);
+    var availableDrivers    = allDrivers.filter(function(d)    { return autoPool.indexOf(d) !== -1; });
+    var availableCommanders = allCommanders.filter(function(c) { return autoPool.indexOf(c) !== -1; });
+    if (availableDrivers.length < count) { errorEl.textContent = 'אין מספיק נהגים! נמצאו ' + availableDrivers.length + ' מתוך ' + count + ' נדרשים.'; errorEl.classList.add('visible'); return; }
+    if (availableCommanders.length < count) { errorEl.textContent = 'שים לב: נמצאו רק ' + availableCommanders.length + ' מפקדים זמינים לעומת ' + count + ' רכבים.'; errorEl.classList.add('visible'); }
+    assignState.vehicles = [];
+    for (var i = 0; i < count; i++) { assignState.vehicles.push({ name: 'רכב ' + (i+1), fighters: [] }); }
+    var usedNames = [], cmdIndex = 0;
+    for (var i = 0; i < count; i++) {
+      while (cmdIndex < availableCommanders.length && usedNames.indexOf(availableCommanders[cmdIndex]) !== -1) { cmdIndex++; }
+      if (cmdIndex < availableCommanders.length) { assignState.vehicles[i].fighters.push(availableCommanders[cmdIndex]); usedNames.push(availableCommanders[cmdIndex]); cmdIndex++; }
+    }
+    for (var i = 0; i < count; i++) {
+      var driver = availableDrivers[i];
+      if (usedNames.indexOf(driver) === -1) { assignState.vehicles[i].fighters.push(driver); usedNames.push(driver); }
+    }
+    var others = autoPool.filter(function(name) { return usedNames.indexOf(name) === -1; });
+    var vIdx = 0;
+    others.forEach(function(name) {
+      var attempts = 0;
+      while (assignState.vehicles[vIdx].fighters.length >= MAX_FIGHTERS && attempts < count) { vIdx = (vIdx+1) % count; attempts++; }
+      if (assignState.vehicles[vIdx].fighters.length < MAX_FIGHTERS) { assignState.vehicles[vIdx].fighters.push(name); vIdx = (vIdx+1) % count; }
+    });
+    renderAssignment();
+  }
+
+  function selectDay(day) {
+    var todayBtn = $('dayBtnToday'), tomorrowBtn = $('dayBtnTomorrow');
+    todayBtn.className    = day === 'today'    ? 'btn btn-primary' : 'btn btn-secondary';
+    tomorrowBtn.className = day === 'tomorrow' ? 'btn btn-primary' : 'btn btn-secondary';
+    if (savedReportData) {
+      todayBtn.textContent    = 'היום — '  + (savedReportData.todayLabel    || '');
+      tomorrowBtn.textContent = 'מחר — '  + (savedReportData.tomorrowLabel || '');
+    }
+    var names = {}, pool = [];
+    function addName(n) { var c = (n||'').trim(); if (c && !names[c]) { names[c]=true; pool.push(c); } }
+    if (savedReportData) {
+      var values  = day === 'today' ? (savedReportData.todayValues   || []) : (savedReportData.tomorrowValues  || []);
+      var special = day === 'today' ? (savedReportData.todaySpecial  || []) : (savedReportData.tomorrowSpecial || []);
+      values.forEach(function(v)  { if (v && v !== '0' && v !== '1') addName(v); });
+      special.forEach(function(v) { if (v) addName(v.split(' — ')[0]); });
+    }
+    assignState.pool = pool;
+    renderAssignment();
+  }
+
+  function isAssigned(name)      { return assignState.vehicles.some(function(v) { return v.fighters.indexOf(name) !== -1; }); }
+  function isDriver(name)        { return (savedDrivers.drivers    || []).indexOf(name) !== -1; }
+  function isCommanderRole(name) { return (savedDrivers.commanders || []).indexOf(name) !== -1; }
+
+  function addToVehicle(vIdx, name) {
+    if (assignState.vehicles[vIdx].fighters.length >= MAX_FIGHTERS) return false;
+    if (isDriver(name) || isCommanderRole(name)) { assignState.vehicles[vIdx].fighters.unshift(name); }
+    else { assignState.vehicles[vIdx].fighters.push(name); }
+    return true;
+  }
+
+  function assignFromPool(name) {
+    var idx = parseInt($('assignVehicleSelect').value);
+    if (isNaN(idx) || isAssigned(name)) return;
+    addToVehicle(idx, name);
+    renderAssignment();
+  }
+
+  function removeFromVehicle(vIdx, name) {
+    assignState.vehicles[vIdx].fighters = assignState.vehicles[vIdx].fighters.filter(function(f) { return f !== name; });
+    renderAssignment();
+  }
+
+  function addManualFighter(vIdx) {
+    var input = $('manual-' + vIdx), name = (input.value || '').trim();
+    if (!name || assignState.vehicles[vIdx].fighters.indexOf(name) !== -1) return;
+    addToVehicle(vIdx, name);
+    input.value = '';
+    renderAssignment();
+  }
+
+  function renderAssignment() { renderVehicleCards(); renderPoolTags(); updateVehicleSelect(); updateAssignSummary(); }
+var draggedItem = null;
+var draggedFromVehicle = null;
+function renderVehicleCards() {
+  var grid = $('vehiclesGrid');
+  grid.innerHTML = '';
+
+  assignState.vehicles.forEach(function(v, i) {
+    var card = document.createElement('div');
+    card.style.cssText =
+      'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;';
+
+    var header = document.createElement('div');
+    header.style.cssText =
+      'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+
+    // 🔥 NAME EDITABLE
+    var titleWrap = document.createElement('div');
+    titleWrap.style.display = 'flex';
+    titleWrap.style.alignItems = 'center';
+    titleWrap.style.gap = '6px';
+
+    var title = document.createElement('input');
+    title.value = v.name || ('רכב ' + (i + 1));
+    title.style.cssText =
+      'background:transparent;border:none;color:var(--text);font-weight:bold;font-size:14px;width:120px;outline:none;';
+
+    // 🔥 FIX: live update everywhere
+    title.oninput = function() {
+      assignState.vehicles[i].name = this.value;
+
+      // עדכון מיידי של כל UI שתלוי בשם
+      updateVehicleSelect();
+      updateAssignSummary();
+    };
+
+    titleWrap.appendChild(title);
+
+    var count = document.createElement('span');
+    count.textContent = v.fighters.length + '/4';
+
+    header.appendChild(titleWrap);
+    header.appendChild(count);
+
+    var list = document.createElement('div');
+    list.style.cssText =
+      'min-height:80px;border:1px dashed rgba(255,255,255,0.2);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:6px;';
+
+    // =========================
+    // DROP ON VEHICLE
+    // =========================
+    list.ondragover = function(e) {
+      e.preventDefault();
+    };
+
+    list.ondrop = function(e) {
+      e.preventDefault();
+      if (!draggedItem) return;
+
+      moveItem(draggedItem, draggedFromVehicle, i, null);
+    };
+
+    // =========================
+    // fighters
+    // =========================
+    v.fighters.forEach(function(f, index) {
+      var row = document.createElement('div');
+
+      row.draggable = true;
+
+      row.ondragstart = function() {
+        draggedItem = f;
+        draggedFromVehicle = i;
+      };
+
+      row.ondragover = function(e) {
+        e.preventDefault();
+      };
+
+      row.ondrop = function(e) {
+        e.preventDefault();
+
+        if (!draggedItem) return;
+
+        moveItem(draggedItem, draggedFromVehicle, i, index);
+      };
+
+      row.style.cssText =
+        'display:flex;justify-content:space-between;align-items:center;' +
+        'background:rgba(155,109,255,0.2);padding:6px 8px;border-radius:6px;cursor:grab;';
+
+      var name = document.createElement('span');
+      name.textContent = f;
+
+      var remove = document.createElement('button');
+      remove.textContent = '×';
+      remove.style.cssText =
+        'background:none;border:none;color:var(--text);cursor:pointer;font-size:16px;';
+
+      remove.onclick = function() {
+        assignState.vehicles[i].fighters =
+          assignState.vehicles[i].fighters.filter(x => x !== f);
+
+        renderAssignment();
+      };
+
+      row.appendChild(name);
+      row.appendChild(remove);
+      list.appendChild(row);
+    });
+
+    card.appendChild(header);
+    card.appendChild(list);
+    grid.appendChild(card);
+  });
+}
+function moveItem(item, fromVehicle, toVehicle, toIndex) {
+
+  if (fromVehicle === null || toVehicle === null) return;
+
+  var fromArr = assignState.vehicles[fromVehicle].fighters;
+  var toArr = assignState.vehicles[toVehicle].fighters;
+
+  // remove from old
+  var idx = fromArr.indexOf(item);
+  if (idx === -1) return;
+  fromArr.splice(idx, 1);
+
+  // same vehicle reorder
+  if (fromVehicle === toVehicle) {
+
+    if (toIndex === null || toIndex === undefined) {
+      toArr.push(item);
+    } else {
+      toArr.splice(toIndex, 0, item);
+    }
+
+  } else {
+
+    if (toIndex === null || toIndex === undefined) {
+      toArr.push(item);
+    } else {
+      toArr.splice(toIndex, 0, item);
+    }
+  }
+
+  draggedItem = null;
+  draggedFromVehicle = null;
+
+  renderAssignment();
+}
+  function renderPoolTags() {
+    var container = $('poolTags');
+    container.innerHTML = '';
+    if (!assignState.pool.length) { container.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">אין נתונים מדוח 1</span>'; return; }
+    assignState.pool.forEach(function(name) {
+      var assigned = isAssigned(name);
+      var tag = document.createElement('div');
+      tag.textContent = name;
+      tag.style.cssText = 'font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:var(--text);cursor:pointer;' + (assigned ? 'opacity:0.3;pointer-events:none;text-decoration:line-through;' : '');
+      tag.onclick = function() { assignFromPool(name); };
+      container.appendChild(tag);
+    });
+  }
+  function updateVehicleSelect() {
+  var sel = $('assignVehicleSelect'), prev = sel.value;
+
+  sel.innerHTML = '<option value="">בחר רכב לשיבוץ...</option>';
+
+  assignState.vehicles.forEach(function(v, i) {
+    var name = (v.name && v.name.trim() !== '') ? v.name : ('רכב ' + (i + 1));
+
+    var opt = document.createElement('option');
+    opt.value = i;
+    opt.disabled = v.fighters.length >= MAX_FIGHTERS;
+    opt.textContent = name + ' (' + v.fighters.length + '/' + MAX_FIGHTERS + ')';
+
+    sel.appendChild(opt);
+  });
+
+  if (prev !== '') sel.value = prev;
+}
+
+  function updateAssignSummary() {
+  $('assignSummary').textContent = assignState.vehicles.map(function(v, i) {
+
+    var name = (v.name && v.name.trim() !== '') ? v.name : ('רכב ' + (i + 1));
+
+    return name + ':\n' +
+      (v.fighters.length > 0 ? v.fighters.join('\n') : '—');
+
+  }).join('\n\n');
+}
+
+  function copySummary() {
+    navigator.clipboard.writeText($('assignSummary').textContent).then(function() {
+      var btn = $('copyAssignBtn'); btn.textContent = 'הועתק!';
+      setTimeout(function() { btn.textContent = 'העתק'; }, 2000);
+    });
+  }
+
+  var chatHistory   = [];
+  var sheetContext  = null;
+  var systemPrompt  = null;
+
+  function loadSheetContext() {
+    if (sheetContext) return;
+    google.script.run
+      .withSuccessHandler(function(data) { sheetContext = data; })
+      .withFailureHandler(function(err)  { console.log('sheet error: ' + err.message); })
+      .getSheetDataForChat(window.selectedGroup);
+    google.script.run
+      .withSuccessHandler(function(prompt) { systemPrompt = prompt; })
+      .withFailureHandler(function(err)    { console.log('prompt error: ' + err.message); })
+      .getChatSystemPrompt();
+  }
+  function sendChatMessage() {
+  var input = $('chatInput'), msg = (input.value || '').trim();
+  if (!msg) return;
+
+  input.value = '';
+  appendChatMessage('user', msg);
+  $('chatLoader').classList.add('active');
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  var contextStr = '';
+  if (sheetContext) {
+    Object.keys(sheetContext).forEach(function(name) {
+      contextStr += '\n\nגיליון: ' + name + '\n';
+      sheetContext[name].slice(0, 50).forEach(function(row) {
+        contextStr += row.join(' | ') + '\n';
+      });
+    });
+  }
+
+  var fullPrompt =
+    (systemPrompt || 'אתה עוזר כוח אדם. ענה בעברית.') +
+    '\n\n=== נתוני הגיליונות ===\n' +
+    contextStr;
+
+  // ✅ CHANGED: no fetch, no API key in frontend
+  google.script.run
+    .withSuccessHandler(function(data) {
+      $('chatLoader').classList.remove('active');
+
+      var reply =
+        data &&
+        data.content &&
+        data.content[0]
+          ? data.content[0].text
+          : 'שגיאה בתשובה';
+
+      appendChatMessage('assistant', reply);
+      chatHistory.push({ role: 'assistant', content: reply });
+    })
+    .withFailureHandler(function(err) {
+      $('chatLoader').classList.remove('active');
+      appendChatMessage('assistant', 'שגיאה: ' + err.message);
+    })
+    .callClaude(fullPrompt, chatHistory);
+}
+
+  function appendChatMessage(role, text) {
+    var container = $('chatMessages');
+    var div = document.createElement('div');
+    div.style.cssText = 'padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.5;max-width:90%;' +
+      (role === 'user'
+        ? 'background:rgba(155,109,255,0.2);align-self:flex-start;border:1px solid rgba(155,109,255,0.3);color:var(--text);'
+        : 'background:rgba(255,255,255,0.06);align-self:flex-end;border:1px solid rgba(255,255,255,0.1);color:var(--text);');
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function clearAttendance() {
+    $('attendanceResult').style.display = 'none';
+    $('attendanceError').classList.remove('visible');
+  }
+
+  function fetchAttendance() {
+    clearAttendance();
+    var dateVal = $('attendanceDate').value;
+    if (!dateVal) { $('attendanceError').textContent = 'נא לבחור תאריך'; $('attendanceError').classList.add('visible'); return; }
+    var MONTHS = ['ינו׳','פבר׳','מרץ','אפר׳','מאי','יוני','יולי','אוג׳','ספט׳','אוק׳','נוב׳','דצמ׳'];
+    var parts = dateVal.split('-');
+    var dateLabel = parseInt(parts[2]) + '-' + MONTHS[parseInt(parts[1]) - 1];
+    $('attendanceLoader').classList.add('active');
+    google.script.run
+      .withSuccessHandler(function(data) {
+        $('attendanceLoader').classList.remove('active');
+        if (!data.success) { $('attendanceError').textContent = data.error || 'תאריך לא נמצא'; $('attendanceError').classList.add('visible'); return; }
+        renderAttendance(data);
+      })
+      .withFailureHandler(function(err) {
+        $('attendanceLoader').classList.remove('active');
+        $('attendanceError').textContent = 'שגיאה: ' + err.message;
+        $('attendanceError').classList.add('visible');
+      })
+      .getAttendance(window.selectedGroup, dateLabel);
+  }
+
+  function renderAttendance(data) {
+    $('attendanceInBaseTitle').textContent = 'בבסיס ב-' + data.dateLabel + ' (' + data.inBase.length + ')';
+    $('attendanceComingTitle').textContent = 'מגיעים מהבית (' + data.comingFromHome.length + ')';
+    var inBaseEl = $('attendanceInBase');
+    inBaseEl.innerHTML = '';
+    data.inBase.forEach(function(name) {
+      var tag = document.createElement('div');
+      tag.textContent = name;
+      tag.style.cssText = 'font-size:13px;padding:5px 12px;border-radius:8px;background:rgba(102,194,255,0.15);border:1px solid rgba(102,194,255,0.3);color:var(--blue-text);';
+      inBaseEl.appendChild(tag);
+    });
+    var comingEl = $('attendanceComing');
+    comingEl.innerHTML = '';
+    if (data.comingFromHome.length === 0) {
+      comingEl.innerHTML = '<span style="font-size:13px;color:var(--text-muted);">אין חיילים חדשים המגיעים</span>';
+    } else {
+      data.comingFromHome.forEach(function(name) {
+        var tag = document.createElement('div');
+        tag.textContent = name;
+        tag.style.cssText = 'font-size:13px;padding:5px 12px;border-radius:8px;background:rgba(255,217,102,0.15);border:1px solid rgba(255,217,102,0.3);color:var(--yellow-text);';
+        comingEl.appendChild(tag);
+      });
+    }
+    $('attendanceResult').style.display = 'block';
+  }
+
+  var loggedInUser = null;
+
+  function submitRequest() {
+    var errorEl = $('reqError'), successEl = $('reqSuccess');
+    errorEl.classList.remove('visible');
+    successEl.style.display = 'none';
+    var startDate = $('reqStartDate').value;
+    var endDate   = $('reqEndDate').value;
+    var reason    = ($('reqReason').value || '').trim();
+    if (!startDate) { errorEl.textContent = 'נא לבחור תאריך התחלה'; errorEl.classList.add('visible'); return; }
+    if (!endDate)   { errorEl.textContent = 'נא לבחור תאריך סיום';  errorEl.classList.add('visible'); return; }
+    if (!reason)    { errorEl.textContent = 'נא להזין סיבת הבקשה'; errorEl.classList.add('visible'); return; }
+    if (endDate < startDate) { errorEl.textContent = 'תאריך סיום לפני תאריך התחלה'; errorEl.classList.add('visible'); return; }
+    function formatDate(d) { var p = d.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+    var btn = $('pageRequest').querySelector('.btn-primary');
+    btn.disabled = true; btn.textContent = 'שולח...';
+    google.script.run
+      .withSuccessHandler(function() {
+        btn.disabled = false; btn.textContent = 'הגש בקשה';
+        successEl.style.display = 'block';
+        $('reqStartDate').value = ''; $('reqEndDate').value = ''; $('reqReason').value = '';
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false; btn.textContent = 'הגש בקשה';
+        errorEl.textContent = 'שגיאה: ' + err.message; errorEl.classList.add('visible');
+      })
+      .submitLeaveRequest(window.selectedGroup, window.loggedInUser, formatDate(startDate), formatDate(endDate), reason);
+  }
+
+  window.onload = loadGroups;
+</script>
