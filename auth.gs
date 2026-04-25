@@ -1,63 +1,49 @@
-/**
- * auth.gs — Authentication & session
- *
- * Sessions are stored per-user via PropertiesService.getUserProperties().
- * Apps Script web apps deployed as "execute as user accessing the web app"
- * give each viewer their own user properties bucket — sufficient for a
- * lightweight session.
- */
+// ═══════════════════════════════════════
+//  auth.gs — login / logout / session
+//  Session is carried in the URL via &sid=USERID (no PropertiesService,
+//  because PropertiesService is per-script-user, not per-end-user, so
+//  it cannot be used as a real session store on a web app).
+// ═══════════════════════════════════════
 
-var SESSION_KEY = 'session_user_id';
+function Auth_login(p) {
+  const userId = (p.userId || '').trim();
+  const pass   = (p.password || '').trim();
 
-function Auth_handleLogin(params) {
-  var userId   = (params.userId || '').toString().trim();
-  var password = (params.password || '').toString();
-
-  if (!userId || !password) {
-    return Views_redirect('?page=login&msg=Missing+credentials');
+  if (!userId || !pass) {
+    return Views_login({ error: 'Please enter user ID and password.' });
   }
 
-  var creds = readSheet('Credentials');
-  var ok = creds.some(function (c) {
-    return String(c.user_id) === userId && String(c.password) === password;
-  });
+  const creds = _rows('Credentials').data;
+  const ok = creds.some(r => String(r[0]).trim() === userId && String(r[1]).trim() === pass);
+  if (!ok) return Views_login({ error: 'Invalid user ID or password.' });
 
-  if (!ok) {
-    return Views_redirect('?page=login&msg=Invalid+credentials');
-  }
+  // Confirm user exists in Users sheet
+  const user = Users_get(userId);
+  if (!user) return Views_login({ error: 'User not registered.' });
 
-  var user = findById('Users', userId);
-  if (!user) {
-    return Views_redirect('?page=login&msg=User+not+found');
-  }
-
-  PropertiesService.getUserProperties().setProperty(SESSION_KEY, String(userId));
-  return Views_redirect('?page=dashboard');
+  // Build dashboard with sid in query
+  return Views_dashboard({ sid: userId });
 }
 
-function Auth_logout() {
-  PropertiesService.getUserProperties().deleteProperty(SESSION_KEY);
+function Auth_logout(p) {
+  return Views_login({ info: 'Logged out.' });
 }
 
-/**
- * Returns a session object: { id, name, role, team_id } or null.
- */
-function Auth_getSession() {
-  var uid = PropertiesService.getUserProperties().getProperty(SESSION_KEY);
-  if (!uid) return null;
-  var u = findById('Users', uid);
-  if (!u) return null;
-  return {
-    id: String(u.id),
-    name: u.name,
-    role: u.role,
-    team_id: u.team_id != null ? String(u.team_id) : ''
-  };
+// Resolve current user from sid query param
+function Auth_current(p) {
+  const sid = (p && p.sid) ? String(p.sid).trim() : '';
+  if (!sid) return null;
+  return Users_get(sid);
 }
 
-function Auth_requireRole(session, roles) {
-  if (!session) throw new Error('Not authenticated');
-  if (roles.indexOf(session.role) === -1) {
-    throw new Error('Forbidden: requires one of ' + roles.join(', '));
-  }
+function Auth_require(p) {
+  const u = Auth_current(p);
+  if (!u) throw new Error('Not authenticated. Please log in again.');
+  return u;
+}
+
+function Auth_requireRole(p, roles) {
+  const u = Auth_require(p);
+  if (roles.indexOf(u.role) === -1) throw new Error('Forbidden: insufficient role.');
+  return u;
 }

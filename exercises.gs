@@ -1,86 +1,61 @@
-/**
- * exercises.gs — Exercise CRUD + duplication + ExerciseDetails
- */
+// ═══════════════════════════════════════
+//  exercises.gs — exercise CRUD + duplication
+// ═══════════════════════════════════════
 
 function Exercises_all() {
-  return readSheet('Exercises');
+  return _rows('Exercises').data.map(r => ({
+    id: String(r[0]), title: String(r[1]), description: String(r[2]),
+    created_by: String(r[3]), date: r[4] ? String(r[4]) : ''
+  }));
 }
 
 function Exercises_get(id) {
-  return findById('Exercises', id);
+  return Exercises_all().find(e => e.id === String(id)) || null;
 }
 
 function Exercises_details(exerciseId) {
-  exerciseId = String(exerciseId);
-  return readSheet('ExerciseDetails').filter(function (d) {
-    return String(d.exercise_id) === exerciseId;
-  });
+  return _rows('ExerciseDetails').data
+    .filter(r => String(r[1]) === String(exerciseId))
+    .map(r => ({ id: String(r[0]), time: String(r[2]), location: String(r[3]), description: String(r[4]) }));
 }
 
-function Exercises_handleCreate(session, params) {
-  Auth_requireRole(session, ['admin']);
-  var id = nextId('Exercises');
-  appendRow('Exercises', {
-    id: id,
-    title: params.title || '',
-    description: params.description || '',
-    created_by: session.id,
-    date: params.date || ''
-  });
-  return Views_redirect('?page=exercise&id=' + id + '&msg=Created');
+function Exercises_create(p) {
+  const u = Auth_requireRole(p, ['admin']);
+  const id = 'E' + _nextId('Exercises');
+  _append('Exercises', [id, p.title || '', p.description || '', u.id, p.date || '']);
+  return Views_dashboard({ sid: p.sid, info: 'Exercise created (' + id + ').' });
 }
 
-function Exercises_handleUpdate(session, params) {
-  Auth_requireRole(session, ['admin']);
-  var ex = Exercises_get(params.id);
-  if (!ex) return Views_message('Exercise not found.');
-  updateRow('Exercises', ex._row, {
-    title: params.title,
-    description: params.description,
-    date: params.date
-  });
-  return Views_redirect('?page=exercise&id=' + ex.id + '&msg=Updated');
+function Exercises_edit(p) {
+  Auth_requireRole(p, ['admin']);
+  const row = _findRowIndex('Exercises', p.id);
+  if (row < 0) throw new Error('Exercise not found.');
+  const sh = _sheet('Exercises');
+  sh.getRange(row, 2).setValue(p.title || '');
+  sh.getRange(row, 3).setValue(p.description || '');
+  sh.getRange(row, 5).setValue(p.date || '');
+  return Views_exercise({ sid: p.sid, id: p.id, info: 'Exercise updated.' });
 }
 
-function Exercises_handleDuplicate(session, params) {
-  Auth_requireRole(session, ['admin']);
-  var ex = Exercises_get(params.id);
-  if (!ex) return Views_message('Exercise not found.');
-
-  var newId = nextId('Exercises');
-  appendRow('Exercises', {
-    id: newId,
-    title: ex.title + ' (Copy)',
-    description: ex.description,
-    created_by: session.id,
-    date: ex.date
+function Exercises_duplicate(p) {
+  const u = Auth_requireRole(p, ['admin']);
+  const orig = Exercises_get(p.id);
+  if (!orig) throw new Error('Exercise not found.');
+  const newId = 'E' + _nextId('Exercises');
+  _append('Exercises', [newId, orig.title + ' (copy)', orig.description, u.id, orig.date]);
+  // Copy details
+  Exercises_details(orig.id).forEach(d => {
+    const did = 'D' + _nextId('ExerciseDetails');
+    _append('ExerciseDetails', [did, newId, d.time, d.location, d.description]);
   });
-
-  // Copy all ExerciseDetails
-  var details = Exercises_details(ex.id);
-  details.forEach(function (d) {
-    appendRow('ExerciseDetails', {
-      id: nextId('ExerciseDetails'),
-      exercise_id: newId,
-      time: d.time,
-      location: d.location,
-      description: d.description
-    });
-  });
-
-  return Views_redirect('?page=exercise&id=' + newId + '&msg=Duplicated');
+  return Views_dashboard({ sid: p.sid, info: 'Duplicated as ' + newId + '.' });
 }
 
-function Exercises_handleAddDetail(session, params) {
-  Auth_requireRole(session, ['admin']);
-  var ex = Exercises_get(params.exercise_id);
-  if (!ex) return Views_message('Exercise not found.');
-  appendRow('ExerciseDetails', {
-    id: nextId('ExerciseDetails'),
-    exercise_id: ex.id,
-    time: params.time || '',
-    location: params.location || '',
-    description: params.description || ''
-  });
-  return Views_redirect('?page=exercise&id=' + ex.id + '&msg=Detail+added');
+function Exercises_addDetail(p) {
+  Auth_requireRole(p, ['admin']);
+  const exId = p.exerciseId;
+  if (!Exercises_get(exId)) throw new Error('Exercise not found.');
+  const did = 'D' + _nextId('ExerciseDetails');
+  _append('ExerciseDetails', [did, exId, p.time || '', p.location || '', p.detailDescription || '']);
+  return Views_exercise({ sid: p.sid, id: exId, info: 'Timeline entry added.' });
 }

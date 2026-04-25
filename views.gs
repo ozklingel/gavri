@@ -1,328 +1,238 @@
-/**
- * views.gs — HTML rendering (no CSS, no JS — just HTML)
- *
- * Every page is server-rendered. Navigation is plain links and forms.
- * `Views_redirect` uses an HTML meta-refresh because Apps Script web apps
- * cannot send HTTP redirects directly.
- */
+// ═══════════════════════════════════════
+//  views.gs — server-side HTML partials rendered inside index.html
+//  No CSS. No JavaScript. Forms post directly to the deployed web-app URL.
+// ═══════════════════════════════════════
 
-function Views_wrap(title, bodyHtml, session) {
-  var nav = '';
-  if (session) {
-    nav += '<p>Logged in as <b>' + escapeHtml(session.name) +
-           '</b> (' + escapeHtml(session.role) + ') | ' +
-           '<a href="?page=dashboard">Dashboard</a>';
-    if (session.role === 'admin') {
-      nav += ' | <a href="?page=users">User Roles</a>';
-      nav += ' | <a href="?page=exerciseForm">New Exercise</a>';
-    }
-    nav += ' | <a href="?page=logout">Logout</a></p><hr>';
-  }
-  var html =
-    '<!DOCTYPE html><html><head><title>' + escapeHtml(title) + '</title></head>' +
-    '<body><h1>' + escapeHtml(title) + '</h1>' + nav + bodyHtml + '</body></html>';
-  return HtmlService.createHtmlOutput(html)
-    .setTitle(title)
+function _html(body, title) {
+  const template = HtmlService.createTemplateFromFile('index');
+  template.pageTitle = title || 'Military Training';
+  template.body = body;
+  return template.evaluate()
+    .setTitle(title || 'Military Training')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function Views_redirect(query) {
-  // Apps Script web app URL is unknown to the script directly; use relative refresh.
-  var url = ScriptApp.getService().getUrl() + query;
-  var html = '<!DOCTYPE html><html><head>' +
-    '<meta http-equiv="refresh" content="0; url=' + escapeHtml(url) + '">' +
-    '</head><body><p>Redirecting... <a href="' + escapeHtml(url) + '">click here</a></p>' +
-    '</body></html>';
-  return HtmlService.createHtmlOutput(html)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function _flash(p) {
+  let s = '';
+  if (p && p.error) s += '<p><b>Error:</b> ' + _esc(p.error) + '</p>';
+  if (p && p.info) s += '<p><i>' + _esc(p.info) + '</i></p>';
+  return s;
 }
 
-function Views_message(msg) {
-  return Views_wrap('Notice',
-    '<p>' + escapeHtml(msg) + '</p><p><a href="?page=dashboard">Back</a></p>',
-    Auth_getSession());
+function _nav(user, sid) {
+  if (!user) return '';
+  let s = '<p>Logged in as <b>' + _esc(user.name) + '</b> (' + _esc(user.role) + ') &nbsp;|&nbsp; ';
+  s += '<a href="' + _esc(_url({ page: 'dashboard', sid: sid })) + '">Dashboard</a>';
+  if (user.role === 'admin') s += ' | <a href="' + _esc(_url({ page: 'users', sid: sid })) + '">User Roles</a>';
+  s += ' | <a href="' + _esc(_url({ action: 'logout' })) + '">Logout</a></p><hr>';
+  return s;
 }
 
-function Views_msgBanner(params) {
-  if (!params || !params.msg) return '';
-  return '<p><i>' + escapeHtml(params.msg) + '</i></p>';
+function _formStart() {
+  return '<form action="' + _esc(_appUrl()) + '" method="post" target="_top">';
 }
 
-/* ---------- LOGIN ---------- */
-function Views_loginPage(params) {
-  var body = Views_msgBanner(params) +
-    '<form method="post" action="">' +
+function Views_error(msg, p) {
+  const sid = p && p.sid ? p.sid : '';
+  const back = sid
+    ? '<p><a href="' + _esc(_url({ page: 'dashboard', sid: sid })) + '">Back to dashboard</a></p>'
+    : '<p><a href="' + _esc(_url({ page: 'login' })) + '">Back to login</a></p>';
+  return _html('<h1>Error</h1><p>' + _esc(msg) + '</p>' + back, 'Error');
+}
+
+function Views_login(p) {
+  const body =
+    '<h1>Military Training — Login</h1>' +
+    _flash(p) +
+    _formStart() +
     '<input type="hidden" name="action" value="login">' +
     '<p>User ID: <input type="text" name="userId" required></p>' +
     '<p>Password: <input type="password" name="password" required></p>' +
     '<p><button type="submit">Login</button></p>' +
-    '</form>';
-  return Views_wrap('Login', body, null);
+    '</form>' +
+    '<hr><p><small>Demo: U001/admin123 · U002/cmd123 · U003/train123</small></p>';
+  return _html(body, 'Login');
 }
 
-/* ---------- DASHBOARD (router by role) ---------- */
-function Views_dashboardPage(session, params) {
-  if (session.role === 'admin')     return Views_adminDashboard(session, params);
-  if (session.role === 'commander') return Views_commanderDashboard(session, params);
-  return Views_traineeDashboard(session, params);
+function Views_dashboard(p) {
+  const user = Auth_current(p);
+  if (!user) return Views_login({ error: 'Please log in.' });
+  const sid = user.id;
+  let body = _nav(user, sid) + _flash(p) + '<h1>Dashboard</h1>';
+  if (user.role === 'admin') body += _adminDashboard(sid);
+  else if (user.role === 'commander') body += _commanderDashboard(user, sid);
+  else body += _traineeDashboard(user, sid);
+  return _html(body, 'Dashboard');
 }
 
-/* ---------- ADMIN DASHBOARD ---------- */
-function Views_adminDashboard(session, params) {
-  var body = Views_msgBanner(params);
-  var exs = Exercises_all();
-  var users = Users_all();
-
-  body += '<h2>All Exercises</h2>';
-  body += '<table border="1" cellpadding="4"><tr><th>ID</th><th>Title</th><th>Date</th><th>Actions</th></tr>';
+function _adminDashboard(sid) {
+  const exs = Exercises_all();
+  const users = Users_all();
+  let s = '<h2>All Exercises</h2><table border="1" cellpadding="5">' +
+    '<tr><th>ID</th><th>Title</th><th>Date</th><th>Actions</th></tr>';
   exs.forEach(function (e) {
-    body += '<tr>' +
-      '<td>' + escapeHtml(e.id) + '</td>' +
-      '<td><a href="?page=exercise&id=' + escapeHtml(e.id) + '">' + escapeHtml(e.title) + '</a></td>' +
-      '<td>' + escapeHtml(e.date) + '</td>' +
-      '<td>' +
-        '<a href="?page=exerciseForm&id=' + escapeHtml(e.id) + '">Edit</a> | ' +
-        '<form method="post" action="" style="display:inline">' +
-          '<input type="hidden" name="action" value="duplicateExercise">' +
-          '<input type="hidden" name="id" value="' + escapeHtml(e.id) + '">' +
-          '<button type="submit">Duplicate</button>' +
-        '</form>' +
-      '</td>' +
-    '</tr>';
+    s += '<tr><td>' + _esc(e.id) + '</td><td>' + _esc(e.title) + '</td><td>' + _esc(e.date) + '</td><td>' +
+      '<a href="' + _esc(_url({ page: 'exercise', id: e.id, sid: sid })) + '">View / Edit</a> | ' +
+      '<a href="' + _esc(_url({ action: 'duplicateExercise', id: e.id, sid: sid })) + '">Duplicate</a>' +
+      '</td></tr>';
   });
-  body += '</table>';
+  s += '</table>';
 
-  body += '<h2>Quick Assign Exercise</h2>';
-  body += Views_assignForm(exs, users);
+  s += '<h2>Create Exercise</h2>' + _formStart() +
+    '<input type="hidden" name="action" value="createExercise">' +
+    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+    '<p>Title: <input name="title" required></p>' +
+    '<p>Description: <input name="description" size="60"></p>' +
+    '<p>Date: <input type="date" name="date"></p>' +
+    '<p><button type="submit">Create</button></p></form>';
 
-  body += '<h2>All Users</h2>';
-  body += '<p><a href="?page=users">Manage user roles</a></p>';
-  return Views_wrap('Admin Dashboard', body, session);
+  s += '<h2>Assign Exercise</h2>' + _formStart() +
+    '<input type="hidden" name="action" value="assign">' +
+    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+    '<p>Exercise: <select name="exerciseId" required>' +
+    exs.map(function (e) { return '<option value="' + _esc(e.id) + '">' + _esc(e.id + ' — ' + e.title) + '</option>'; }).join('') +
+    '</select></p>' +
+    '<p>User: <select name="userId" required>' +
+    users.map(function (u) { return '<option value="' + _esc(u.id) + '">' + _esc(u.id + ' — ' + u.name + ' (' + u.role + ')') + '</option>'; }).join('') +
+    '</select></p>' +
+    '<p><button type="submit">Assign</button></p></form>';
+
+  return s;
 }
 
-function Views_assignForm(exs, users) {
-  var html = '<form method="post" action="">' +
-    '<input type="hidden" name="action" value="assignExercise">' +
-    '<p>Exercise: <select name="exercise_id" required>';
-  exs.forEach(function (e) {
-    html += '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.title) + '</option>';
-  });
-  html += '</select></p>' +
-    '<p>User: <select name="user_id" required>';
-  users.forEach(function (u) {
-    html += '<option value="' + escapeHtml(u.id) + '">' +
-      escapeHtml(u.name) + ' (' + escapeHtml(u.role) + ')</option>';
-  });
-  html += '</select></p>' +
-    '<p><button type="submit">Assign</button></p>' +
-    '</form>';
-  return html;
-}
-
-/* ---------- COMMANDER DASHBOARD ---------- */
-function Views_commanderDashboard(session, params) {
-  var body = Views_msgBanner(params);
-  var trainees = Users_traineesOfTeam(session.team_id);
-  var exs = Exercises_all();
-
-  body += '<h2>Team: ' + escapeHtml(Users_teamName(session.team_id)) + '</h2>';
+function _commanderDashboard(user, sid) {
+  const trainees = Users_traineesOfCommander(user.id);
+  const exs = Exercises_all();
+  let s = '<h2>My Trainees</h2>';
+  if (!trainees.length) s += '<p>No trainees in your team yet.</p>';
 
   trainees.forEach(function (t) {
-    body += '<h3>' + escapeHtml(t.name) + ' (ID ' + escapeHtml(t.id) + ')</h3>';
-    var assigns = Assignments_forUser(t.id);
-
-    var pending = assigns.filter(function (a) { return a.status !== 'completed'; });
-    var done    = assigns.filter(function (a) { return a.status === 'completed'; });
-
-    body += '<h4>Pending</h4>';
-    body += Views_assignmentsTable(pending, true);
-
-    body += '<h4>Completed</h4>';
-    body += Views_assignmentsTable(done, false);
-
-    // Per-trainee assign form
-    body += '<form method="post" action="">' +
-      '<input type="hidden" name="action" value="assignExercise">' +
-      '<input type="hidden" name="user_id" value="' + escapeHtml(t.id) + '">' +
-      '<p>Assign exercise: <select name="exercise_id" required>';
-    exs.forEach(function (e) {
-      body += '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.title) + '</option>';
-    });
-    body += '</select> <button type="submit">Assign</button></p></form><hr>';
-  });
-
-  return Views_wrap('Commander Dashboard', body, session);
-}
-
-function Views_assignmentsTable(assigns, allowComplete) {
-  if (!assigns.length) return '<p><i>None.</i></p>';
-  var html = '<table border="1" cellpadding="4"><tr><th>Assignment</th><th>Exercise</th><th>Status</th><th>Score</th>';
-  if (allowComplete) html += '<th>Action</th>';
-  html += '</tr>';
-  assigns.forEach(function (a) {
-    var ex = findById('Exercises', a.exercise_id);
-    html += '<tr>' +
-      '<td>' + escapeHtml(a.id) + '</td>' +
-      '<td>' + (ex
-        ? '<a href="?page=exercise&id=' + escapeHtml(ex.id) + '">' + escapeHtml(ex.title) + '</a>'
-        : '?') + '</td>' +
-      '<td>' + escapeHtml(a.status) + '</td>' +
-      '<td>' + escapeHtml(a.score) + '</td>';
-    if (allowComplete) {
-      html += '<td><form method="post" action="" style="display:inline">' +
-        '<input type="hidden" name="action" value="completeAssignment">' +
-        '<input type="hidden" name="assignment_id" value="' + escapeHtml(a.id) + '">' +
-        'Score: <input type="text" name="score" size="4"> ' +
-        '<button type="submit">Mark complete</button></form></td>';
+    const assigns = Assignments_byUser(t.id);
+    s += '<h3>' + _esc(t.name) + ' (' + _esc(t.id) + ')</h3>';
+    if (!assigns.length) {
+      s += '<p>No assignments.</p>';
+    } else {
+      s += '<table border="1" cellpadding="5"><tr><th>Assignment</th><th>Exercise</th><th>Status</th><th>Action</th></tr>';
+      assigns.forEach(function (a) {
+        const ex = Exercises_get(a.exercise_id);
+        s += '<tr><td>' + _esc(a.id) + '</td><td>' + _esc(ex ? ex.title : a.exercise_id) + '</td><td>' + _esc(a.status) + '</td><td>';
+        if (a.status !== 'completed') {
+          s += '<a href="' + _esc(_url({ action: 'complete', assignmentId: a.id, sid: sid })) + '">Mark completed</a>';
+        } else {
+          s += '✓';
+        }
+        s += '</td></tr>';
+      });
+      s += '</table>';
     }
-    html += '</tr>';
+
+    s += _formStart() +
+      '<input type="hidden" name="action" value="assign">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="userId" value="' + _esc(t.id) + '">' +
+      'Assign exercise: <select name="exerciseId" required>' +
+      exs.map(function (e) { return '<option value="' + _esc(e.id) + '">' + _esc(e.title) + '</option>'; }).join('') +
+      '</select> <button type="submit">Assign</button></form>';
   });
-  html += '</table>';
-  return html;
+
+  return s;
 }
 
-/* ---------- TRAINEE DASHBOARD ---------- */
-function Views_traineeDashboard(session, params) {
-  var body = Views_msgBanner(params);
-  var assigns = Assignments_forUser(session.id);
-  body += '<h2>My Assigned Exercises</h2>';
-  if (!assigns.length) {
-    body += '<p>No assignments yet.</p>';
-  } else {
-    body += '<table border="1" cellpadding="4"><tr><th>Exercise</th><th>Status</th><th>Score</th></tr>';
-    assigns.forEach(function (a) {
-      var ex = findById('Exercises', a.exercise_id);
-      body += '<tr>' +
-        '<td>' + (ex
-          ? '<a href="?page=exercise&id=' + escapeHtml(ex.id) + '">' + escapeHtml(ex.title) + '</a>'
-          : '?') + '</td>' +
-        '<td>' + escapeHtml(a.status) + '</td>' +
-        '<td>' + escapeHtml(a.score) + '</td>' +
-      '</tr>';
-    });
-    body += '</table>';
-  }
-  return Views_wrap('Trainee Dashboard', body, session);
+function _traineeDashboard(user, sid) {
+  const assigns = Assignments_byUser(user.id);
+  let s = '<h2>My Assigned Exercises</h2>';
+  if (!assigns.length) return s + '<p>No assignments yet.</p>';
+  s += '<table border="1" cellpadding="5"><tr><th>Exercise</th><th>Status</th><th>Score</th><th>Details</th></tr>';
+  assigns.forEach(function (a) {
+    const ex = Exercises_get(a.exercise_id);
+    s += '<tr><td>' + _esc(ex ? ex.title : a.exercise_id) + '</td><td>' + _esc(a.status) + '</td><td>' + _esc(a.score) + '</td>' +
+      '<td><a href="' + _esc(_url({ page: 'exercise', id: a.exercise_id, sid: sid })) + '">View</a></td></tr>';
+  });
+  s += '</table>';
+  return s;
 }
 
-/* ---------- EXERCISE PAGE ---------- */
-function Views_exercisePage(session, params) {
-  var ex = Exercises_get(params.id);
-  if (!ex) return Views_message('Exercise not found.');
+function Views_exercise(p) {
+  const user = Auth_current(p);
+  if (!user) return Views_login({ error: 'Please log in.' });
+  const sid = user.id;
+  const ex = Exercises_get(p.id);
+  if (!ex) return Views_error('Exercise not found.', p);
 
-  var body = Views_msgBanner(params);
-  body += '<p><b>Title:</b> ' + escapeHtml(ex.title) + '</p>';
-  body += '<p><b>Description:</b> ' + escapeHtml(ex.description) + '</p>';
-  body += '<p><b>Date:</b> ' + escapeHtml(ex.date) + '</p>';
+  let s = _nav(user, sid) + _flash(p) +
+    '<h1>' + _esc(ex.title) + '</h1>' +
+    '<p><b>ID:</b> ' + _esc(ex.id) + ' &nbsp; <b>Date:</b> ' + _esc(ex.date) + '</p>' +
+    '<p>' + _esc(ex.description) + '</p>';
 
-  body += '<h2>Timeline</h2>';
-  var details = Exercises_details(ex.id);
+  s += '<h2>Timeline</h2>';
+  const details = Exercises_details(ex.id);
   if (details.length) {
-    body += '<table border="1" cellpadding="4"><tr><th>Time</th><th>Location</th><th>Description</th></tr>';
+    s += '<table border="1" cellpadding="5"><tr><th>Time</th><th>Location</th><th>Description</th></tr>';
     details.forEach(function (d) {
-      body += '<tr>' +
-        '<td>' + escapeHtml(d.time) + '</td>' +
-        '<td>' + escapeHtml(d.location) + '</td>' +
-        '<td>' + escapeHtml(d.description) + '</td>' +
-      '</tr>';
+      s += '<tr><td>' + _esc(d.time) + '</td><td>' + _esc(d.location) + '</td><td>' + _esc(d.description) + '</td></tr>';
     });
-    body += '</table>';
+    s += '</table>';
   } else {
-    body += '<p><i>No timeline entries yet.</i></p>';
+    s += '<p>No timeline entries.</p>';
   }
 
-  // Admin can add timeline entries
-  if (session.role === 'admin') {
-    body += '<h3>Add Timeline Entry</h3>' +
-      '<form method="post" action="">' +
-      '<input type="hidden" name="action" value="addExerciseDetail">' +
-      '<input type="hidden" name="exercise_id" value="' + escapeHtml(ex.id) + '">' +
-      '<p>Time: <input type="text" name="time"></p>' +
-      '<p>Location: <input type="text" name="location"></p>' +
-      '<p>Description: <input type="text" name="description"></p>' +
-      '<p><button type="submit">Add</button></p>' +
-      '</form>';
-  }
-
-  body += '<h2>Participants</h2>';
-  var assigns = Assignments_forExercise(ex.id);
-  if (assigns.length) {
-    body += '<table border="1" cellpadding="4"><tr><th>User</th><th>Status</th><th>Score</th></tr>';
-    assigns.forEach(function (a) {
-      var u = findById('Users', a.user_id);
-      body += '<tr>' +
-        '<td>' + (u ? escapeHtml(u.name) : '?') + '</td>' +
-        '<td>' + escapeHtml(a.status) + '</td>' +
-        '<td>' + escapeHtml(a.score) + '</td>' +
-      '</tr>';
+  s += '<h2>Participants</h2>';
+  const parts = Assignments_byExercise(ex.id);
+  if (parts.length) {
+    s += '<table border="1" cellpadding="5"><tr><th>User</th><th>Status</th><th>Score</th></tr>';
+    parts.forEach(function (a) {
+      const u = Users_get(a.user_id);
+      s += '<tr><td>' + _esc(u ? u.name : a.user_id) + '</td><td>' + _esc(a.status) + '</td><td>' + _esc(a.score) + '</td></tr>';
     });
-    body += '</table>';
+    s += '</table>';
   } else {
-    body += '<p><i>No participants yet.</i></p>';
+    s += '<p>No participants yet.</p>';
   }
 
-  if (session.role === 'admin') {
-    body += '<p><a href="?page=exerciseForm&id=' + escapeHtml(ex.id) + '">Edit exercise</a></p>';
+  if (user.role === 'admin') {
+    s += '<hr><h2>Edit Exercise</h2>' + _formStart() +
+      '<input type="hidden" name="action" value="editExercise">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
+      '<p>Title: <input name="title" value="' + _esc(ex.title) + '" required></p>' +
+      '<p>Description: <input name="description" size="60" value="' + _esc(ex.description) + '"></p>' +
+      '<p>Date: <input type="date" name="date" value="' + _esc(ex.date) + '"></p>' +
+      '<p><button type="submit">Save</button></p></form>';
+
+    s += '<h2>Add Timeline Entry</h2>' + _formStart() +
+      '<input type="hidden" name="action" value="addDetail">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+      '<p>Time: <input name="time"></p>' +
+      '<p>Location: <input name="location"></p>' +
+      '<p>Description: <input name="detailDescription" size="60"></p>' +
+      '<p><button type="submit">Add</button></p></form>';
   }
 
-  return Views_wrap('Exercise: ' + ex.title, body, session);
+  return _html(s, ex.title);
 }
 
-/* ---------- EXERCISE FORM (create / edit) — admin only ---------- */
-function Views_exerciseFormPage(session, params) {
-  if (session.role !== 'admin') return Views_message('Forbidden.');
-  var ex = params.id ? Exercises_get(params.id) : null;
-  var action = ex ? 'updateExercise' : 'createExercise';
+function Views_users(p) {
+  const user = Auth_current(p);
+  if (!user || user.role !== 'admin') return Views_error('Admins only.', p);
+  const sid = user.id;
+  const users = Users_all();
 
-  var body = '<form method="post" action="">' +
-    '<input type="hidden" name="action" value="' + action + '">';
-  if (ex) body += '<input type="hidden" name="id" value="' + escapeHtml(ex.id) + '">';
-  body += '<p>Title: <input type="text" name="title" value="' + escapeHtml(ex ? ex.title : '') + '" required></p>' +
-    '<p>Description: <br><textarea name="description" rows="4" cols="40">' +
-      escapeHtml(ex ? ex.description : '') + '</textarea></p>' +
-    '<p>Date: <input type="text" name="date" value="' + escapeHtml(ex ? ex.date : '') + '"></p>' +
-    '<p><button type="submit">' + (ex ? 'Update' : 'Create') + '</button></p>' +
-    '</form>';
-  return Views_wrap(ex ? 'Edit Exercise' : 'New Exercise', body, session);
-}
-
-/* ---------- USER ROLES PAGE — admin only ---------- */
-function Views_usersPage(session, params) {
-  if (session.role !== 'admin') return Views_message('Forbidden.');
-  var body = Views_msgBanner(params);
-  var users = Users_all();
-  var teams = Users_teams();
-
-  body += '<table border="1" cellpadding="4"><tr><th>ID</th><th>Name</th><th>Role</th><th>Team</th><th>Update</th></tr>';
+  let s = _nav(user, sid) + _flash(p) + '<h1>User Roles</h1>' +
+    '<table border="1" cellpadding="5"><tr><th>ID</th><th>Name</th><th>Role</th><th>Team</th><th>Update</th></tr>';
   users.forEach(function (u) {
-    body += '<tr>' +
-      '<td>' + escapeHtml(u.id) + '</td>' +
-      '<td>' + escapeHtml(u.name) + '</td>' +
-      '<td>' + escapeHtml(u.role) + '</td>' +
-      '<td>' + escapeHtml(Users_teamName(u.team_id)) + '</td>' +
-      '<td>' +
-        '<form method="post" action="">' +
-          '<input type="hidden" name="action" value="updateUserRole">' +
-          '<input type="hidden" name="userId" value="' + escapeHtml(u.id) + '">' +
-          'Role: <select name="role">' +
-            ['admin', 'commander', 'trainee'].map(function (r) {
-              return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>';
-            }).join('') +
-          '</select> ' +
-          'Team: <select name="team_id">' +
-            '<option value="">(none)</option>' +
-            teams.map(function (t) {
-              return '<option value="' + escapeHtml(t.id) + '"' +
-                (String(u.team_id) === String(t.id) ? ' selected' : '') + '>' +
-                escapeHtml(t.name) + '</option>';
-            }).join('') +
-          '</select> ' +
-          '<button type="submit">Save</button>' +
-        '</form>' +
-      '</td>' +
-    '</tr>';
+    s += '<tr><td>' + _esc(u.id) + '</td><td>' + _esc(u.name) + '</td><td>' + _esc(u.role) + '</td><td>' + _esc(u.team_id) + '</td><td>' +
+      _formStart() +
+      '<input type="hidden" name="action" value="updateRole">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="targetId" value="' + _esc(u.id) + '">' +
+      '<select name="newRole">' +
+      ['admin', 'commander', 'trainee'].map(function (r) {
+        return '<option value="' + r + '"' + (r === u.role ? ' selected' : '') + '>' + r + '</option>';
+      }).join('') +
+      '</select> Team: <input name="newTeam" value="' + _esc(u.team_id) + '" size="6"> ' +
+      '<button type="submit">Save</button></form></td></tr>';
   });
-  body += '</table>';
-
-  return Views_wrap('User Roles', body, session);
+  s += '</table>';
+  return _html(s, 'User Roles');
 }

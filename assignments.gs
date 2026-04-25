@@ -1,81 +1,56 @@
-/**
- * assignments.gs — Assignments + completion
- *
- * Rules:
- *   - Admin can assign to anyone.
- *   - Commander can only assign to trainees in their own team.
- *   - Only Admin or Commander (of the trainee's team) can mark complete.
- *   - Trainees can never assign or complete.
- */
+// ═══════════════════════════════════════
+//  assignments.gs — assign + complete
+// ═══════════════════════════════════════
 
 function Assignments_all() {
-  return readSheet('Assignments');
+  return _rows('Assignments').data.map(r => ({
+    id: String(r[0]), exercise_id: String(r[1]), user_id: String(r[2]),
+    status: String(r[3] || 'pending'), score: r[4] == null ? '' : String(r[4])
+  }));
 }
 
-function Assignments_forUser(userId) {
-  userId = String(userId);
-  return Assignments_all().filter(function (a) {
-    return String(a.user_id) === userId;
-  });
+function Assignments_byUser(userId) {
+  return Assignments_all().filter(a => a.user_id === String(userId));
 }
 
-function Assignments_forExercise(exerciseId) {
-  exerciseId = String(exerciseId);
-  return Assignments_all().filter(function (a) {
-    return String(a.exercise_id) === exerciseId;
-  });
+function Assignments_byExercise(exerciseId) {
+  return Assignments_all().filter(a => a.exercise_id === String(exerciseId));
 }
 
-function Assignments_handleAssign(session, params) {
-  Auth_requireRole(session, ['admin', 'commander']);
-  var exerciseId = String(params.exercise_id || '');
-  var userId     = String(params.user_id || '');
+function Assignments_assign(p) {
+  const u = Auth_requireRole(p, ['admin','commander']);
+  const exId   = (p.exerciseId || '').trim();
+  const userId = (p.userId     || '').trim();
+  if (!exId || !userId) throw new Error('Missing exercise or user.');
 
-  var target = findById('Users', userId);
-  if (!target) return Views_message('Target user not found.');
-  var ex = findById('Exercises', exerciseId);
-  if (!ex) return Views_message('Exercise not found.');
-
-  if (session.role === 'commander') {
-    if (target.role !== 'trainee' || String(target.team_id) !== session.team_id) {
-      return Views_message('Commanders can only assign to trainees in their team.');
-    }
+  // Commander can only assign to trainees in their team
+  if (u.role === 'commander') {
+    const trainees = Users_traineesOfCommander(u.id).map(t => t.id);
+    if (trainees.indexOf(userId) === -1) throw new Error('Cannot assign outside your team.');
   }
 
-  // Prevent duplicate assignment
-  var existing = Assignments_all().some(function (a) {
-    return String(a.exercise_id) === exerciseId && String(a.user_id) === userId;
-  });
-  if (existing) {
-    return Views_redirect('?page=dashboard&msg=Already+assigned');
-  }
+  // No duplicate
+  const exists = Assignments_all().some(a => a.exercise_id === exId && a.user_id === userId);
+  if (exists) return Views_dashboard({ sid: p.sid, info: 'Already assigned.' });
 
-  appendRow('Assignments', {
-    id: nextId('Assignments'),
-    exercise_id: exerciseId,
-    user_id: userId,
-    status: 'pending',
-    score: ''
-  });
-
-  return Views_redirect('?page=dashboard&msg=Assigned');
+  const id = 'A' + _nextId('Assignments');
+  _append('Assignments', [id, exId, userId, 'pending', '']);
+  return Views_dashboard({ sid: p.sid, info: 'Assigned (' + id + ').' });
 }
 
-function Assignments_handleComplete(session, params) {
-  Auth_requireRole(session, ['admin', 'commander']);
-  var assignmentId = String(params.assignment_id || '');
-  var score        = params.score != null ? params.score : '';
-
-  var a = findById('Assignments', assignmentId);
-  if (!a) return Views_message('Assignment not found.');
-
-  if (session.role === 'commander') {
-    var trainee = findById('Users', a.user_id);
-    if (!trainee || String(trainee.team_id) !== session.team_id) {
-      return Views_message('Commanders can only complete their team\'s assignments.');
-    }
+function Assignments_complete(p) {
+  const u = Auth_requireRole(p, ['admin','commander']);
+  const aid = (p.assignmentId || '').trim();
+  const row = _findRowIndex('Assignments', aid);
+  if (row < 0) throw new Error('Assignment not found.');
+  const sh = _sheet('Assignments');
+  // Commander scope check
+  if (u.role === 'commander') {
+    const userId = String(sh.getRange(row, 3).getValue());
+    const trainees = Users_traineesOfCommander(u.id).map(t => t.id);
+    if (trainees.indexOf(userId) === -1) throw new Error('Cannot mark outside your team.');
   }
-
-  updateRow('Assignments', a._row, { status: 'completed', score: score });
-  return Views_redirect('?page=dashboard&msg=Marked+complete');
+  sh.getRange(row, 4).setValue('completed');
+  if (p.score) sh.getRange(row, 5).setValue(p.score);
+  return Views_dashboard({ sid: p.sid, info: 'Marked completed.' });
 }
