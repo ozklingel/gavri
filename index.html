@@ -1,252 +1,100 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ג׳וחא — כוח אדם</title>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <?!= include('style') ?>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #f5f5f5;
+    }
+
+    .box {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    #msg {
+      margin-top: 10px;
+      color: red;
+    }
+
+    #dashboard {
+      display: none;
+    }
+  </style>
 </head>
 
 <body>
-<div class="container">
 
- <div class="header" style="display:flex;justify-content:space-between;align-items:center;">
-  
-  <div class="app-title">ג׳וחא</div>
+<div class="box" id="loginBox">
+  <h3>Login</h3>
 
+  <input id="userId" placeholder="User ID">
+  <input id="password" type="password" placeholder="Password">
 
-  <div class="subtitle">כוח אדם פלוגתי</div>
+  <button onclick="login()">Login</button>
 
+  <div id="msg"></div>
 </div>
 
-  <!-- מסך 1: בחירת קבוצה -->
-  <div class="card" id="groupCard">
-    <h2>בחר קבוצה</h2>
-    <select id="group"><option value="">טוען קבוצות...</option></select>
-    <button class="btn btn-primary" onclick="selectGroup()">המשך ←</button>
-    <div class="error-msg" id="groupErrorMsg"></div>
-  </div>
+<div class="box" id="dashboard">
+  <h2>Welcome 👋</h2>
+  <p id="welcomeUser"></p>
 
-  <!-- מסך 2: התחברות -->
-  <div class="card" id="loginCard" style="display:none;">
-    <h2>התחברות</h2>
-    <div style="position:relative;">
-      <input id="userSearch" type="text" placeholder="חפש שם משתמש..." autocomplete="off"
-             oninput="filterUsers()" onfocus="showDropdown()" dir="rtl">
-      <div id="userDropdown" style="display:none;position:absolute;top:100%;right:0;left:0;
-        background:#1a1035;border:1px solid rgba(255,255,255,0.15);border-radius:10px;
-        max-height:220px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
-    </div>
-    <input type="hidden" id="user">
-    <input id="pass" type="text" placeholder="סיסמה" autocomplete="off">
-    <button class="btn btn-primary" id="loginBtn" onclick="login()">התחבר</button>
-    <div class="loader" id="loader">
-      <div class="spinner"></div>
-      <span>טוען נתונים...</span>
-    </div>
-    <div class="error-msg" id="errorMsg"></div>
-  </div>
-<div id="mainContent" style="display:none;">
-  
-  <div style="margin-bottom:10px;font-size:16px;color:var(--text);font-weight:600;">
-    <span id="helloUser">משתמש</span> 👋
-  </div>
-
-  <div class="card">
-    <button class="btn btn-secondary" id="formBtn" onclick="showPage('pageRequest')">
-      ✏️ שליחת בקשת יציאה
-    </button>
-  </div>
-
-  <div id="menuGrid"></div>
+  <button onclick="logout()">Logout</button>
 </div>
 
-  <!-- מסך: הסטטוס שלי -->
-  <div id="pageMyStatus" style="display:none;">
-    <button class="btn btn-secondary back-btn" onclick="showMenu()">→ חזור</button>
-    <div class="card">
-      <h2>הסטטוס שלי</h2>
-      <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:var(--blue-text);"></div><span>בבסיס / חוזר לבסיס</span></div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--green-text);"></div><span>בבית / יוצא הביתה</span></div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--yellow-text);"></div><span>בקשה בדיון</span></div>
-      </div>
-      <div class="table-wrapper"><div id="myTableContainer"></div></div>
-    </div>
-  </div>
+<script>
+  function login() {
+    const userId = document.getElementById("userId").value;
+    const password = document.getElementById("password").value;
 
-  <!-- מסך: תצוגת מפקד -->
-  <div id="pageCommander" style="display:none;">
-    <button class="btn btn-secondary back-btn" onclick="showMenu()">→ חזור</button>
-    <div class="card">
-      <h2>👁 תצוגת מפקד</h2>
-      <div class="table-wrapper"><div id="commanderTableContainer"></div></div>
-    </div>
-  </div>
+    document.getElementById("msg").innerText = "Checking...";
 
-  <!-- מסך: דוח יומי -->
-  <div id="pageReport" style="display:none;">
-    <button class="btn btn-secondary back-btn" onclick="showMenu()">→ חזור</button>
-    <div class="card">
-      <h2>📋 דוח יומי — <span id="reportDate"></span> ומחר</h2>
-      <div class="table-wrapper"><div id="reportContainer"></div></div>
-    </div>
-  </div>
+    google.script.run
+      .withSuccessHandler(handleLogin)
+      .login(userId, password);
+  }
 
-  <!-- מסך: שיבוץ קרבי -->
-  <div id="pageAssign" style="display:none;">
-    <button class="btn btn-secondary back-btn" onclick="showMenu()">→ חזור</button>
-    <div class="card">
-      <h2>🚗 שיבוץ קרבי</h2>
+  function handleLogin(res) {
+    if (res.success) {
+      document.getElementById("loginBox").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
 
-      <!-- בחירת שיטה -->
-      <div id="assignMethodPicker" style="display:flex;gap:12px;margin-bottom:16px;">
-        <button class="btn btn-primary" onclick="showAssignMethod('auto')" style="flex:1;padding:14px;font-size:15px;">⚡ אוטומטי</button>
-        <button class="btn btn-secondary" onclick="showAssignMethod('manual')" style="flex:1;padding:14px;font-size:15px;">✏️ ידני</button>
-      </div>
+      document.getElementById("welcomeUser").innerText =
+        "Logged in as: " + res.user;
 
-      <!-- שיבוץ אוטומטי -->
-      <div id="assignAutoPanel" style="display:none;">
-        <div style="background:rgba(155,109,255,0.1);border:1px solid rgba(155,109,255,0.3);border-radius:12px;padding:14px;margin-bottom:16px;">
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-            <label style="font-size:13px;color:var(--text-muted);white-space:nowrap;">מספר רכבים:</label>
-            <input type="number" id="autoVehicleCount" min="1" max="4" value="4"
-              style="width:70px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);
-              background:rgba(255,255,255,0.07);color:var(--text);font-size:14px;text-align:center;">
-          </div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <button id="autoDayToday" class="btn btn-primary" onclick="setAutoDay('today')"
-              style="flex:1;padding:8px;font-size:13px;"></button>
-            <button id="autoDayTomorrow" class="btn btn-secondary" onclick="setAutoDay('tomorrow')"
-              style="flex:1;padding:8px;font-size:13px;"></button>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-primary" onclick="autoAssign()" style="flex:1;padding:10px;font-size:14px;">⚡ בצע שיבוץ</button>
-            <button class="btn btn-secondary" onclick="resetAssign()" style="flex:1;padding:10px;font-size:14px;">🔄 איפוס</button>
-          </div>
-          <div class="error-msg" id="autoAssignError" style="margin-top:10px;"></div>
-        </div>
-      </div>
+    } else {
+      document.getElementById("msg").innerText = res.message;
+    }
+  }
 
-      <!-- שיבוץ ידני -->
-      <div id="assignManualPanel" style="display:none;">
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--glass-border);border-radius:12px;padding:14px;margin-bottom:16px;">
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <select id="assignVehicleSelect" style="flex:1;">
-              <option value="">בחר רכב לשיבוץ...</option>
-            </select>
-          </div>
-          <div style="display:flex;gap:10px;margin-bottom:12px;">
-            <button id="dayBtnToday" class="btn btn-primary" onclick="selectDay('today')"
-              style="flex:1;padding:10px;font-size:14px;"></button>
-            <button id="dayBtnTomorrow" class="btn btn-secondary" onclick="selectDay('tomorrow')"
-              style="flex:1;padding:10px;font-size:14px;"></button>
-          </div>
-          <div id="poolTags" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        </div>
-      </div>
+  function logout() {
+    location.reload();
+  }
+</script>
 
-      <!-- חלוקה לרכבים (מוצג אחרי שיבוץ) -->
-      <div id="vehiclesGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px;"></div>
-
-      <!-- סיכום -->
-      <div style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:12px;padding:16px;">
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">סיכום להעתקה</p>
-        <pre id="assignSummary" style="font-family:monospace;font-size:13px;color:var(--text);white-space:pre-wrap;margin:0 0 12px;"></pre>
-        <button class="btn btn-secondary" id="copyAssignBtn" onclick="copySummary()" style="width:auto;padding:8px 20px;font-size:13px;">העתק</button>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- דף מי מגיע לבסיס -->
-  <div id="pageAttendance" style="display:none;">
-    <button class="btn btn-secondary back-btn" onclick="showMenu()">→ חזור</button>
-    <div class="card">
-      <h2>🏠 מי מגיע לבסיס</h2>
-
-      <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:6px;">בחר תאריך</label>
-      <input type="date" id="attendanceDate" style="margin-bottom:16px;" oninput="clearAttendance()">
-      <button class="btn btn-primary" onclick="fetchAttendance()" style="margin-bottom:16px;">חפש</button>
-
-      <div class="error-msg" id="attendanceError" style="margin-top:0;"></div>
-
-      <div id="attendanceResult" style="display:none;">
-        <!-- בבסיס -->
-        <div style="margin-bottom:20px;">
-          <p style="color:var(--accent-lit);font-weight:600;margin-bottom:10px;" id="attendanceInBaseTitle"></p>
-          <div id="attendanceInBase" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        </div>
-        <!-- מגיעים מהבית -->
-        <div>
-          <p style="color:var(--yellow-text);font-weight:600;margin-bottom:10px;" id="attendanceComingTitle"></p>
-          <div id="attendanceComing" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        </div>
-      </div>
-
-      <div class="loader" id="attendanceLoader" style="margin-top:12px;">
-        <div class="spinner"></div>
-        <span>מחפש...</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- דף בקשת יציאה -->
-  <div id="pageRequest" style="display:none;">
-    <button class="btn btn-secondary back-btn" onclick="showMenu()">→ חזור</button>
-    <div class="card">
-      <h2>✏️ הגשת בקשת יציאה</h2>
-
-      <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:6px;">תאריך התחלה</label>
-      <input type="date" id="reqStartDate" style="margin-bottom:14px;">
-
-      <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:6px;">תאריך סיום</label>
-      <input type="date" id="reqEndDate" style="margin-bottom:14px;">
-
-      <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:6px;">סיבת הבקשה</label>
-      <input type="text" id="reqReason" placeholder="לדוגמה: חתונה, בר מצוה..." dir="rtl" style="margin-bottom:20px;">
-
-      <button class="btn btn-primary" onclick="submitRequest()">הגש בקשה</button>
-
-      <div class="error-msg" id="reqError" style="margin-top:12px;"></div>
-      <div id="reqSuccess" style="display:none;background:rgba(0,200,100,0.1);border:1px solid rgba(0,200,100,0.3);
-        color:#6effa0;padding:12px 16px;border-radius:10px;font-size:14px;text-align:center;margin-top:12px;">
-        ✅ הבקשה הוגשה בהצלחה!
-      </div>
-    </div>
-  </div>
-
-  <!-- דף צ'אט AI -->
-  <div id="pageChat" style="display:none;">
-    <button class="btn btn-secondary back-btn" onclick="showMenu()">→ חזור</button>
-    <div class="card">
-      <h2>🤖 שאל על הגיליון</h2>
-      <div id="chatMessages" style="min-height:200px;max-height:400px;overflow-y:auto;margin-bottom:16px;display:flex;flex-direction:column;gap:12px;"></div>
-      <div style="display:flex;gap:8px;">
-        <input id="chatInput" type="text" placeholder="שאל שאלה על הנתונים..." dir="rtl"
-          style="flex:1;" onkeydown="if(event.key==='Enter')sendChatMessage();">
-        <button class="btn btn-primary" onclick="sendChatMessage()"
-          style="width:auto;padding:12px 20px;font-size:14px;white-space:nowrap;">שלח</button>
-      </div>
-      <div class="loader" id="chatLoader" style="margin-top:12px;">
-        <div class="spinner"></div>
-        <span>חושב...</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Memorial -->
-  <div class="memorial" id="memorial">
-    <img src="https://izkorimagescdn.azureedge.net/fallenimages/518291.jpg"
-         alt="יוחאי (ג'וחא) קלנגל" loading="lazy">
-    <h1>לזכר</h1>
-    <h1>רס״ן יוחאי ג׳וחא קלנגל</h1>
-    <p>נפל ביום ח' בשבט תשע"ה</p>
-  </div>
-
-</div>
-
-<?!= include('script') ?>
 </body>
 </html>

@@ -1,19 +1,40 @@
-// ═══════════════════════════════════════
-//  code.gs — נקודת כניסה בלבד
-// ═══════════════════════════════════════
+const SHEET_ID = "1JxurxC9nEhRQVW3kGIGMwnALCjOZYcJQv3lovbvFvGA";
+const SHEET_NAME = "Credentials";
 
 function doGet() {
-  return HtmlService.createTemplateFromFile('index')
-    .evaluate()
-    .setTitle('ג׳וחא — כוח אדם')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return HtmlService.createHtmlOutputFromFile("index");
 }
 
-/**
- * פונקציית עזר — מאפשרת ל-index.html לייבא קבצים אחרים
- * שימוש ב-HTML: <?!= include('style') ?>
- */
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+// 🔐 LOGIN FUNCTION
+function login(userId, password) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+
+  const data = sheet.getDataRange().getValues();
+
+  // skip header row
+  for (let i = 1; i < data.length; i++) {
+    const rowUser = data[i][0];
+    const rowPass = data[i][1];
+
+    if (rowUser === userId && rowPass === password) {
+      return {
+        success: true,
+        user: userId
+      };
+    }
+  }
+
+  return {
+    success: false,
+    message: "Invalid username or password"
+  };
 }
 
+// 📊 OPTIONAL: Get full user table (admin/debug use)
+function getData() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+
+  return sheet.getDataRange().getValues();
+}
