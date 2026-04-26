@@ -106,9 +106,9 @@ function Views_login(p) {
     _panel('כניסה למערכת', form) +
     _panel('משתמשי דמו', 
       '<font face="Courier New, monospace" color="#d4e8c4">' +
-      '<b>מפקד קורס:</b> U001 / admin123<br>' +
-      '<b>מפקד צוות:</b> U002 / cmd123<br>' +
-      '<b>חניך:</b> U003 / train123' +
+      '<b>מפקד קורס:</b> 1 / admin123<br>' +
+      '<b>מפקד צוות:</b> 2 / cmd123<br>' +
+      '<b>חניך:</b> 3 / train123' +
       '</font>') +
     '</td></tr></table>' +
     '</center>';
