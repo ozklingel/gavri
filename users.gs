@@ -30,13 +30,13 @@ function Users_updateRole(p) {
   const targetId = (p.targetId || '').trim();
   const newRole  = (p.newRole  || '').trim();
   const newTeam  = (p.newTeam  || '').trim();
-  if (!targetId) throw new Error('Missing user id.');
-  if (['admin','commander','trainee'].indexOf(newRole) === -1) throw new Error('Invalid role.');
+  if (!targetId) throw new Error('חסר מזהה משתמש.');
+  if (['admin','commander','trainee'].indexOf(newRole) === -1) throw new Error('תפקיד לא חוקי.');
 
   const row = _findRowIndex('Users', targetId);
-  if (row < 0) throw new Error('User not found.');
+  if (row < 0) throw new Error('המשתמש לא נמצא.');
   const sh = _sheet('Users');
   sh.getRange(row, 3).setValue(newRole);
   sh.getRange(row, 4).setValue(newTeam);
-  return Views_users({ sid: p.sid, info: 'Role updated.' });
+  return Views_users({ sid: p.sid, info: 'התפקיד עודכן בהצלחה.' });
 }

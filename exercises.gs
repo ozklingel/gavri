@@ -23,24 +23,24 @@ function Exercises_create(p) {
   const u = Auth_requireRole(p, ['admin']);
   const id = 'E' + _nextId('Exercises');
   _append('Exercises', [id, p.title || '', p.description || '', u.id, p.date || '']);
-  return Views_dashboard({ sid: p.sid, info: 'Exercise created (' + id + ').' });
+  return Views_dashboard({ sid: p.sid, info: 'התרגיל נוצר בהצלחה (' + id + ').' });
 }
 
 function Exercises_edit(p) {
   Auth_requireRole(p, ['admin']);
   const row = _findRowIndex('Exercises', p.id);
-  if (row < 0) throw new Error('Exercise not found.');
+  if (row < 0) throw new Error('התרגיל לא נמצא.');
   const sh = _sheet('Exercises');
   sh.getRange(row, 2).setValue(p.title || '');
   sh.getRange(row, 3).setValue(p.description || '');
   sh.getRange(row, 5).setValue(p.date || '');
-  return Views_exercise({ sid: p.sid, id: p.id, info: 'Exercise updated.' });
+  return Views_exercise({ sid: p.sid, id: p.id, info: 'התרגיל עודכן בהצלחה.' });
 }
 
 function Exercises_duplicate(p) {
   const u = Auth_requireRole(p, ['admin']);
   const orig = Exercises_get(p.id);
-  if (!orig) throw new Error('Exercise not found.');
+  if (!orig) throw new Error('התרגיל לא נמצא.');
   const newId = 'E' + _nextId('Exercises');
   _append('Exercises', [newId, orig.title + ' (copy)', orig.description, u.id, orig.date]);
   // Copy details
@@ -48,14 +48,14 @@ function Exercises_duplicate(p) {
     const did = 'D' + _nextId('ExerciseDetails');
     _append('ExerciseDetails', [did, newId, d.time, d.location, d.description]);
   });
-  return Views_dashboard({ sid: p.sid, info: 'Duplicated as ' + newId + '.' });
+  return Views_dashboard({ sid: p.sid, info: 'התרגיל שוכפל כ-' + newId + '.' });
 }
 
 function Exercises_addDetail(p) {
   Auth_requireRole(p, ['admin']);
   const exId = p.exerciseId;
-  if (!Exercises_get(exId)) throw new Error('Exercise not found.');
+  if (!Exercises_get(exId)) throw new Error('התרגיל לא נמצא.');
   const did = 'D' + _nextId('ExerciseDetails');
   _append('ExerciseDetails', [did, exId, p.time || '', p.location || '', p.detailDescription || '']);
-  return Views_exercise({ sid: p.sid, id: exId, info: 'Timeline entry added.' });
+  return Views_exercise({ sid: p.sid, id: exId, info: 'רישום ציר הזמן נוסף בהצלחה.' });
 }

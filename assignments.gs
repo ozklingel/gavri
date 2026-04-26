@@ -28,37 +28,37 @@ function Assignments_assign(p) {
   const exId   = (p.exerciseId    || '').trim();
   const userId = (p.userId        || '').trim();
   const resp   = (p.responsibility|| '').trim();
-  if (!exId || !userId) throw new Error('Missing exercise or user.');
-  if (!resp) throw new Error('Responsibility is required.');
+  if (!exId || !userId) throw new Error('חסר תרגיל או חייל.');
+  if (!resp) throw new Error('יש לציין תפקיד.');
 
   // Commander can only assign to trainees in their team
   if (u.role === 'commander') {
     const trainees = Users_traineesOfCommander(u.id).map(t => t.id);
-    if (trainees.indexOf(userId) === -1) throw new Error('Cannot assign outside your team.');
+    if (trainees.indexOf(userId) === -1) throw new Error('לא ניתן להקצות לחייל מחוץ לצוות שלך.');
   }
 
   // No duplicate
   const exists = Assignments_all().some(a => a.exercise_id === exId && a.user_id === userId);
-  if (exists) return Views_dashboard({ sid: p.sid, info: 'Already assigned.' });
+  if (exists) return Views_dashboard({ sid: p.sid, info: 'התרגיל כבר הוקצה לחייל זה.' });
 
   const id = 'A' + _nextId('Assignments');
   _append('Assignments', [id, exId, userId, 'pending', '', resp]);
-  return Views_dashboard({ sid: p.sid, info: 'Assigned (' + id + ') as ' + resp + '.' });
+  return Views_dashboard({ sid: p.sid, info: 'הוקצה בהצלחה (' + id + ') בתפקיד ' + resp + '.' });
 }
 
 function Assignments_complete(p) {
   const u = Auth_requireRole(p, ['admin','commander']);
   const aid = (p.assignmentId || '').trim();
   const row = _findRowIndex('Assignments', aid);
-  if (row < 0) throw new Error('Assignment not found.');
+  if (row < 0) throw new Error('ההקצאה לא נמצאה.');
   const sh = _sheet('Assignments');
   // Commander scope check
   if (u.role === 'commander') {
     const userId = String(sh.getRange(row, 3).getValue());
     const trainees = Users_traineesOfCommander(u.id).map(t => t.id);
-    if (trainees.indexOf(userId) === -1) throw new Error('Cannot mark outside your team.');
+    if (trainees.indexOf(userId) === -1) throw new Error('לא ניתן לסמן הקצאה מחוץ לצוות שלך.');
   }
   sh.getRange(row, 4).setValue('completed');
   if (p.score) sh.getRange(row, 5).setValue(p.score);
-  return Views_dashboard({ sid: p.sid, info: 'Marked completed.' });
+  return Views_dashboard({ sid: p.sid, info: 'התרגיל סומן כהושלם.' });
 }
