@@ -1,11 +1,17 @@
 // ═══════════════════════════════════════
 //  assignments.gs — assign + complete
+//  Sheet "Assignments" columns:
+//    A: id | B: exercise_id | C: user_id | D: status | E: score | F: responsibility
 // ═══════════════════════════════════════
 
 function Assignments_all() {
   return _rows('Assignments').data.map(r => ({
-    id: String(r[0]), exercise_id: String(r[1]), user_id: String(r[2]),
-    status: String(r[3] || 'pending'), score: r[4] == null ? '' : String(r[4])
+    id: String(r[0]),
+    exercise_id: String(r[1]),
+    user_id: String(r[2]),
+    status: String(r[3] || 'pending'),
+    score: r[4] == null ? '' : String(r[4]),
+    responsibility: r[5] == null ? '' : String(r[5])
   }));
 }
 
@@ -19,9 +25,11 @@ function Assignments_byExercise(exerciseId) {
 
 function Assignments_assign(p) {
   const u = Auth_requireRole(p, ['admin','commander']);
-  const exId   = (p.exerciseId || '').trim();
-  const userId = (p.userId     || '').trim();
+  const exId   = (p.exerciseId    || '').trim();
+  const userId = (p.userId        || '').trim();
+  const resp   = (p.responsibility|| '').trim();
   if (!exId || !userId) throw new Error('Missing exercise or user.');
+  if (!resp) throw new Error('Responsibility is required.');
 
   // Commander can only assign to trainees in their team
   if (u.role === 'commander') {
@@ -34,8 +42,8 @@ function Assignments_assign(p) {
   if (exists) return Views_dashboard({ sid: p.sid, info: 'Already assigned.' });
 
   const id = 'A' + _nextId('Assignments');
-  _append('Assignments', [id, exId, userId, 'pending', '']);
-  return Views_dashboard({ sid: p.sid, info: 'Assigned (' + id + ').' });
+  _append('Assignments', [id, exId, userId, 'pending', '', resp]);
+  return Views_dashboard({ sid: p.sid, info: 'Assigned (' + id + ') as ' + resp + '.' });
 }
 
 function Assignments_complete(p) {
