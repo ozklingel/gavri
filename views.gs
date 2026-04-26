@@ -1,364 +1,549 @@
 // ═══════════════════════════════════════
-//  views.gs — HTML rendering בעברית, סגנון צה"ל ירוק
-//  HTML טהור: ללא CSS, ללא JS. רק תגיות, טבלאות, צבעים בתגיות.
+//  views.gs — Modern compact UI, RTL Hebrew
+//  Pure HTML + inline CSS. No external JS beyond index.html script tag.
 // ═══════════════════════════════════════
 
 function _appUrl() {
-  const url = ScriptApp.getService().getUrl();
-  return url || '';
+  return ScriptApp.getService().getUrl() || '';
 }
-
 function _url(query) {
-  const base = _appUrl();
-  return (base ? base : '') + (query ? '?' + query : '');
+  return _appUrl() + (query ? '?' + query : '');
 }
 
-function _link(query, label) {
-  return '<a target="_top" href="' + _esc(_url(query)) + '"><font color="#9fd66e"><b>[ ' + label + ' ]</b></font></a>';
+// ── Core building blocks ──
+
+function _a(query, label, cls) {
+  cls = cls || 'btn btn-secondary btn-sm';
+  return '<a target="_top" href="' + _esc(_url(query)) + '" class="' + cls + '">' + label + '</a>';
 }
 
-function _formOpen() {
-  return '<form action="' + _esc(_appUrl()) + '" method="get" target="_top">';
+function _formOpen(extraClass) {
+  return '<form action="' + _esc(_appUrl()) + '" method="get" target="_top"' + (extraClass ? ' class="' + extraClass + '"' : '') + '>';
 }
 
-function _btn(label) {
-  return '<button type="submit" style="background:#4B5320;color:#fff;border:2px solid #9fd66e;padding:6px 18px;font-family:Courier New,monospace;font-weight:bold;cursor:pointer">► ' + label + '</button>';
+function _submitBtn(label, cls) {
+  cls = cls || 'btn btn-primary';
+  return '<button type="submit" class="' + cls + '">► ' + label + '</button>';
 }
 
-function _panel(title, inner) {
-  return '<table width="100%" cellpadding="12" cellspacing="0" border="2" bordercolor="#4B5320" bgcolor="#0f1f0f">' +
-         '<tr><td bgcolor="#2a3a2a"><font color="#9fd66e" face="Courier New, monospace" size="3"><b>▌ ' + title + '</b></font></td></tr>' +
-         '<tr><td>' + inner + '</td></tr></table><br>';
+function _input(name, placeholder, value, type, extra) {
+  type = type || 'text';
+  value = value || '';
+  extra = extra || '';
+  return '<input type="' + type + '" name="' + name + '" placeholder="' + _esc(placeholder || '') + '" value="' + _esc(value) + '" class="form-input" ' + extra + '>';
 }
 
-function _tableOpen(headers) {
-  let s = '<table width="100%" cellpadding="8" cellspacing="0" border="1" bordercolor="#4B5320" bgcolor="#1a2a1a">' +
-          '<tr bgcolor="#2a3a2a">';
-  headers.forEach(h => { s += '<th><font color="#9fd66e" face="Courier New, monospace">' + h + '</font></th>'; });
-  return s + '</tr>';
+
+function _dateInput(name, value) {
+  // Custom Hebrew date picker — replaces <input type="date">
+  // value should be "YYYY-MM-DD" or empty
+  value = value || '';
+  return '<div class="dp-wrap">' +
+    '<input type="hidden" name="' + name + '" value="' + _esc(value) + '">' +
+    '<div class="dp-trigger">' +
+    '<span class="dp-val"><span class="dp-placeholder">בחר תאריך...</span></span>' +
+    '<span class="dp-icon">📅</span>' +
+    '</div>' +
+    '<div class="dp-popup"></div>' +
+    '</div>';
 }
 
-function _html(body, title) {
-  const template = HtmlService.createTemplateFromFile('index');
-  template.pageTitle = title || 'צה״ל — תרגילי אימון';
-  template.body = body;
-  return template.evaluate()
-    .setTitle(title || 'צה״ל — תרגילי אימון')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function _select(name, options, selected) {
+  // options: array of [value, label]
+  let s = '<select name="' + name + '" class="form-select">';
+  options.forEach(function(o) {
+    s += '<option value="' + _esc(o[0]) + '"' + (o[0] === selected ? ' selected' : '') + '>' + _esc(o[1]) + '</option>';
+  });
+  return s + '</select>';
 }
 
-// תרגום תפקידים
-function _roleHe(r) {
-  return r === 'admin' ? 'מפקד קורס' : r === 'commander' ? 'מפקד צוות' : r === 'trainee' ? 'חניך' : r;
-}
-function _statusHe(s) {
-  return s === 'completed' ? 'הושלם' : s === 'pending' ? 'ממתין' : s === 'in_progress' ? 'בביצוע' : s;
-}
-
-function _nav(user, sid) {
-  if (!user) return '';
-  let nav = '<table width="100%" cellpadding="8" cellspacing="0" border="0" bgcolor="#2a3a2a"><tr><td>' +
-            '<font face="Courier New, monospace" color="#d4e8c4">' +
-            '👤 מחובר: <b><font color="#9fd66e">' + _esc(user.name) + '</font></b> ' +
-            '(<i>' + _esc(_roleHe(user.role)) + '</i>) ' +
-            '</font></td><td align="left">' +
-            _link('page=dashboard&sid=' + encodeURIComponent(sid), 'לוח בקרה');
-  if (user.role === 'admin') {
-    nav += '&nbsp;' + _link('page=users&sid=' + encodeURIComponent(sid), 'ניהול משתמשים');
-  }
-  nav += '&nbsp;' + _link('action=logout', 'התנתקות') + '</td></tr></table><br>';
-  return nav;
+function _badge(label, type) {
+  type = type || 'muted';
+  return '<span class="badge badge-' + type + '">' + label + '</span>';
 }
 
 function _flash(p) {
   let s = '';
-  if (p && p.error) s += '<table width="100%" bgcolor="#5a1a1a" cellpadding="10" border="2" bordercolor="#ff6666"><tr><td><font color="#ffcccc"><b>⚠ שגיאה:</b> ' + _esc(p.error) + '</font></td></tr></table><br>';
-  if (p && p.info)  s += '<table width="100%" bgcolor="#1a4a1a" cellpadding="10" border="2" bordercolor="#9fd66e"><tr><td><font color="#d4e8c4"><b>✓</b> ' + _esc(p.info) + '</font></td></tr></table><br>';
+  if (p && p.error) s += '<div class="flash flash-error">⚠ ' + _esc(p.error) + '</div>';
+  if (p && p.info)  s += '<div class="flash flash-info">✓ ' + _esc(p.info) + '</div>';
   return s;
 }
 
+function _html(body, title) {
+  const tpl = HtmlService.createTemplateFromFile('index');
+  tpl.pageTitle = title || 'צה״ל — מערכת תרגילים';
+  tpl.body = body;
+  return tpl.evaluate()
+    .setTitle(title || 'צה״ל — מערכת תרגילים')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function _roleHe(r) {
+  return r === 'admin' ? 'מפקד קורס' : r === 'commander' ? 'מפקד צוות' : r === 'trainee' ? 'חניך' : r;
+}
+
+function _statusHe(s) {
+  return s === 'completed' ? 'הושלם' : s === 'pending' ? 'ממתין' : s === 'in_progress' ? 'בביצוע' : s;
+}
+
+function _statusBadge(s) {
+  if (s === 'completed') return _badge('✓ הושלם', 'green');
+  if (s === 'in_progress') return _badge('⟳ בביצוע', 'blue');
+  return _badge('◌ ממתין', 'yellow');
+}
+
+function _topbar(user, sid) {
+  if (!user) return '';
+  const sidQ = encodeURIComponent(sid);
+  let nav = '<nav class="topbar">' +
+    '<div class="topbar-brand">' +
+    '<span class="star">★</span>' +
+    '<div><span>צה״ל</span><span class="sub">TRAINING CMD SYS // CLASSIFIED</span></div>' +
+    '</div>' +
+    '<div class="topbar-nav">';
+
+  nav += _a('page=dashboard&sid=' + sidQ, '⊞ לוח בקרה', 'btn btn-ghost btn-sm');
+  if (user.role === 'admin') {
+    nav += _a('page=users&sid=' + sidQ, '👤 משתמשים', 'btn btn-ghost btn-sm');
+  }
+  nav += '<span class="topbar-user">👤 ' + _esc(user.name) + ' · ' + _esc(_roleHe(user.role)) + '</span>';
+  nav += _a('action=logout', '⏻ יציאה', 'btn btn-ghost btn-sm');
+  nav += '</div></nav>';
+  return nav;
+}
+
+// ─────────── ERROR ───────────
 function Views_error(msg, p) {
   const sid = (p && p.sid) ? p.sid : '';
   const back = sid
-    ? '<p>' + _link('page=dashboard&sid=' + encodeURIComponent(sid), 'חזרה ללוח הבקרה') + '</p>'
-    : '<p>' + _link('page=login', 'חזרה למסך התחברות') + '</p>';
-  return _html('<h2><font color="#ff6666">⚠ שגיאה</font></h2><p>' + _esc(msg) + '</p>' + back, 'שגיאה');
+    ? _a('page=dashboard&sid=' + encodeURIComponent(sid), '← לוח בקרה', 'btn btn-secondary')
+    : _a('page=login', '← התחברות', 'btn btn-secondary');
+  const body =
+    '<div class="login-wrap">' +
+    '<div class="login-box">' +
+    '<div class="login-head"><div class="login-star">⚠</div>' +
+    '<div class="login-title" style="color:#f87171">שגיאה</div></div>' +
+    '<div class="login-body">' +
+    '<p style="color:#fca5a5;margin-bottom:16px">' + _esc(msg) + '</p>' +
+    back + '</div></div></div>';
+  return _html(body, 'שגיאה');
 }
 
-// ─────────── התחברות ───────────
+// ─────────── LOGIN ───────────
 function Views_login(p) {
   const form =
     _formOpen() +
     '<input type="hidden" name="action" value="login">' +
-    '<p><font color="#9fd66e"><b>מספר אישי:</b></font><br>' +
-    '<input type="text" name="userId" required size="30" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Courier New,monospace;font-size:14px"></p>' +
-    '<p><font color="#9fd66e"><b>סיסמה:</b></font><br>' +
-    '<input type="password" name="password" required size="30" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Courier New,monospace;font-size:14px"></p>' +
-    '<p>' + _btn('כניסה למערכת') + '</p>' +
+    '<div class="form-row"><label class="form-label">מספר אישי</label>' +
+    _input('userId', 'U001', '', 'text', 'required autofocus') + '</div>' +
+    '<div class="form-row"><label class="form-label">סיסמה</label>' +
+    _input('password', '••••••••', '', 'password', 'required') + '</div>' +
+    _submitBtn('כניסה למערכת', 'btn btn-primary btn-full btn-lg') +
     '</form>';
 
   const body =
-    '<center>' +
-    '<table width="500" cellpadding="0" cellspacing="0" border="0"><tr><td>' +
-    '<h1 align="center"><font color="#9fd66e" face="Courier New, monospace">🔒 התחברות מאובטחת</font></h1>' +
-    '<p align="center"><font color="#7fb84e" face="Courier New, monospace" size="2">// AUTHORIZED PERSONNEL ONLY //</font></p>' +
+    '<div class="login-wrap">' +
+    '<div class="login-box">' +
+    '<div class="login-head">' +
+    '<div class="login-star">★</div>' +
+    '<div class="login-title">מערכת ניהול תרגילים</div>' +
+    '<div class="login-sub">// AUTHORIZED PERSONNEL ONLY //</div>' +
+    '</div>' +
+    '<div class="login-body">' +
     _flash(p) +
-    _panel('כניסה למערכת', form) +
-    _panel('משתמשי דמו', 
-      '<font face="Courier New, monospace" color="#d4e8c4">' +
-      '<b>מפקד קורס:</b> 1 / admin123<br>' +
-      '<b>מפקד צוות:</b> 2 / cmd123<br>' +
-      '<b>חניך:</b> 3 / train123' +
-      '</font>') +
-    '</td></tr></table>' +
-    '</center>';
+    form +
+    '<hr class="divider">' +
+    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">// משתמשי דמו</div>' +
+    '<div class="demo-grid">' +
+    '<div class="demo-item"><div class="demo-role">מפקד קורס</div><div class="demo-cred">U001<br>admin123</div></div>' +
+    '<div class="demo-item"><div class="demo-role">מפקד צוות</div><div class="demo-cred">U002<br>cmd123</div></div>' +
+    '<div class="demo-item"><div class="demo-role">חניך</div><div class="demo-cred">U003<br>train123</div></div>' +
+    '</div>' +
+    '</div></div></div>';
   return _html(body, 'התחברות');
 }
 
-// ─────────── לוח בקרה ───────────
+// ─────────── DASHBOARD ───────────
 function Views_dashboard(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
 
-  let body = _nav(user, sid) + _flash(p) +
-             '<h1><font color="#9fd66e">▌ לוח בקרה</font></h1>';
+  let content = '';
+  if (user.role === 'admin')          content = _adminDashboard(sid);
+  else if (user.role === 'commander') content = _commanderDashboard(user, sid);
+  else                                content = _traineeDashboard(user, sid);
 
-  if (user.role === 'admin')          body += _adminDashboard(sid);
-  else if (user.role === 'commander') body += _commanderDashboard(user, sid);
-  else                                body += _traineeDashboard(user, sid);
-
+  const body = _topbar(user, sid) +
+    '<div class="page">' + _flash(p) + content + '</div>';
   return _html(body, 'לוח בקרה');
 }
 
-function _datalistResp() {
-  return '<datalist id="respList">' +
-         '<option value="מפקד">' +
-         '<option value="נווט">' +
-         '<option value="חובש">' +
-         '<option value="קשר">' +
-         '<option value="צלף">' +
-         '<option value="נהג">' +
-         '<option value="לוחם">' +
-         '<option value="תצפיתן">' +
-         '<option value="לוגיסטיקה">' +
-         '</datalist>';
-}
-
+// ── Admin Dashboard ──
 function _adminDashboard(sid) {
   const exs = Exercises_all();
   const users = Users_all();
   const sidQ = encodeURIComponent(sid);
 
-  // טבלת תרגילים
-  let table = _tableOpen(['מזהה', 'שם התרגיל', 'תאריך', 'פעולות']);
-  exs.forEach(e => {
-    table += '<tr><td><font face="Courier New, monospace" color="#9fd66e">' + _esc(e.id) + '</font></td>' +
-             '<td><b>' + _esc(e.title) + '</b></td>' +
-             '<td>' + _esc(e.date) + '</td>' +
-             '<td>' +
-               _link('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, 'צפייה / עריכה') + '&nbsp;' +
-               _link('action=duplicateExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, 'שכפול') +
-             '</td></tr>';
-  });
-  table += '</table>';
-  let s = _panel('כל התרגילים (' + exs.length + ')', table);
+  // Stats row
+  const assigns = Assignments_all ? Assignments_all() : [];
+  const completed = assigns.filter(function(a){ return a.status === 'completed'; }).length;
+  const pending   = assigns.filter(function(a){ return a.status !== 'completed'; }).length;
 
-  // יצירת תרגיל
-  s += _panel('יצירת תרגיל חדש',
+  let s = '<div class="page-title">⊞ לוח בקרה — מפקד קורס</div>';
+
+  // Stat boxes
+  s += '<div class="grid-3" style="margin-bottom:16px">' +
+    '<div class="stat-box"><div class="stat-num">' + exs.length + '</div><div class="stat-label">תרגילים</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + pending + '</div><div class="stat-label">הקצאות ממתינות</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + completed + '</div><div class="stat-label">הושלמו</div></div>' +
+    '</div>';
+
+  // Exercises list (compact)
+  let exList = '<div class="card" style="margin-bottom:14px">' +
+    '<div class="card-header">' +
+    '<span class="card-title">📋 תרגילים (' + exs.length + ')</span>' +
+    '</div>';
+
+  if (!exs.length) {
+    exList += '<div class="empty">אין תרגילים עדיין</div>';
+  } else {
+    exs.forEach(function(e) {
+      exList += '<div class="ex-row">' +
+        '<div class="ex-info">' +
+        '<div class="ex-title">' + _esc(e.title) + '</div>' +
+        '<div class="ex-meta">' + _esc(e.id) + (e.date ? ' · ' + _esc(e.date) : '') + '</div>' +
+        '</div>' +
+        '<div class="ex-btns">' +
+        _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-primary btn-sm') +
+        _a('action=duplicateExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '⎘ שכפול', 'btn btn-ghost btn-sm') +
+        '</div>' +
+        '</div>';
+    });
+  }
+  exList += '</div>';
+  s += exList;
+
+  // Create exercise (collapsible)
+  const createForm =
     _formOpen() +
     '<input type="hidden" name="action" value="createExercise">' +
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-    '<p><b>שם התרגיל:</b><br><input name="title" required size="50" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial"></p>' +
-    '<p><b>תיאור:</b><br><input name="description" size="60" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial"></p>' +
-    '<p><b>תאריך:</b><br><input type="date" name="date" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
-    '<p>' + _btn('צור תרגיל') + '</p></form>');
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', 'שם התרגיל', '', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">תאריך</label>' + _dateInput('date', '') + '</div>' +
+    '</div>' +
+    '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', 'תיאור קצר...') + '</div>' +
+    '<div style="display:flex;gap:8px">' + _submitBtn('➕ צור תרגיל', 'btn btn-primary') + '</div>' +
+    '</form>';
 
-  // הקצאת תרגיל מתבצעת כעת מתוך עמוד התרגיל עצמו (כניסה דרך "צפייה / עריכה").
-  s += _panel('הקצאת תרגיל לחייל',
-    '<font color="#d4e8c4">כדי להקצות חייל לתרגיל, פתח את התרגיל מטבלת התרגילים שלמעלה ' +
-    'ובחר ב-<b><font color="#9fd66e">"הקצאת חייל לתרגיל"</font></b> בתחתית עמוד התרגיל.</font>');
+  s += '<div class="collapsible" style="margin-bottom:14px">' +
+    '<button class="collapsible-toggle">➕ צור תרגיל חדש <span class="arrow">▾</span></button>' +
+    '<div class="collapsible-content">' +
+    '<div class="card"><div class="card-body">' + createForm + '</div></div>' +
+    '</div></div>';
+
+  // Users summary
+  s += '<div class="collapsible">' +
+    '<button class="collapsible-toggle">👤 משתמשים (' + users.length + ') <span class="arrow">▾</span></button>' +
+    '<div class="collapsible-content">' +
+    '<div class="card"><div class="card-body">' +
+    '<p style="color:var(--muted);font-family:var(--mono);font-size:12px;margin-bottom:8px">לניהול תפקידים:</p>' +
+    _a('page=users&sid=' + sidQ, '→ עמוד ניהול משתמשים', 'btn btn-secondary') +
+    '</div></div></div></div>';
 
   return s;
 }
 
+// ── Commander Dashboard ──
 function _commanderDashboard(user, sid) {
-  const trainees = Users_traineesOfCommander(user.id);
-  const exs = Exercises_all();
   const sidQ = encodeURIComponent(sid);
+  const trainees = Users_traineesOfCommander(user.id);
 
-  if (!trainees.length) return _panel('הצוות שלי', '<p><i>אין חיילים מוקצים לצוות שלך עדיין.</i></p>');
+  let s = '<div class="page-title">⊞ לוח בקרה — מפקד צוות</div>';
 
-  let s = '';
-  trainees.forEach(t => {
+  if (!trainees.length) {
+    return s + '<div class="card"><div class="empty">אין חיילים מוקצים לצוות שלך עדיין</div></div>';
+  }
+
+  // Summary stats
+  let totalAssigns = 0, totalDone = 0;
+  trainees.forEach(function(t) {
+    const a = Assignments_byUser(t.id);
+    totalAssigns += a.length;
+    totalDone += a.filter(function(x){ return x.status === 'completed'; }).length;
+  });
+
+  s += '<div class="grid-2" style="margin-bottom:16px">' +
+    '<div class="stat-box"><div class="stat-num">' + trainees.length + '</div><div class="stat-label">חיילים בצוות</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + totalDone + '/' + totalAssigns + '</div><div class="stat-label">הקצאות הושלמו</div></div>' +
+    '</div>';
+
+  trainees.forEach(function(t) {
     const assigns = Assignments_byUser(t.id);
     let inner = '';
     if (!assigns.length) {
-      inner += '<p><i>אין תרגילים מוקצים.</i></p>';
+      inner = '<div class="empty">אין תרגילים מוקצים</div>';
     } else {
-      inner += _tableOpen(['מזהה', 'תרגיל', 'תפקיד', 'סטטוס', 'פעולה']);
-      assigns.forEach(a => {
+      inner = '<table class="tbl"><thead><tr>' +
+        '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>פעולה</th>' +
+        '</tr></thead><tbody>';
+      assigns.forEach(function(a) {
         const ex = Exercises_get(a.exercise_id);
-        inner += '<tr><td><font face="Courier New, monospace">' + _esc(a.id) + '</font></td>' +
-                 '<td>' + _esc(ex ? ex.title : a.exercise_id) + '</td>' +
-                 '<td><b>' + _esc(a.responsibility) + '</b></td>' +
-                 '<td>' + _esc(_statusHe(a.status)) + '</td><td>';
+        inner += '<tr>' +
+          '<td>' + _esc(ex ? ex.title : a.exercise_id) + '</td>' +
+          '<td>' + _esc(a.responsibility) + '</td>' +
+          '<td>' + _statusBadge(a.status) + '</td>' +
+          '<td class="actions">';
         if (a.status !== 'completed') {
-          inner += _link('action=complete&assignmentId=' + encodeURIComponent(a.id) + '&sid=' + sidQ, 'סמן כהושלם');
-        } else inner += '<font color="#9fd66e" size="4">✓</font>';
+          inner += _a('action=complete&assignmentId=' + encodeURIComponent(a.id) + '&sid=' + sidQ, '✓ סמן הושלם', 'btn btn-primary btn-sm');
+        } else {
+          inner += _badge('✓ הושלם', 'green');
+        }
         inner += '</td></tr>';
       });
-      inner += '</table>';
+      inner += '</tbody></table>';
     }
-    // הקצאת חיילים לתרגיל מתבצעת ע"י מפקד הקורס בלבד, מתוך עמוד התרגיל.
 
-
-    s += _panel('🪖 ' + _esc(t.name) + ' &nbsp; (' + _esc(t.id) + ')', inner);
+    s += '<div class="collapsible" style="margin-bottom:8px">' +
+      '<button class="collapsible-toggle">🪖 ' + _esc(t.name) +
+      ' <span class="badge badge-muted" style="font-size:10px;margin-right:6px">' + assigns.length + ' תרגילים</span>' +
+      '<span class="arrow">▾</span></button>' +
+      '<div class="collapsible-content">' +
+      '<div class="card"><div class="card-body" style="padding:0">' + inner + '</div></div>' +
+      '</div></div>';
   });
 
-  s += _datalistResp();
   return s;
 }
 
+// ── Trainee Dashboard ──
 function _traineeDashboard(user, sid) {
   const sidQ = encodeURIComponent(sid);
   const assigns = Assignments_byUser(user.id);
-  if (!assigns.length) return _panel('התרגילים שלי', '<p><i>אין תרגילים מוקצים עדיין.</i></p>');
 
-  let table = _tableOpen(['תרגיל', 'תפקיד', 'סטטוס', 'ציון', 'פרטים']);
-  assigns.forEach(a => {
+  let s = '<div class="page-title">⊞ התרגילים שלי</div>';
+
+  if (!assigns.length) {
+    return s + '<div class="card"><div class="empty">אין תרגילים מוקצים עדיין</div></div>';
+  }
+
+  const done = assigns.filter(function(a){ return a.status === 'completed'; }).length;
+  s += '<div class="grid-2" style="margin-bottom:16px">' +
+    '<div class="stat-box"><div class="stat-num">' + assigns.length + '</div><div class="stat-label">סה״כ תרגילים</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + done + '</div><div class="stat-label">הושלמו</div></div>' +
+    '</div>';
+
+  s += '<div class="card"><div class="card-body" style="padding:0">' +
+    '<table class="tbl"><thead><tr>' +
+    '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>פרטים</th>' +
+    '</tr></thead><tbody>';
+
+  assigns.forEach(function(a) {
     const ex = Exercises_get(a.exercise_id);
-    table += '<tr><td><b>' + _esc(ex ? ex.title : a.exercise_id) + '</b></td>' +
-             '<td><font color="#9fd66e">' + _esc(a.responsibility) + '</font></td>' +
-             '<td>' + _esc(_statusHe(a.status)) + '</td>' +
-             '<td>' + _esc(a.score) + '</td>' +
-             '<td>' + _link('page=exercise&id=' + encodeURIComponent(a.exercise_id) + '&sid=' + sidQ, 'צפייה') + '</td></tr>';
+    s += '<tr>' +
+      '<td><b>' + _esc(ex ? ex.title : a.exercise_id) + '</b></td>' +
+      '<td>' + _esc(a.responsibility) + '</td>' +
+      '<td>' + _statusBadge(a.status) + '</td>' +
+      '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
+      '<td>' + _a('page=exercise&id=' + encodeURIComponent(a.exercise_id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-secondary btn-sm') + '</td>' +
+      '</tr>';
   });
-  table += '</table>';
-  return _panel('התרגילים המוקצים שלי', table);
+
+  s += '</tbody></table></div></div>';
+  return s;
 }
 
-// ─────────── דף תרגיל ───────────
+// ─────────── EXERCISE PAGE ───────────
 function Views_exercise(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
   const ex  = Exercises_get(p.id);
   if (!ex) return Views_error('התרגיל לא נמצא.', p);
+  const sidQ = encodeURIComponent(sid);
 
-  let s = _nav(user, sid) + _flash(p) +
-          '<h1><font color="#9fd66e">▌ ' + _esc(ex.title) + '</font></h1>' +
-          _panel('פרטי התרגיל',
-            '<p><b>מזהה:</b> <font face="Courier New, monospace" color="#9fd66e">' + _esc(ex.id) + '</font> ' +
-            '&nbsp;&nbsp; <b>תאריך:</b> ' + _esc(ex.date) + '</p>' +
-            '<p><b>תיאור:</b><br>' + _esc(ex.description) + '</p>');
+  let s = _topbar(user, sid) + '<div class="page">';
+  s += _flash(p);
 
-  // ציר זמן
-  const details = Exercises_details(ex.id);
-  let timeline;
-  if (details.length) {
-    timeline = _tableOpen(['שעה', 'מיקום', 'תיאור']);
-    details.forEach(d => {
-      timeline += '<tr><td><font face="Courier New, monospace" color="#9fd66e">' + _esc(d.time) + '</font></td>' +
-                  '<td>' + _esc(d.location) + '</td>' +
-                  '<td>' + _esc(d.description) + '</td></tr>';
-    });
-    timeline += '</table>';
-  } else timeline = '<p><i>אין רישומים בציר הזמן.</i></p>';
-  s += _panel('🕐 ציר זמן', timeline);
-
-  // משתתפים
-  const parts = Assignments_byExercise(ex.id);
-  let pHtml;
-  if (parts.length) {
-    pHtml = _tableOpen(['חייל', 'תפקיד', 'סטטוס', 'ציון']);
-    parts.forEach(a => {
-      const u = Users_get(a.user_id);
-      pHtml += '<tr><td><b>' + _esc(u ? u.name : a.user_id) + '</b></td>' +
-               '<td><font color="#9fd66e">' + _esc(a.responsibility) + '</font></td>' +
-               '<td>' + _esc(_statusHe(a.status)) + '</td>' +
-               '<td>' + _esc(a.score) + '</td></tr>';
-    });
-    pHtml += '</table>';
-  } else pHtml = '<p><i>אין משתתפים מוקצים.</i></p>';
-  s += _panel('👥 משתתפים (' + parts.length + ')', pHtml);
+  // Page header with action buttons
+  s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+    '<div class="page-title" style="margin:0">' + _esc(ex.title) + '</div>' +
+    '<div style="display:flex;gap:6px">' +
+    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
 
   if (user.role === 'admin') {
-    s += _panel('✏ עריכת תרגיל',
-      _formOpen() +
-      '<input type="hidden" name="action" value="editExercise">' +
-      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-      '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
-      '<p><b>שם התרגיל:</b><br><input name="title" value="' + _esc(ex.title) + '" required size="50" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
-      '<p><b>תיאור:</b><br><input name="description" size="60" value="' + _esc(ex.description) + '" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
-      '<p><b>תאריך:</b><br><input type="date" name="date" value="' + _esc(ex.date) + '" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
-      '<p>' + _btn('שמור שינויים') + '</p></form>');
+    s += _a('action=duplicateExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, '⎘ שכפל', 'btn btn-ghost btn-sm');
+  }
+  s += '</div></div>';
 
-    s += _panel('➕ הוספת רישום לציר זמן',
+  // ── Top info strip ──
+  s += '<div class="card" style="margin-bottom:14px">' +
+    '<div class="card-body" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">מזהה</span><br>' +
+    '<span style="font-family:var(--mono);color:var(--green)">' + _esc(ex.id) + '</span></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">תאריך</span><br>' +
+    '<b>' + _esc(ex.date || '—') + '</b></div>' +
+    '<div style="flex:1"><span style="color:var(--muted);font-family:var(--mono);font-size:11px">תיאור</span><br>' +
+    _esc(ex.description || '—') + '</div>' +
+    '</div></div>';
+
+  // ── Two-column layout for timeline + participants ──
+  s += '<div class="grid-2" style="margin-bottom:14px">';
+
+  // Timeline
+  const details = Exercises_details(ex.id);
+  let tlHtml = '<div class="card">' +
+    '<div class="card-header"><span class="card-title">🕐 ציר זמן (' + details.length + ')</span>';
+
+  if (user.role === 'admin') {
+    tlHtml += '<button class="btn btn-ghost btn-sm" onclick="toggleCollapsible(\'add-detail\')">➕ הוסף</button>';
+  }
+  tlHtml += '</div>';
+
+  if (!details.length) {
+    tlHtml += '<div class="empty">אין רישומים</div>';
+  } else {
+    tlHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr><th>שעה</th><th>מיקום</th><th>תיאור</th></tr></thead><tbody>';
+    details.forEach(function(d) {
+      tlHtml += '<tr><td class="mono">' + _esc(d.time) + '</td><td>' + _esc(d.location) + '</td><td>' + _esc(d.description) + '</td></tr>';
+    });
+    tlHtml += '</tbody></table></div>';
+  }
+
+  if (user.role === 'admin') {
+    tlHtml += '<div id="add-detail" style="display:none">' +
+      '<div class="card-body" style="border-top:1px solid var(--border)">' +
       _formOpen() +
       '<input type="hidden" name="action" value="addDetail">' +
       '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
       '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-      '<p><b>שעה:</b> <input name="time" placeholder="08:00" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
-      '<p><b>מיקום:</b> <input name="location" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
-      '<p><b>תיאור:</b><br><input name="detailDescription" size="60" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
-      '<p>' + _btn('הוסף רישום') + '</p></form>');
+      '<div class="form-grid">' +
+      '<div class="form-row"><label class="form-label">שעה</label>' + _input('time', '08:00') + '</div>' +
+      '<div class="form-row"><label class="form-label">מיקום</label>' + _input('location', 'שם מיקום') + '</div>' +
+      '</div>' +
+      '<div class="form-row"><label class="form-label">תיאור</label>' + _input('detailDescription', 'תיאור הפעילות', '', 'text') + '</div>' +
+      _submitBtn('➕ הוסף רישום', 'btn btn-primary btn-sm') +
+      '</form></div></div>';
+  }
+  tlHtml += '</div>';
+  s += tlHtml;
 
-    // הקצאת חייל לתרגיל זה — מפקד קורס בלבד
+  // Participants
+  const parts = Assignments_byExercise(ex.id);
+  let pHtml = '<div class="card">' +
+    '<div class="card-header"><span class="card-title">👥 משתתפים (' + parts.length + ')</span></div>';
+
+  if (!parts.length) {
+    pHtml += '<div class="empty">אין משתתפים</div>';
+  } else {
+    pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr><th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th></tr></thead><tbody>';
+    parts.forEach(function(a) {
+      const u = Users_get(a.user_id);
+      pHtml += '<tr><td><b>' + _esc(u ? u.name : a.user_id) + '</b></td>' +
+        '<td>' + _esc(a.responsibility) + '</td>' +
+        '<td>' + _statusBadge(a.status) + '</td>' +
+        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td></tr>';
+    });
+    pHtml += '</tbody></table></div>';
+  }
+  pHtml += '</div>';
+  s += pHtml;
+  s += '</div>'; // end grid-2
+
+  // ── Admin-only panels ──
+  if (user.role === 'admin') {
+
+    // Edit exercise + Assign soldier — side by side
+    s += '<div class="grid-2" style="margin-bottom:14px">';
+
+    // Edit form
+    s += '<div class="collapsible">' +
+      '<button class="collapsible-toggle">✏ עריכת פרטי תרגיל <span class="arrow">▾</span></button>' +
+      '<div class="collapsible-content"><div class="card"><div class="card-body">' +
+      _formOpen() +
+      '<input type="hidden" name="action" value="editExercise">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
+      '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', '', ex.title, 'text', 'required') + '</div>' +
+      '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', '', ex.description) + '</div>' +
+      '<div class="form-row"><label class="form-label">תאריך</label>' + _dateInput('date', ex.rawDate) + '</div>' +
+      _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
+      '</form>' +
+      '</div></div></div></div>';
+
+    // Assign soldier
     const allUsers = Users_all();
-    const assignedIds = parts.map(a => a.user_id);
-    const availableUsers = allUsers.filter(u => assignedIds.indexOf(u.id) === -1);
-    let assignInner;
-    if (!availableUsers.length) {
-      assignInner = '<p><i>כל המשתמשים כבר הוקצו לתרגיל זה.</i></p>';
+    const assignedIds = parts.map(function(a){ return a.user_id; });
+    const available = allUsers.filter(function(u){ return assignedIds.indexOf(u.id) === -1; });
+
+    let assignBody;
+    if (!available.length) {
+      assignBody = '<div class="empty">כל המשתמשים כבר הוקצו</div>';
     } else {
-      assignInner =
+      const respOptions = ['מפקד','נווט','חובש','קשר','צלף','נהג','לוחם','תצפיתן','לוגיסטיקה'];
+      const userOptions = available.map(function(u){ return [u.id, u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')']; });
+      assignBody =
         _formOpen() +
         '<input type="hidden" name="action" value="assign">' +
         '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
         '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-        '<p><b>חייל:</b><br><select name="userId" required style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial">' +
-          availableUsers.map(u => '<option value="' + _esc(u.id) + '">' + _esc(u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')') + '</option>').join('') +
-        '</select></p>' +
-        '<p><b>תפקיד באירוע:</b><br><input name="responsibility" list="respList" required placeholder="לדוגמה: חובש, צלף, מפקד..." size="40" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial"></p>' +
-        _datalistResp() +
-        '<p>' + _btn('הקצה חייל לתרגיל') + '</p></form>';
+        '<div class="form-row"><label class="form-label">חייל</label>' + _select('userId', userOptions) + '</div>' +
+        '<div class="form-row"><label class="form-label">תפקיד</label>' +
+        '<input name="responsibility" list="respList" placeholder="בחר או הקלד..." class="form-input" required>' +
+        '<datalist id="respList">' + respOptions.map(function(r){ return '<option value="' + r + '">'; }).join('') + '</datalist>' +
+        '</div>' +
+        _submitBtn('➤ הקצה חייל', 'btn btn-primary') +
+        '</form>';
     }
-    s += _panel('➤ הקצאת חייל לתרגיל', assignInner);
+
+    s += '<div class="collapsible">' +
+      '<button class="collapsible-toggle">➤ הקצאת חייל לתרגיל <span class="arrow">▾</span></button>' +
+      '<div class="collapsible-content"><div class="card"><div class="card-body">' + assignBody + '</div></div></div></div>';
+
+    s += '</div>'; // end grid-2
   }
 
+  s += '</div>'; // end page
   return _html(s, ex.title);
 }
 
-// ─────────── ניהול משתמשים ───────────
+// ─────────── USERS PAGE ───────────
 function Views_users(p) {
   const user = Auth_current(p);
   if (!user || user.role !== 'admin') return Views_error('גישה למפקדי קורס בלבד.', p);
   const sid = user.id;
   const users = Users_all();
 
-  let table = _tableOpen(['מספר אישי', 'שם', 'תפקיד', 'צוות', 'עדכון']);
-  users.forEach(u => {
-    table += '<tr><td><font face="Courier New, monospace" color="#9fd66e">' + _esc(u.id) + '</font></td>' +
-             '<td><b>' + _esc(u.name) + '</b></td>' +
-             '<td>' + _esc(_roleHe(u.role)) + '</td>' +
-             '<td>' + _esc(u.team_id) + '</td><td>' +
-             _formOpen() +
-             '<input type="hidden" name="action" value="updateRole">' +
-             '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-             '<input type="hidden" name="targetId" value="' + _esc(u.id) + '">' +
-             '<select name="newRole" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:4px">' +
-               [['admin','מפקד קורס'],['commander','מפקד צוות'],['trainee','חניך']].map(r =>
-                 '<option value="' + r[0] + '"' + (r[0] === u.role ? ' selected' : '') + '>' + r[1] + '</option>').join('') +
-             '</select> ' +
-             'צוות: <input name="newTeam" value="' + _esc(u.team_id) + '" size="6" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:4px"> ' +
-             _btn('שמור') +
-             '</form></td></tr>';
-  });
-  table += '</table>';
+  let table = '<div class="card"><div class="card-body" style="padding:0">' +
+    '<table class="tbl"><thead><tr>' +
+    '<th>מספר אישי</th><th>שם</th><th>תפקיד נוכחי</th><th>צוות</th><th>עדכון</th>' +
+    '</tr></thead><tbody>';
 
-  const body = _nav(user, sid) + _flash(p) +
-               '<h1><font color="#9fd66e">▌ ניהול משתמשים ותפקידים</font></h1>' +
-               _panel('כל המשתמשים במערכת (' + users.length + ')', table);
+  users.forEach(function(u) {
+    table += '<tr>' +
+      '<td class="mono">' + _esc(u.id) + '</td>' +
+      '<td><b>' + _esc(u.name) + '</b></td>' +
+      '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : 'muted') + '</td>' +
+      '<td>' + (u.team_id ? _esc(u.team_id) : '—') + '</td>' +
+      '<td>' +
+      _formOpen('form-inline') +
+      '<input type="hidden" name="action" value="updateRole">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="targetId" value="' + _esc(u.id) + '">' +
+      _select('newRole', [['admin','מפקד קורס'],['commander','מפקד צוות'],['trainee','חניך']], u.role) +
+      '<input name="newTeam" value="' + _esc(u.team_id) + '" class="form-input" style="width:60px" placeholder="צוות">' +
+      _submitBtn('💾', 'btn btn-primary btn-sm btn-icon') +
+      '</form></td></tr>';
+  });
+
+  table += '</tbody></table></div></div>';
+
+  const body = _topbar(user, sid) +
+    '<div class="page">' +
+    _flash(p) +
+    '<div class="page-title">👤 ניהול משתמשים</div>' +
+    table +
+    '</div>';
   return _html(body, 'ניהול משתמשים');
 }

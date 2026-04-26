@@ -2,10 +2,47 @@
 //  exercises.gs — exercise CRUD + duplication
 // ═══════════════════════════════════════
 
+// Format a spreadsheet date cell value → e.g. "יום שלישי, 15 באפריל 2025"
+// Google Sheets gives Date cells as JS Date objects (midnight UTC).
+function _fmtDate(val) {
+  if (!val) return '';
+  const months = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני',
+                  'יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  const days   = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  let dd, mm, yy, wd;
+  if (val instanceof Date) {
+    // Sheet Date objects are midnight UTC — use UTC accessors to avoid timezone shift
+    dd = val.getUTCDate();
+    mm = val.getUTCMonth();
+    yy = val.getUTCFullYear();
+    wd = val.getUTCDay();
+  } else {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    dd = d.getUTCDate();
+    mm = d.getUTCMonth();
+    yy = d.getUTCFullYear();
+    wd = d.getUTCDay();
+  }
+  return 'יום ' + days[wd] + ', ' + dd + ' ב' + months[mm] + ' ' + yy;
+}
+
+
+// Returns "YYYY-MM-DD" for the date picker value attribute
+function _rawDate(val) {
+  if (!val) return '';
+  let d = (val instanceof Date) ? val : new Date(val);
+  if (isNaN(d.getTime())) return '';
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth()+1).padStart(2,'0');
+  const dd = String(d.getUTCDate()).padStart(2,'0');
+  return y + '-' + m + '-' + dd;
+}
+
 function Exercises_all() {
   return _rows('Exercises').data.map(r => ({
     id: String(r[0]), title: String(r[1]), description: String(r[2]),
-    created_by: String(r[3]), date: r[4] ? String(r[4]) : ''
+    created_by: String(r[3]), date: _fmtDate(r[4]), rawDate: _rawDate(r[4])
   }));
 }
 
@@ -43,7 +80,6 @@ function Exercises_duplicate(p) {
   if (!orig) throw new Error('התרגיל לא נמצא.');
   const newId = 'E' + _nextId('Exercises');
   _append('Exercises', [newId, orig.title + ' (copy)', orig.description, u.id, orig.date]);
-  // Copy details
   Exercises_details(orig.id).forEach(d => {
     const did = 'D' + _nextId('ExerciseDetails');
     _append('ExerciseDetails', [did, newId, d.time, d.location, d.description]);

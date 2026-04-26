@@ -60,7 +60,7 @@ function _append(name, row) { _sheet(name).appendRow(row); }
 function _nextId(name) {
   const { data } = _rows(name);
   let max = 0;
-  data.forEach(r => { const n = parseInt(r[0], 10); if (!isNaN(n) && n > max) max = n; });
+  data.forEach(r => { const n = parseInt(String(r[0]).replace(/^[^0-9]+/, ''), 10); if (!isNaN(n) && n > max) max = n; });
   return max + 1;
 }
 function _findRowIndex(name, idValue) {
