@@ -1,42 +1,27 @@
-# ★ צה״ל — מערכת ניהול תרגילי אימון (גרסה 9)
+# Military Training App — v10 (Admin-only assignments, on exercise page)
 
-מערכת ניהול תרגילי אימון צבאית, בנויה כ-Google Apps Script Web App עם Google Sheets כמסד נתונים.
+## What changed in v10
+- **Assignments are now admin-only.** Commanders can no longer assign exercises.
+  - `Assignments_assign` requires role `admin`.
+- **Assignment form moved to the Exercise page.**
+  - Removed the "Assign exercise" panel from the admin dashboard (a hint now
+    points users to open the exercise page).
+  - Removed the per-trainee assign form from the commander dashboard.
+  - The Exercise page (admin only) now shows a new panel
+    **"➤ הקצאת חייל לתרגיל"** that lists only users who are NOT yet assigned
+    to that exercise, plus the responsibility input.
+- After a successful assignment, the user is returned to the same exercise page
+  with a confirmation flash.
 
-## ✨ חדש בגרסה 9
-- 🟢 **עיצוב צבאי-ירוק** בסגנון צה״ל (ירוק זית, פונט מונוספייס)
-- 🇮🇱 **עברית מלאה** + RTL
-- ★ סמל צה״ל בכותרת
-- כל ההודעות, התפקידים, והסטטוסים מתורגמים
+## Commander capabilities (unchanged)
+- View their team and their team's assignments.
+- Mark assignments as complete (`action=complete`).
 
-## תפקידים
-- **מפקד קורס** (admin) — ניהול מלא
-- **מפקד צוות** (commander) — ניהול צוות בלבד
-- **חניך** (trainee) — צפייה בתרגילים שהוקצו
-
-## משתמשי דמו
-| מספר אישי | סיסמה | תפקיד |
-|---|---|---|
-| U001 | admin123 | מפקד קורס |
-| U002 | cmd123 | מפקד צוות |
-| U003 | train123 | חניך |
-
-## התקנה
-1. פתח את גיליון ה-Google Sheets שלך → **הרחבות → Apps Script**
-2. החלף את כל הקבצים בקבצים מ-zip זה (כולל `index.html`)
-3. הרץ פעם אחת `setupSheets()` או `resetTrainingTables()` (לאיפוס מלא)
-4. **פריסה → ניהול פריסות → ערוך (עיפרון) → גרסה: גרסה חדשה**
-5. גש ל-Web App URL והתחבר
-
-## מבנה גיליונות
-- **Users**: id, name, role, team_id
-- **Credentials**: user_id, password
-- **Teams**: id, name, commander_id
-- **Exercises**: id, title, description, created_by, date
-- **ExerciseDetails**: id, exercise_id, time, location, description
-- **Assignments**: id, exercise_id, user_id, status, score, **responsibility**
-
-## ארכיטקטורה
-- כל פעולה דרך GET (כדי לעקוף את מגבלות iframe של Apps Script)
-- תבנית מרכזית: `index.html` עם `<base target="_top">` להבטחת ניווט בחלון העליון
-- כל הקישורים מוחלטים דרך `ScriptApp.getService().getUrl()`
-- ללא JavaScript בצד לקוח — הכל server-rendered
+## Deployment
+1. Replace all files in your Apps Script project (Code.gs, auth.gs, users.gs,
+   exercises.gs, assignments.gs, views.gs, index.html).
+2. **Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy.**
+3. Test:
+   - Login as `U001 / admin123`.
+   - Open any exercise → scroll to **"➤ הקצאת חייל לתרגיל"** → assign.
+   - Login as `U002 / cmd123` → confirm no assign form is visible.

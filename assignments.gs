@@ -24,26 +24,21 @@ function Assignments_byExercise(exerciseId) {
 }
 
 function Assignments_assign(p) {
-  const u = Auth_requireRole(p, ['admin','commander']);
+  // הקצאה מותרת למפקדי קורס (admin) בלבד
+  Auth_requireRole(p, ['admin']);
   const exId   = (p.exerciseId    || '').trim();
   const userId = (p.userId        || '').trim();
   const resp   = (p.responsibility|| '').trim();
   if (!exId || !userId) throw new Error('חסר תרגיל או חייל.');
   if (!resp) throw new Error('יש לציין תפקיד.');
 
-  // Commander can only assign to trainees in their team
-  if (u.role === 'commander') {
-    const trainees = Users_traineesOfCommander(u.id).map(t => t.id);
-    if (trainees.indexOf(userId) === -1) throw new Error('לא ניתן להקצות לחייל מחוץ לצוות שלך.');
-  }
-
   // No duplicate
   const exists = Assignments_all().some(a => a.exercise_id === exId && a.user_id === userId);
-  if (exists) return Views_dashboard({ sid: p.sid, info: 'התרגיל כבר הוקצה לחייל זה.' });
+  if (exists) return Views_exercise({ sid: p.sid, id: exId, info: 'התרגיל כבר הוקצה לחייל זה.' });
 
   const id = 'A' + _nextId('Assignments');
   _append('Assignments', [id, exId, userId, 'pending', '', resp]);
-  return Views_dashboard({ sid: p.sid, info: 'הוקצה בהצלחה (' + id + ') בתפקיד ' + resp + '.' });
+  return Views_exercise({ sid: p.sid, id: exId, info: 'הוקצה בהצלחה (' + id + ') בתפקיד ' + resp + '.' });
 }
 
 function Assignments_complete(p) {

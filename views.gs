@@ -174,20 +174,10 @@ function _adminDashboard(sid) {
     '<p><b>תאריך:</b><br><input type="date" name="date" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
     '<p>' + _btn('צור תרגיל') + '</p></form>');
 
-  // הקצאת תרגיל
+  // הקצאת תרגיל מתבצעת כעת מתוך עמוד התרגיל עצמו (כניסה דרך "צפייה / עריכה").
   s += _panel('הקצאת תרגיל לחייל',
-    _formOpen() +
-    '<input type="hidden" name="action" value="assign">' +
-    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-    '<p><b>תרגיל:</b><br><select name="exerciseId" required style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial">' +
-       exs.map(e => '<option value="' + _esc(e.id) + '">' + _esc(e.id + ' — ' + e.title) + '</option>').join('') +
-    '</select></p>' +
-    '<p><b>חייל:</b><br><select name="userId" required style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial">' +
-       users.map(u => '<option value="' + _esc(u.id) + '">' + _esc(u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')') + '</option>').join('') +
-    '</select></p>' +
-    '<p><b>תפקיד באירוע:</b><br><input name="responsibility" list="respList" required placeholder="לדוגמה: חובש, צלף, מפקד..." size="40" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial"></p>' +
-    _datalistResp() +
-    '<p>' + _btn('הקצה תרגיל') + '</p></form>');
+    '<font color="#d4e8c4">כדי להקצות חייל לתרגיל, פתח את התרגיל מטבלת התרגילים שלמעלה ' +
+    'ובחר ב-<b><font color="#9fd66e">"הקצאת חייל לתרגיל"</font></b> בתחתית עמוד התרגיל.</font>');
 
   return s;
 }
@@ -220,17 +210,8 @@ function _commanderDashboard(user, sid) {
       });
       inner += '</table>';
     }
-    inner += '<br><b>הקצאת תרגיל חדש:</b><br>' +
-             _formOpen() +
-             '<input type="hidden" name="action" value="assign">' +
-             '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-             '<input type="hidden" name="userId" value="' + _esc(t.id) + '">' +
-             'תרגיל: <select name="exerciseId" required style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:4px">' +
-               exs.map(e => '<option value="' + _esc(e.id) + '">' + _esc(e.title) + '</option>').join('') +
-             '</select> ' +
-             'תפקיד: <input name="responsibility" list="respList" required placeholder="לדוגמה: חובש" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:4px"> ' +
-             _btn('הקצה');
-    inner += '</form>';
+    // הקצאת חיילים לתרגיל מתבצעת ע"י מפקד הקורס בלבד, מתוך עמוד התרגיל.
+
 
     s += _panel('🪖 ' + _esc(t.name) + ' &nbsp; (' + _esc(t.id) + ')', inner);
   });
@@ -322,6 +303,28 @@ function Views_exercise(p) {
       '<p><b>מיקום:</b> <input name="location" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
       '<p><b>תיאור:</b><br><input name="detailDescription" size="60" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px"></p>' +
       '<p>' + _btn('הוסף רישום') + '</p></form>');
+
+    // הקצאת חייל לתרגיל זה — מפקד קורס בלבד
+    const allUsers = Users_all();
+    const assignedIds = parts.map(a => a.user_id);
+    const availableUsers = allUsers.filter(u => assignedIds.indexOf(u.id) === -1);
+    let assignInner;
+    if (!availableUsers.length) {
+      assignInner = '<p><i>כל המשתמשים כבר הוקצו לתרגיל זה.</i></p>';
+    } else {
+      assignInner =
+        _formOpen() +
+        '<input type="hidden" name="action" value="assign">' +
+        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+        '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+        '<p><b>חייל:</b><br><select name="userId" required style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial">' +
+          availableUsers.map(u => '<option value="' + _esc(u.id) + '">' + _esc(u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')') + '</option>').join('') +
+        '</select></p>' +
+        '<p><b>תפקיד באירוע:</b><br><input name="responsibility" list="respList" required placeholder="לדוגמה: חובש, צלף, מפקד..." size="40" style="background:#0a1a0a;color:#9fd66e;border:2px solid #4B5320;padding:6px;font-family:Arial"></p>' +
+        _datalistResp() +
+        '<p>' + _btn('הקצה חייל לתרגיל') + '</p></form>';
+    }
+    s += _panel('➤ הקצאת חייל לתרגיל', assignInner);
   }
 
   return _html(s, ex.title);
