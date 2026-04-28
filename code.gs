@@ -20,6 +20,7 @@ function doGet(e) {
     if (action === 'createExercise')     return Exercises_create(p);
     if (action === 'editExercise')       return Exercises_edit(p);
     if (action === 'duplicateExercise')  return Exercises_duplicate(p);
+    if (action === 'deleteExercise')      return Exercises_delete(p);
     if (action === 'addDetail')          return Exercises_addDetail(p);
     if (action === 'assign')             return Assignments_assign(p);
     if (action === 'complete')           return Assignments_complete(p);

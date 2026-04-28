@@ -114,3 +114,36 @@ function Exercises_addDetail(p) {
   _append('ExerciseDetails', [did, exId, p.time || '', p.location || '', p.detailDescription || '']);
   return Views_exercise({ sid: p.sid, id: exId, info: 'רישום ציר הזמן נוסף בהצלחה.' });
 }
+
+// Safe delete: removes exercise + all its ExerciseDetails + all its Assignments
+function Exercises_delete(p) {
+  Auth_requireRole(p, ['admin']);
+  const id = (p.id || '').trim();
+  if (!id) throw new Error('חסר מזהה תרגיל.');
+
+  // 1. Delete all Assignments for this exercise
+  const assignSh = _sheet('Assignments');
+  let assignData = _rows('Assignments').data;
+  // Delete from bottom up to preserve row indices
+  for (let i = assignData.length - 1; i >= 0; i--) {
+    if (String(assignData[i][1]) === id) {
+      assignSh.deleteRow(i + 2); // +2: 1-based + header row
+    }
+  }
+
+  // 2. Delete all ExerciseDetails for this exercise
+  const detailSh = _sheet('ExerciseDetails');
+  let detailData = _rows('ExerciseDetails').data;
+  for (let i = detailData.length - 1; i >= 0; i--) {
+    if (String(detailData[i][1]) === id) {
+      detailSh.deleteRow(i + 2);
+    }
+  }
+
+  // 3. Delete the exercise itself
+  const row = _findRowIndex('Exercises', id);
+  if (row < 0) throw new Error('התרגיל לא נמצא.');
+  _sheet('Exercises').deleteRow(row);
+
+  return Views_dashboard({ sid: p.sid, info: 'התרגיל נמחק יחד עם כל ההקצאות ורשומות ציר הזמן.' });
+}

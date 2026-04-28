@@ -468,6 +468,16 @@
 <body>
 <?!= body ?>
 <script>
+  // Confirm-before-delete for all 🗑 delete buttons
+  function confirmDelete(el) {
+    const msg = el.dataset.confirm || 'בטוח שרוצים למחוק?';
+    if (!confirm(msg)) return false;
+    // Show brief loading state
+    el.textContent = '⏳...';
+    el.style.pointerEvents = 'none';
+    return true;
+  }
+
   // Collapsible toggle (for .collapsible-toggle buttons)
   document.querySelectorAll('.collapsible-toggle').forEach(btn => {
     btn.addEventListener('click', function() {

@@ -2,7 +2,7 @@
 //  users.gs — users, teams, roles
 // ═══════════════════════════════════════
 
-// ─── Users ───
+// ── Users ──
 
 function Users_all() {
   return _rows('Users').data.map(r => ({
@@ -25,61 +25,81 @@ function Users_traineesOfCommander(commanderId) {
   return Users_all().filter(u => u.role === 'trainee' && teams.indexOf(u.team_id) !== -1);
 }
 
+// Create a new user (admin only)
+function Users_create(p) {
+  Auth_requireRole(p, ['admin']);
+  const newId   = (p.newUserId   || '').trim();
+  const name    = (p.newName     || '').trim();
+  const pass    = (p.newPassword || '').trim();
+  const role    = (p.newRole     || 'trainee').trim();
+  const teamId  = (p.newTeamId   || '').trim();
+
+  if (!newId)  throw new Error('נא להזין מספר אישי.');
+  if (!name)   throw new Error('נא להזין שם מלא.');
+  if (!pass)   throw new Error('נא להזין סיסמה.');
+  if (['admin','commander','trainee'].indexOf(role) === -1) throw new Error('תפקיד לא חוקי.');
+
+  // Uniqueness check
+  if (Users_get(newId)) throw new Error('מספר אישי ' + newId + ' כבר קיים במערכת.');
+
+  _append('Users',       [newId, name, role, teamId]);
+  _append('Credentials', [newId, pass]);
+
+  return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש ' + name + ' (' + newId + ') נוצר בהצלחה.' });
+}
+
+// Delete a user (admin only)
+function Users_delete(p) {
+  Auth_requireRole(p, ['admin']);
+  const targetId = (p.targetId || '').trim();
+  if (!targetId) throw new Error('חסר מזהה משתמש.');
+  if (targetId === p.sid) throw new Error('לא ניתן למחוק את המשתמש המחובר.');
+
+  const row = _findRowIndex('Users', targetId);
+  if (row < 0) throw new Error('המשתמש לא נמצא.');
+  _sheet('Users').deleteRow(row);
+
+  // Delete credentials
+  const credRow = _findRowIndex('Credentials', targetId);
+  if (credRow > 0) _sheet('Credentials').deleteRow(credRow);
+
+  // Delete all Assignments belonging to this user (cascade)
+  const assignSh = _sheet('Assignments');
+  const assignData = _rows('Assignments').data;
+  for (let i = assignData.length - 1; i >= 0; i--) {
+    if (String(assignData[i][2]) === targetId) {
+      assignSh.deleteRow(i + 2);
+    }
+  }
+
+  // Remove as commander from any team
+  const teamsSh = _sheet('Teams');
+  const teamsData = _rows('Teams').data;
+  teamsData.forEach(function(r, i) {
+    if (String(r[2]) === targetId) {
+      teamsSh.getRange(i + 2, 3).setValue('');
+    }
+  });
+
+  return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש נמחק יחד עם כל ההקצאות שלו.' });
+}
+
+// Update role only (from users tab)
 function Users_updateRole(p) {
   Auth_requireRole(p, ['admin']);
   const targetId = (p.targetId || '').trim();
   const newRole  = (p.newRole  || '').trim();
   if (!targetId) throw new Error('חסר מזהה משתמש.');
   if (['admin','commander','trainee'].indexOf(newRole) === -1) throw new Error('תפקיד לא חוקי.');
+
   const row = _findRowIndex('Users', targetId);
   if (row < 0) throw new Error('המשתמש לא נמצא.');
   _sheet('Users').getRange(row, 3).setValue(newRole);
-  return Views_users({ sid: p.sid, info: 'התפקיד עודכן בהצלחה.', tab: 'users' });
+
+  return Views_users({ sid: p.sid, tab: 'users', info: 'התפקיד עודכן בהצלחה.' });
 }
 
-function Users_create(p) {
-  Auth_requireRole(p, ['admin']);
-  const userId   = (p.newUserId   || '').trim();
-  const name     = (p.newName     || '').trim();
-  const password = (p.newPassword || '').trim();
-  const role     = (p.newRole     || 'trainee').trim();
-  const teamId   = (p.newTeamId   || '').trim();
-
-  if (!userId || !name || !password) throw new Error('יש למלא מספר אישי, שם וסיסמה.');
-  if (['admin','commander','trainee'].indexOf(role) === -1) throw new Error('תפקיד לא חוקי.');
-
-  // Check duplicate ID
-  if (Users_get(userId)) throw new Error('מספר אישי ' + userId + ' כבר קיים במערכת.');
-
-  _append('Users', [userId, name, role, teamId]);
-  _append('Credentials', [userId, password]);
-
-  // If a team was selected, verify it exists
-  if (teamId && _findRowIndex('Teams', teamId) < 0) throw new Error('הצוות לא נמצא.');
-
-  return Views_users({ sid: p.sid, info: 'המשתמש ' + name + ' (' + userId + ') נוצר בהצלחה.', tab: 'create' });
-}
-
-function Users_delete(p) {
-  Auth_requireRole(p, ['admin']);
-  const targetId = (p.targetId || '').trim();
-  if (!targetId) throw new Error('חסר מזהה משתמש.');
-
-  const me = Auth_current(p);
-  if (me && me.id === targetId) throw new Error('לא ניתן למחוק את המשתמש המחובר.');
-
-  const rowU = _findRowIndex('Users', targetId);
-  if (rowU < 0) throw new Error('המשתמש לא נמצא.');
-  _sheet('Users').deleteRow(rowU);
-
-  // Remove credentials
-  const rowC = _findRowIndex('Credentials', targetId);
-  if (rowC > 0) _sheet('Credentials').deleteRow(rowC);
-
-  return Views_users({ sid: p.sid, info: 'המשתמש נמחק.', tab: 'users' });
-}
-
-// ─── Teams ───
+// ── Teams ──
 
 function Teams_all() {
   return _rows('Teams').data.map(r => ({
@@ -91,45 +111,55 @@ function Teams_get(id) {
   return Teams_all().find(t => t.id === String(id)) || null;
 }
 
+// Create a new team
 function Teams_create(p) {
   Auth_requireRole(p, ['admin']);
   const name = (p.teamName || '').trim();
-  if (!name) throw new Error('יש להזין שם לצוות.');
+  if (!name) throw new Error('נא להזין שם צוות.');
 
   const id = 'T' + _nextId('Teams');
   _append('Teams', [id, name, '']);
-  return Views_users({ sid: p.sid, info: 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.', tab: 'teams' });
+  return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.' });
 }
 
+// Rename a team
 function Teams_rename(p) {
   Auth_requireRole(p, ['admin']);
   const teamId = (p.teamId   || '').trim();
   const name   = (p.teamName || '').trim();
-  if (!teamId || !name) throw new Error('חסר מזהה צוות או שם.');
+  if (!teamId) throw new Error('חסר מזהה צוות.');
+  if (!name)   throw new Error('נא להזין שם חדש.');
+
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
   _sheet('Teams').getRange(row, 2).setValue(name);
-  return Views_users({ sid: p.sid, info: 'שם הצוות עודכן ל"' + name + '".', tab: 'teams' });
+  return Views_users({ sid: p.sid, tab: 'teams', info: 'שם הצוות עודכן ל"' + name + '".' });
 }
 
+// Delete a team (removes team_id from all members)
 function Teams_delete(p) {
   Auth_requireRole(p, ['admin']);
   const teamId = (p.teamId || '').trim();
   if (!teamId) throw new Error('חסר מזהה צוות.');
+
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
+  _sheet('Teams').deleteRow(row);
 
-  // Clear team_id from all members
-  const sh = _sheet('Users');
+  // Clear team_id for all members of this team
+  const usersSh = _sheet('Users');
   const { data } = _rows('Users');
   data.forEach((r, i) => {
-    if (String(r[3]) === teamId) sh.getRange(i + 2, 4).setValue('');
+    if (String(r[3]) === teamId) {
+      usersSh.getRange(i + 2, 4).setValue('');
+    }
   });
 
-  _sheet('Teams').deleteRow(row);
-  return Views_users({ sid: p.sid, info: 'הצוות נמחק.', tab: 'teams' });
+  // Also clear commander_id references pointing to this team (already handled above)
+  return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות נמחק וחברים הוסרו ממנו.' });
 }
 
+// Set team commander (updates Teams sheet col C)
 function Teams_setCommander(p) {
   Auth_requireRole(p, ['admin']);
   const teamId      = (p.teamId      || '').trim();
@@ -139,33 +169,26 @@ function Teams_setCommander(p) {
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
   _sheet('Teams').getRange(row, 3).setValue(commanderId);
-
-  // If a commander was selected, make sure they're in this team
-  if (commanderId) {
-    const userRow = _findRowIndex('Users', commanderId);
-    if (userRow > 0) _sheet('Users').getRange(userRow, 4).setValue(teamId);
-  }
-
-  const msg = commanderId ? 'המפקד הוגדר בהצלחה.' : 'המפקד הוסר מהצוות.';
-  return Views_users({ sid: p.sid, info: msg, tab: 'teams' });
+  return Views_users({ sid: p.sid, tab: 'teams', info: 'מפקד הצוות עודכן.' });
 }
 
+// Add a user to a team (sets user's team_id)
 function Teams_addMember(p) {
   Auth_requireRole(p, ['admin']);
   const teamId = (p.teamId || '').trim();
   const userId = (p.userId || '').trim();
-  if (!teamId || !userId) throw new Error('חסר מזהה צוות או משתמש.');
+  if (!teamId || !userId) throw new Error('חסרים פרטים.');
 
-  if (_findRowIndex('Teams', teamId) < 0) throw new Error('הצוות לא נמצא.');
+  if (!Teams_get(teamId)) throw new Error('הצוות לא נמצא.');
+
   const userRow = _findRowIndex('Users', userId);
   if (userRow < 0) throw new Error('המשתמש לא נמצא.');
-
   _sheet('Users').getRange(userRow, 4).setValue(teamId);
 
-  const user = Users_get(userId);
-  return Views_users({ sid: p.sid, info: (user ? user.name : userId) + ' נוסף לצוות.', tab: 'teams' });
+  return Views_users({ sid: p.sid, tab: 'teams', info: 'המשתמש נוסף לצוות.' });
 }
 
+// Remove a user from a team (clears team_id)
 function Teams_removeMember(p) {
   Auth_requireRole(p, ['admin']);
   const userId = (p.userId || '').trim();
@@ -173,17 +196,7 @@ function Teams_removeMember(p) {
 
   const userRow = _findRowIndex('Users', userId);
   if (userRow < 0) throw new Error('המשתמש לא נמצא.');
-
-  // Also clear as commander if they were set
-  const user = Users_get(userId);
-  if (user) {
-    const teamRow = _findRowIndex('Teams', user.team_id);
-    if (teamRow > 0) {
-      const cmdId = String(_sheet('Teams').getRange(teamRow, 3).getValue());
-      if (cmdId === userId) _sheet('Teams').getRange(teamRow, 3).setValue('');
-    }
-  }
-
   _sheet('Users').getRange(userRow, 4).setValue('');
-  return Views_users({ sid: p.sid, info: (user ? user.name : userId) + ' הוסר מהצוות.', tab: 'teams' });
+
+  return Views_users({ sid: p.sid, tab: 'teams', info: 'המשתמש הוסר מהצוות.' });
 }
