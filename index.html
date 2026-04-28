@@ -468,6 +468,18 @@
 <body>
 <?!= body ?>
 <script>
+  // Inline edit-panel toggle for user rows
+  function toggleEditPanel(btn) {
+    const targetId = btn.dataset.target;
+    const row = document.getElementById(targetId);
+    if (!row) return;
+    const isOpen = row.style.display !== 'none' && row.style.display !== '';
+    row.style.display = isOpen ? 'none' : 'table-row';
+    btn.textContent = isOpen ? '✏ עריכה' : '✕ סגור';
+    btn.classList.toggle('btn-ghost', isOpen);
+    btn.classList.toggle('btn-secondary', !isOpen);
+  }
+
   // Confirm-before-delete for all 🗑 delete buttons
   function confirmDelete(el) {
     const msg = el.dataset.confirm || 'בטוח שרוצים למחוק?';

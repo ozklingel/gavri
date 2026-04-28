@@ -20,29 +20,11 @@ function doGet(e) {
     if (action === 'createExercise')     return Exercises_create(p);
     if (action === 'editExercise')       return Exercises_edit(p);
     if (action === 'duplicateExercise')  return Exercises_duplicate(p);
-    if (action === 'deleteExercise')      return Exercises_delete(p);
     if (action === 'addDetail')          return Exercises_addDetail(p);
     if (action === 'assign')             return Assignments_assign(p);
     if (action === 'complete')           return Assignments_complete(p);
-    if (action === 'removeAssignment')    return Assignments_remove(p);
-    if (action === 'assignTeam')          return Assignments_assignTeamAction(p);
     if (action === 'updateRole')         return Users_updateRole(p);
-    if (action === 'createUser')          return Users_create(p);
-    if (action === 'deleteUser')          return Users_delete(p);
-    if (action === 'createTeam')          return Teams_create(p);
-    if (action === 'renameTeam')          return Teams_rename(p);
-    if (action === 'deleteTeam')          return Teams_delete(p);
-    if (action === 'setCommander')        return Teams_setCommander(p);
-    if (action === 'addMember')           return Teams_addMember(p);
-    if (action === 'removeMember')        return Teams_removeMember(p);
-    if (action === 'createUser')          return Users_create(p);
-    if (action === 'deleteUser')          return Users_delete(p);
-    if (action === 'createTeam')          return Teams_create(p);
-    if (action === 'renameTeam')          return Teams_rename(p);
-    if (action === 'deleteTeam')          return Teams_delete(p);
-    if (action === 'setCommander')        return Teams_setCommander(p);
-    if (action === 'addMember')           return Teams_addMember(p);
-    if (action === 'removeMember')        return Teams_removeMember(p);
+    if (action === 'updateProfile')       return Users_updateProfile(p);
 
     // ── Pages (read-only renders) ──
     if (page === 'login')     return Views_login(p);
@@ -79,7 +61,7 @@ function _append(name, row) { _sheet(name).appendRow(row); }
 function _nextId(name) {
   const { data } = _rows(name);
   let max = 0;
-  data.forEach(r => { const n = parseInt(String(r[0]).replace(/^[^0-9]+/, ''), 10); if (!isNaN(n) && n > max) max = n; });
+  data.forEach(r => { const n = parseInt(r[0], 10); if (!isNaN(n) && n > max) max = n; });
   return max + 1;
 }
 function _findRowIndex(name, idValue) {
@@ -110,13 +92,18 @@ function setupSheets() {
     const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
     if (headers.indexOf(columnName) === -1) sh.getRange(1, lastCol + 1).setValue(columnName);
   };
-  ensure('Users',            ['id','name','role','team_id']);
+  ensure('Users',            ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role']);
   ensure('Credentials',      ['user_id','password']);
   ensure('Teams',            ['id','name','commander_id']);
   ensure('Exercises',        ['id','title','description','created_by','date']);
   ensure('ExerciseDetails',  ['id','exercise_id','time','location','description']);
   ensure('Assignments',      ['id','exercise_id','user_id','status','score','responsibility']);
   ensureColumn('Assignments', 'responsibility');
+  ensureColumn('Users', 'unit_affiliation');
+  ensureColumn('Users', 'service_type');
+  ensureColumn('Users', 'military_affiliation');
+  ensureColumn('Users', 'unit_classification');
+  ensureColumn('Users', 'target_role');
 
   // Seed demo users if Users is empty
   const usersSh = ss.getSheetByName('Users');
@@ -136,7 +123,7 @@ function setupSheets() {
 function resetTrainingTables() {
   const ss = SS();
   const schemas = {
-    Users: ['id','name','role','team_id'],
+    Users: ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role'],
     Credentials: ['user_id','password'],
     Teams: ['id','name','commander_id'],
     Exercises: ['id','title','description','created_by','date'],

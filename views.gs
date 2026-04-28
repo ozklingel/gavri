@@ -598,6 +598,32 @@ function Views_users(p) {
   return _html(body, 'ניהול משתמשים');
 }
 
+
+// Shared helper: render the 5 extra profile fields
+function _extraProfileFields(u) {
+  u = u || {};
+  const svcOpts = [
+    ['', '— בחר —'],
+    ['סדיר', 'סדיר'],
+    ['מילואים', 'מילואים'],
+    ['קבע', 'קבע'],
+    ['חובה', 'חובה']
+  ];
+  return '<hr class="divider">' +
+    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">// שדות פרופיל מורחב</div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">שיוך יחידתי</label>' +
+      _input('unit_affiliation', 'גולני / שריון...', u.unit_affiliation || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">סוג שירות</label>' +
+      _select('service_type', svcOpts, u.service_type || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">שיוך חיילי</label>' +
+      _input('military_affiliation', 'חיל הרגלים...', u.military_affiliation || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">אפיון יחידתי</label>' +
+      _input('unit_classification', 'קרבי / תומכי לחימה...', u.unit_classification || '') + '</div>' +
+    '</div>' +
+    '<div class="form-row"><label class="form-label">תפקיד אל"חיו מיועד</label>' +
+      _input('target_role', 'מ"כ / קמ"ן...', u.target_role || '') + '</div>';
+}
 // ── טאב צוותות ──
 function _teamsTab(sid, sidQ) {
   const teams = Teams_all();
@@ -739,32 +765,53 @@ function _usersTab(sid, sidQ) {
   const teamMap = {};
   teams.forEach(function(t) { teamMap[t.id] = t.name; });
 
-  let table = '<div class="card"><div class="card-body" style="padding:0">' +
+  let table = '<div class="card"><div class="card-body" style="padding:0;overflow-x:auto">' +
     '<table class="tbl"><thead><tr>' +
-    '<th>מספר אישי</th><th>שם</th><th>תפקיד</th><th>צוות</th><th>עריכה</th><th>מחיקה</th>' +
+    '<th>מספר אישי</th><th>שם</th><th>תפקיד</th><th>צוות</th>' +
+    '<th>שיוך יחידתי</th><th>סוג שירות</th><th>שיוך חיילי</th><th>אפיון יחידתי</th><th>תפקיד אל"חיו</th>' +
+    '<th>עריכה</th><th>מחיקה</th>' +
     '</tr></thead><tbody>';
 
   users.forEach(function(u) {
     const teamName = u.team_id && teamMap[u.team_id] ? teamMap[u.team_id] : (u.team_id || '—');
+    // Edit profile collapsible form
+    const editProfileForm =
+      _formOpen() +
+      '<input type="hidden" name="action" value="updateProfile">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="targetId" value="' + _esc(u.id) + '">' +
+      '<div class="form-grid">' +
+      '<div class="form-row"><label class="form-label">תפקיד</label>' +
+        _select('newRole', [['admin','מפקד קורס'],['commander','מפקד צוות'],['trainee','חניך']], u.role) +
+      '</div>' +
+      '</div>' +
+      _extraProfileFields(u) +
+      _submitBtn('💾 שמור', 'btn btn-primary btn-sm') +
+      '</form>';
+
     table += '<tr>' +
       '<td class="mono">' + _esc(u.id) + '</td>' +
       '<td><b>' + _esc(u.name) + '</b></td>' +
       '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : 'muted') + '</td>' +
       '<td>' + _esc(teamName) + '</td>' +
+      '<td>' + (u.unit_affiliation     ? _esc(u.unit_affiliation)     : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td>' + (u.service_type         ? _badge(_esc(u.service_type), 'muted') : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td>' + (u.unit_classification  ? _esc(u.unit_classification)  : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td>' + (u.target_role          ? _esc(u.target_role)          : '<span style="color:var(--muted)">—</span>') + '</td>' +
       '<td>' +
-        _formOpen('form-inline') +
-        '<input type="hidden" name="action" value="updateRole">' +
-        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-        '<input type="hidden" name="targetId" value="' + _esc(u.id) + '">' +
-        _select('newRole', [['admin','מפקד קורס'],['commander','מפקד צוות'],['trainee','חניך']], u.role) +
-        _submitBtn('💾', 'btn btn-primary btn-sm btn-icon') +
-        '</form>' +
+        '<button class="btn btn-ghost btn-sm" data-target="edit-' + _esc(u.id) + '" onclick="toggleEditPanel(this)">✏ עריכה</button>' +
       '</td>' +
       '<td>' +
         _confirmDelete(
           'action=deleteUser&sid=' + _esc(sid) + '&targetId=' + _esc(u.id),
           'מחיקת המשתמש ' + u.name + ' תסיר גם את ההקצאות שלו. להמשיך?'
         ) +
+      '</td></tr>' +
+      // Inline edit row
+      '<tr id="edit-' + _esc(u.id) + '" style="display:none">' +
+      '<td colspan="11" style="background:var(--bg3);padding:14px">' +
+        editProfileForm +
       '</td></tr>';
   });
 
@@ -792,6 +839,7 @@ function _createUserTab(sid, sidQ) {
     '</div>' +
     '<div class="form-row"><label class="form-label">צוות</label>' + _select('newTeamId', teamOptions) + '</div>' +
     '</div>' +
+    _extraProfileFields() +
     '<div style="margin-top:4px">' + _submitBtn('➕ צור משתמש', 'btn btn-primary') + '</div>' +
     '</form>';
 

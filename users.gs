@@ -6,7 +6,15 @@
 
 function Users_all() {
   return _rows('Users').data.map(r => ({
-    id: String(r[0]), name: String(r[1]), role: String(r[2]), team_id: String(r[3] || '')
+    id:                    String(r[0]),
+    name:                  String(r[1]),
+    role:                  String(r[2]),
+    team_id:               String(r[3] || ''),
+    unit_affiliation:      String(r[4] || ''),
+    service_type:          String(r[5] || ''),
+    military_affiliation:  String(r[6] || ''),
+    unit_classification:   String(r[7] || ''),
+    target_role:           String(r[8] || '')
   }));
 }
 
@@ -42,7 +50,14 @@ function Users_create(p) {
   // Uniqueness check
   if (Users_get(newId)) throw new Error('מספר אישי ' + newId + ' כבר קיים במערכת.');
 
-  _append('Users',       [newId, name, role, teamId]);
+  _append('Users', [
+    newId, name, role, teamId,
+    (p.unit_affiliation     || '').trim(),
+    (p.service_type         || '').trim(),
+    (p.military_affiliation || '').trim(),
+    (p.unit_classification  || '').trim(),
+    (p.target_role          || '').trim()
+  ]);
   _append('Credentials', [newId, pass]);
 
   return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש ' + name + ' (' + newId + ') נוצר בהצלחה.' });
@@ -199,4 +214,21 @@ function Teams_removeMember(p) {
   _sheet('Users').getRange(userRow, 4).setValue('');
 
   return Views_users({ sid: p.sid, tab: 'teams', info: 'המשתמש הוסר מהצוות.' });
+}
+
+// Update a user's extended profile fields (admin only)
+function Users_updateProfile(p) {
+  Auth_requireRole(p, ['admin']);
+  const targetId = (p.targetId || '').trim();
+  if (!targetId) throw new Error('חסר מזהה משתמש.');
+  const row = _findRowIndex('Users', targetId);
+  if (row < 0) throw new Error('המשתמש לא נמצא.');
+  const sh = _sheet('Users');
+  // Columns: 1=id,2=name,3=role,4=team_id,5=unit_affiliation,6=service_type,7=military_affiliation,8=unit_classification,9=target_role
+  sh.getRange(row, 5).setValue((p.unit_affiliation     || '').trim());
+  sh.getRange(row, 6).setValue((p.service_type         || '').trim());
+  sh.getRange(row, 7).setValue((p.military_affiliation || '').trim());
+  sh.getRange(row, 8).setValue((p.unit_classification  || '').trim());
+  sh.getRange(row, 9).setValue((p.target_role          || '').trim());
+  return Views_users({ sid: p.sid, tab: 'users', info: 'פרופיל המשתמש עודכן.' });
 }
