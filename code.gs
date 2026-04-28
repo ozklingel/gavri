@@ -23,7 +23,25 @@ function doGet(e) {
     if (action === 'addDetail')          return Exercises_addDetail(p);
     if (action === 'assign')             return Assignments_assign(p);
     if (action === 'complete')           return Assignments_complete(p);
+    if (action === 'removeAssignment')    return Assignments_remove(p);
+    if (action === 'assignTeam')          return Assignments_assignTeamAction(p);
     if (action === 'updateRole')         return Users_updateRole(p);
+    if (action === 'createUser')          return Users_create(p);
+    if (action === 'deleteUser')          return Users_delete(p);
+    if (action === 'createTeam')          return Teams_create(p);
+    if (action === 'renameTeam')          return Teams_rename(p);
+    if (action === 'deleteTeam')          return Teams_delete(p);
+    if (action === 'setCommander')        return Teams_setCommander(p);
+    if (action === 'addMember')           return Teams_addMember(p);
+    if (action === 'removeMember')        return Teams_removeMember(p);
+    if (action === 'createUser')          return Users_create(p);
+    if (action === 'deleteUser')          return Users_delete(p);
+    if (action === 'createTeam')          return Teams_create(p);
+    if (action === 'renameTeam')          return Teams_rename(p);
+    if (action === 'deleteTeam')          return Teams_delete(p);
+    if (action === 'setCommander')        return Teams_setCommander(p);
+    if (action === 'addMember')           return Teams_addMember(p);
+    if (action === 'removeMember')        return Teams_removeMember(p);
 
     // ── Pages (read-only renders) ──
     if (page === 'login')     return Views_login(p);

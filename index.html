@@ -477,6 +477,25 @@
     });
   });
 
+  // Mini-tab switcher — uses data-target, no onclick quoting issues
+  document.addEventListener('click', function(e) {
+    const tab = e.target.closest('.dp-tab');
+    if (!tab) return;
+    const targetId = tab.dataset.target;
+    const panel = document.getElementById(targetId);
+    if (!panel) return;
+    const tabRow = tab.parentElement;
+    const card   = tabRow.parentElement;
+    tabRow.querySelectorAll('.dp-tab').forEach(t => {
+      t.style.color = 'var(--muted)';
+      t.style.borderBottom = 'none';
+    });
+    card.querySelectorAll('.dp-panel').forEach(p => { p.style.display = 'none'; });
+    tab.style.color = 'var(--green)';
+    tab.style.borderBottom = '2px solid var(--green)';
+    panel.style.display = 'block';
+  });
+
   // Manual toggle by ID (used in exercise page inline buttons)
   function toggleCollapsible(id) {
     const el = document.getElementById(id);

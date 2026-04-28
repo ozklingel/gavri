@@ -57,10 +57,29 @@ function Exercises_details(exerciseId) {
 }
 
 function Exercises_create(p) {
-  const u = Auth_requireRole(p, ['admin']);
-  const id = 'E' + _nextId('Exercises');
+  const u      = Auth_requireRole(p, ['admin']);
+  const id     = 'E' + _nextId('Exercises');
+  const teamId = (p.teamId || '').trim();
+
   _append('Exercises', [id, p.title || '', p.description || '', u.id, p.date || '']);
-  return Views_dashboard({ sid: p.sid, info: 'התרגיל נוצר בהצלחה (' + id + ').' });
+
+  let info = 'התרגיל נוצר בהצלחה (' + id + ').';
+
+  if (teamId) {
+    const result = Assignments_assignTeam(id, teamId, p.sid);
+    const team   = Teams_get(teamId);
+    const tName  = team ? team.name : teamId;
+    if (result.added > 0) {
+      info += ' ' + result.added + ' חיילים מצוות "' + tName + '" נוספו אוטומטית.';
+    }
+    if (result.skipped > 0) {
+      info += ' (' + result.skipped + ' כבר משתתפים.)';
+    }
+    // Open the exercise page so admin can see/edit participants
+    return Views_exercise({ sid: p.sid, id: id, info: info });
+  }
+
+  return Views_dashboard({ sid: p.sid, info: info });
 }
 
 function Exercises_edit(p) {
