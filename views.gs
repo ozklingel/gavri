@@ -122,6 +122,7 @@ function _topbar(user, sid) {
   nav += _a('page=dashboard&sid=' + sidQ, '⊞ לוח בקרה', 'btn btn-ghost btn-sm');
   if (user.role === 'admin') {
     nav += _a('page=users&sid=' + sidQ, '👤 משתמשים', 'btn btn-ghost btn-sm');
+  nav += _a('page=timeline&sid=' + sidQ, '📅 ציר זמן', 'btn btn-ghost btn-sm');
   }
   nav += '<span class="topbar-user">👤 ' + _esc(user.name) + ' · ' + _esc(_roleHe(user.role)) + '</span>';
   nav += _a('action=logout', '⏻ יציאה', 'btn btn-ghost btn-sm');
@@ -245,7 +246,7 @@ function _adminDashboard(sid) {
       exList += '<div class="ex-row">' +
         '<div class="ex-info">' +
         '<div class="ex-title">' + _esc(e.title) + '</div>' +
-        '<div class="ex-meta">' + _esc(e.id) + (e.date ? ' · ' + _esc(e.date) : '') + '</div>' +
+        '<div class="ex-meta">' + _esc(e.id) + (e.start_date ? ' · ' + _esc(e.start_date) : '') + (e.end_date ? ' — ' + _esc(e.end_date) : '') + '</div>' +
         '</div>' +
         '<div class="ex-btns">' +
         _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-primary btn-sm') +
@@ -269,7 +270,7 @@ function _adminDashboard(sid) {
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
     '<div class="form-grid">' +
     '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', 'שם התרגיל', '', 'text', 'required') + '</div>' +
-    '<div class="form-row"><label class="form-label">תאריך</label>' + _dateInput('date', '') + '</div>' +
+    '<div class="form-grid">' + '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', '') + '</div>' + '<div class="form-row"><label class="form-label">תאריך סיום</label>' + _dateInput('end_date', '') + '</div>' + '</div>' +
     '</div>' +
     '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', 'תיאור קצר...') + '</div>' +
     '<div class="form-row">' +
@@ -425,8 +426,10 @@ function Views_exercise(p) {
     '<div class="card-body" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' +
     '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">מזהה</span><br>' +
     '<span style="font-family:var(--mono);color:var(--green)">' + _esc(ex.id) + '</span></div>' +
-    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">תאריך</span><br>' +
-    '<b>' + _esc(ex.date || '—') + '</b></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">תחילה</span><br>' +
+    '<b>' + _esc(ex.start_date || '—') + '</b></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">סיום</span><br>' +
+    '<b>' + _esc(ex.end_date || '—') + '</b></div>' +
     '<div style="flex:1"><span style="color:var(--muted);font-family:var(--mono);font-size:11px">תיאור</span><br>' +
     _esc(ex.description || '—') + '</div>' +
     '</div></div>';
@@ -522,7 +525,10 @@ function Views_exercise(p) {
       '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
       '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', '', ex.title, 'text', 'required') + '</div>' +
       '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', '', ex.description) + '</div>' +
-      '<div class="form-row"><label class="form-label">תאריך</label>' + _dateInput('date', ex.rawDate) + '</div>' +
+      '<div class="form-grid">' +
+      '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', ex.rawStartDate) + '</div>' +
+      '<div class="form-row"><label class="form-label">תאריך סיום</label>' + _dateInput('end_date', ex.rawEndDate) + '</div>' +
+      '</div>' +
       _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
       '</form>' +
       '</div></div></div></div>';
@@ -870,4 +876,263 @@ function _createUserTab(sid, sidQ) {
 
   return '<div class="card"><div class="card-header"><span class="card-title">➕ יצירת משתמש חדש</span></div>' +
     '<div class="card-body">' + form + '</div></div>';
+}
+
+// ═══════════════════════════════════════
+//  Views_timeline — Gantt-style timeline
+//  תרגילים מקבילים מוצגים בשורות נפרדות באותה רמה
+// ═══════════════════════════════════════
+function Views_timeline(p) {
+  const user = Auth_current(p);
+  if (!user) return Views_login({ error: 'נדרשת התחברות.' });
+  const sid  = user.id;
+  const sidQ = encodeURIComponent(sid);
+
+  let exercises = Exercises_all();
+
+  // Filter: commander/trainee see only their relevant exercises
+  if (user.role === 'commander') {
+    const myTrainees = Users_traineesOfCommander(user.id).map(t => t.id);
+    const allAssigns = Assignments_all ? Assignments_all() : [];
+    exercises = exercises.filter(ex =>
+      ex.created_by === user.id ||
+      allAssigns.some(a => a.exercise_id === ex.id && myTrainees.indexOf(a.user_id) !== -1)
+    );
+  } else if (user.role === 'trainee') {
+    const myAssigns = Assignments_byUser ? Assignments_byUser(user.id) : [];
+    const myExIds   = myAssigns.map(a => a.exercise_id);
+    exercises = exercises.filter(ex => myExIds.indexOf(ex.id) !== -1);
+  }
+
+  // Parse dates → timestamps for layout
+  const parsed = exercises.map(ex => {
+    const s = _parseRawDate(ex.rawStartDate);
+    const e = _parseRawDate(ex.rawEndDate || ex.rawStartDate); // fallback: single day
+    return { ex, start: isNaN(s) ? null : s, end: isNaN(e) ? null : e };
+  }).filter(x => x.start !== null);
+
+  if (!parsed.length) {
+    const body = _topbar(user, sid) +
+      '<div class="page"><div class="page-title">📅 ציר זמן תרגילים</div>' +
+      '<div class="card"><div class="empty">אין תרגילים עם תאריכים להצגה. הוסף תאריך התחלה לפחות לתרגיל אחד.</div></div></div>';
+    return _html(body, 'ציר זמן');
+  }
+
+  // Sort by start date
+  parsed.sort((a, b) => a.start - b.start);
+
+  // ── Compute chart bounds ──
+  const minTs  = parsed.reduce((m, x) => Math.min(m, x.start), Infinity);
+  const maxTs  = parsed.reduce((m, x) => Math.max(m, x.end),   -Infinity);
+  const span   = Math.max(maxTs - minTs, 86400000); // at least 1 day
+  const DAY_MS = 86400000;
+
+  // Add 5% padding on each side
+  const padMs   = span * 0.05;
+  const chartMin = minTs - padMs;
+  const chartMax = maxTs + padMs;
+  const chartSpan = chartMax - chartMin;
+
+  function pct(ts) {
+    return ((ts - chartMin) / chartSpan * 100).toFixed(3) + '%';
+  }
+  function pctW(from, to) {
+    return (Math.max(to - from, DAY_MS) / chartSpan * 100).toFixed(3) + '%';
+  }
+
+  // ── Lane assignment (greedy, prevents overlap) ──
+  // Each "lane" tracks the rightmost end-timestamp currently in it
+  const lanes = []; // array of { endTs }
+  const itemLanes = parsed.map(item => {
+    let placed = -1;
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i].endTs <= item.start) {
+        lanes[i].endTs = item.end;
+        placed = i;
+        break;
+      }
+    }
+    if (placed === -1) {
+      lanes.push({ endTs: item.end });
+      placed = lanes.length - 1;
+    }
+    return placed;
+  });
+
+  const laneCount  = lanes.length;
+  const laneH      = 44; // px per lane
+  const headerH    = 40; // px for date ruler
+  const totalH     = headerH + laneCount * laneH;
+
+  // ── Date ruler ticks ──
+  // Choose a sensible tick interval based on total span
+  const spanDays = span / DAY_MS;
+  let tickInterval; // in days
+  if      (spanDays <= 14)  tickInterval = 1;
+  else if (spanDays <= 60)  tickInterval = 7;
+  else if (spanDays <= 180) tickInterval = 14;
+  else if (spanDays <= 730) tickInterval = 30;
+  else                      tickInterval = 90;
+
+  const tickMs = tickInterval * DAY_MS;
+  // Start ticks from the nearest tickInterval boundary after chartMin
+  const firstTick = Math.ceil(chartMin / tickMs) * tickMs;
+  const ticks = [];
+  for (let t = firstTick; t <= chartMax; t += tickMs) ticks.push(t);
+
+  function fmtTick(ts) {
+    const d = new Date(ts);
+    const months = ['ינו','פבר','מרץ','אפר','מאי','יוני','יולי','אוג','ספט','אוק','נוב','דצמ'];
+    if (tickInterval >= 30) return months[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+    return d.getUTCDate() + '/' + (d.getUTCMonth()+1);
+  }
+
+  // ── Colors (cycle through) ──
+  const COLORS = [
+    '#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be123c',
+    '#065f46','#1d4ed8','#7e22ce','#c2410c','#0e7490','#9f1239'
+  ];
+
+  // ── Build SVG ruler ──
+  let rulerSvg = '<svg width="100%" height="' + headerH + '" style="display:block;overflow:visible">';
+  ticks.forEach(ts => {
+    const x = pct(ts);
+    rulerSvg +=
+      '<line x1="' + x + '" y1="0" x2="' + x + '" y2="100%" stroke="#2a4a2a" stroke-width="1"/>' +
+      '<text x="' + x + '" y="' + (headerH - 6) + '" fill="#4b7a5a" font-family="Share Tech Mono,monospace" font-size="11" text-anchor="middle">' +
+      _esc(fmtTick(ts)) + '</text>';
+  });
+  rulerSvg += '</svg>';
+
+  // ── Build bars ──
+  let bars = '';
+  const today = Date.now();
+  const todayPct = today >= chartMin && today <= chartMax ? pct(today) : null;
+
+  parsed.forEach((item, idx) => {
+    const lane  = itemLanes[idx];
+    const ex    = item.ex;
+    const color = COLORS[idx % COLORS.length];
+    const top   = headerH + lane * laneH + 6;
+    const barH  = laneH - 12;
+    const left  = pct(item.start);
+    const width = pctW(item.start, item.end);
+
+    const isActive  = today >= item.start && today <= item.end;
+    const isPast    = today > item.end;
+    const opacity   = isPast ? '0.55' : '1';
+    const glowStyle = isActive ? 'box-shadow:0 0 0 2px ' + color + ',0 0 12px ' + color + '44;' : '';
+
+    const href = '?page=exercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ;
+
+    bars +=
+      '<a target="_top" href="' + _esc(href) + '" title="' + _esc(ex.title) +
+        ' | ' + _esc(ex.start_date) + (ex.end_date ? ' — ' + _esc(ex.end_date) : '') + '"' +
+        ' style="position:absolute;top:' + top + 'px;left:' + left + ';width:' + width +
+        ';height:' + barH + 'px;background:' + color + ';border-radius:4px;' +
+        'display:flex;align-items:center;padding:0 8px;overflow:hidden;' +
+        'opacity:' + opacity + ';text-decoration:none;' + glowStyle +
+        'transition:opacity .15s,filter .15s;cursor:pointer"' +
+        ' onmouseover="this.style.filter=\'brightness(1.25)\'" onmouseout="this.style.filter=\'\'">' +
+        '<span style="font-family:var(--mono);font-size:11px;color:#fff;' +
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;width:100%">' +
+        _esc(ex.title) + '</span>' +
+      '</a>';
+  });
+
+  // ── Today line ──
+  let todayLine = '';
+  if (todayPct) {
+    todayLine = '<div style="position:absolute;top:0;left:' + todayPct +
+      ';width:2px;height:100%;background:#fbbf24;opacity:.7;pointer-events:none">' +
+      '<div style="position:absolute;top:4px;left:4px;font-family:var(--mono);' +
+        'font-size:10px;color:#fbbf24;white-space:nowrap">היום</div></div>';
+  }
+
+  // ── Grid vertical lines ──
+  let gridLines = '';
+  ticks.forEach(ts => {
+    gridLines += '<div style="position:absolute;top:0;left:' + pct(ts) +
+      ';width:1px;height:100%;background:#2a4a2a;pointer-events:none"></div>';
+  });
+
+  // ── Legend / summary ──
+  const totalEx    = parsed.length;
+  const activeEx   = parsed.filter(x => today >= x.start && today <= x.end).length;
+  const upcomingEx = parsed.filter(x => today < x.start).length;
+  const pastEx     = parsed.filter(x => today > x.end).length;
+
+  // ── Assemble HTML ──
+  const chartWrap =
+    // Ruler
+    '<div style="position:relative;width:100%;height:' + headerH + 'px;' +
+      'border-bottom:1px solid #2a4a2a;overflow:hidden">' +
+    rulerSvg +
+    '</div>' +
+    // Bars area
+    '<div style="position:relative;width:100%;height:' + (laneCount * laneH) + 'px">' +
+    gridLines +
+    bars +
+    todayLine +
+    '</div>';
+
+  const body = _topbar(user, sid) +
+    '<div class="page">' +
+    _flash(p) +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
+    '<div class="page-title" style="margin:0">📅 ציר זמן תרגילים</div>' +
+    '<div style="display:flex;gap:6px">' +
+    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+    '</div></div>' +
+
+    // Stats strip
+    '<div class="grid-3" style="margin-bottom:16px">' +
+    '<div class="stat-box"><div class="stat-num" style="color:#fbbf24">' + activeEx + '</div><div class="stat-label">פעילים כעת</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + upcomingEx + '</div><div class="stat-label">עתידיים</div></div>' +
+    '<div class="stat-box"><div class="stat-num" style="color:var(--muted)">' + pastEx + '</div><div class="stat-label">הסתיימו</div></div>' +
+    '</div>' +
+
+    // Legend
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--muted)">' +
+    '<span><span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:2px;margin-left:4px;opacity:.8"></span>קו היום</span>' +
+    '<span style="color:var(--text2)">לחץ על תרגיל לפתיחה</span>' +
+    '<span>תרגילים שהסתיימו מוצגים בשקיפות</span>' +
+    '</div>' +
+
+    // Chart
+    '<div class="card" style="overflow-x:auto">' +
+    '<div style="min-width:600px;padding:0 4px 8px">' +
+    chartWrap +
+    '</div></div>' +
+
+    // Exercise list table below chart
+    '<div class="card" style="margin-top:14px">' +
+    '<div class="card-header"><span class="card-title">📋 רשימת תרגילים (' + totalEx + ')</span></div>' +
+    '<div class="card-body" style="padding:0">' +
+    '<table class="tbl"><thead><tr>' +
+    '<th>שם התרגיל</th><th>תאריך התחלה</th><th>תאריך סיום</th><th>משך (ימים)</th><th>סטטוס</th><th>פתיחה</th>' +
+    '</tr></thead><tbody>' +
+    parsed.map((item, idx) => {
+      const ex       = item.ex;
+      const durationDays = Math.round((item.end - item.start) / DAY_MS) + 1;
+      const isActive = today >= item.start && today <= item.end;
+      const isPast   = today > item.end;
+      const status   = isActive ? _badge('● פעיל', 'yellow')
+                     : isPast   ? _badge('✓ הסתיים', 'muted')
+                     :            _badge('◌ עתידי', 'blue');
+      const color    = COLORS[idx % COLORS.length];
+      return '<tr>' +
+        '<td><span style="display:inline-block;width:10px;height:10px;background:' + color + ';border-radius:2px;margin-left:6px"></span>' +
+        '<b>' + _esc(ex.title) + '</b></td>' +
+        '<td class="mono">' + _esc(ex.start_date || '—') + '</td>' +
+        '<td class="mono">' + _esc(ex.end_date   || '—') + '</td>' +
+        '<td class="mono" style="text-align:center">' + durationDays + '</td>' +
+        '<td>' + status + '</td>' +
+        '<td>' + _a('page=exercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-secondary btn-sm') + '</td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table></div></div>' +
+    '</div>'; // end page
+
+  return _html(body, 'ציר זמן — MilEx');
 }
