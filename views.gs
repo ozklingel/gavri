@@ -25,6 +25,15 @@ function _confirmDelete(query, msg) {
     'onclick="return confirmDelete(this)">🗑 מחק</a>';
 }
 
+// Render a generic confirm-before-action link button
+function _confirmAction(query, label, msg, cls) {
+  cls = cls || 'btn btn-secondary';
+  return '<a target="_top" href="' + _esc(_url(query)) + '" ' +
+    'class="' + cls + '" ' +
+    'data-confirm="' + _esc(msg) + '" ' +
+    'onclick="return confirmDelete(this)">' + label + '</a>';
+}
+
 function _formOpen(extraClass) {
   return '<form action="' + _esc(_appUrl()) + '" method="get" target="_top"' + (extraClass ? ' class="' + extraClass + '"' : '') + '>';
 }
@@ -207,6 +216,22 @@ function _adminDashboard(sid) {
     '<div class="stat-box"><div class="stat-num">' + completed + '</div><div class="stat-label">הושלמו</div></div>' +
     '</div>';
 
+  // 🤖 Auto-assign panel
+  s += '<div class="card" style="margin-bottom:14px;border:1px solid var(--accent,#888)">' +
+    '<div class="card-header">' +
+    '<span class="card-title">🤖 שיבוץ אוטומטי</span>' +
+    '</div>' +
+    '<div class="card-body">' +
+    '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">' +
+    'משבץ אוטומטית לכל תרגיל: מפקד צוות + 2 חניכים. ' +
+    'חניך לא ישובץ ביותר מתרגיל אחד. תרגילים עם שיבוצים קיימים — מדולגים.' +
+    '</p>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-primary') +
+    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 נקה את כל השיבוצים', 'פעולה זו תמחק את כל השיבוצים הקיימים. להמשיך?', 'btn btn-secondary') +
+    '</div>' +
+    '</div></div>';
+
   // Exercises list (compact)
   let exList = '<div class="card" style="margin-bottom:14px">' +
     '<div class="card-header">' +
@@ -248,7 +273,7 @@ function _adminDashboard(sid) {
     '</div>' +
     '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', 'תיאור קצר...') + '</div>' +
     '<div class="form-row">' +
-    '<label class="form-label">🪖 צוות משתתף <span style="color:var(--muted)">(אופציונלי — כל חברי הצוות יתווספו אוטומטית)</span></label>' +
+    '<label class="form-label">🪖 צוות משתתף <span style="color:var(--muted)">(אופציונלי — מפקד הצוות + 2 חניכים ראשונים ישובצו אוטומטית)</span></label>' +
     _select('teamId', teamOptions) +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-top:4px">' + _submitBtn('➕ צור תרגיל', 'btn btn-primary') + '</div>' +
@@ -545,7 +570,7 @@ function Views_exercise(p) {
         '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
         '<div class="form-row"><label class="form-label">צוות</label>' + _select('teamId', teamOptions) + '</div>' +
         '<p style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px">' +
-        'כל חברי הצוות יתווספו. חברים שכבר רשומים ידולגו.</p>' +
+        'ישובצו אוטומטית: מפקד הצוות + 2 החניכים הראשונים. מי שכבר רשום ידולג.</p>' +
         _submitBtn('🪖 הוסף צוות שלם', 'btn btn-primary') +
         '</form>';
     }

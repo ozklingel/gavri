@@ -58,7 +58,7 @@ function Exercises_details(exerciseId) {
 
 function Exercises_create(p) {
   const u      = Auth_requireRole(p, ['admin']);
-  const id     = 'E' + _nextId('Exercises');
+  const id = 'E' + new Date().getTime();
   const teamId = (p.teamId || '').trim();
 
   _append('Exercises', [id, p.title || '', p.description || '', u.id, p.date || '']);

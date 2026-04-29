@@ -17,14 +17,35 @@ function doGet(e) {
     // ── Actions (mutations) — performed via GET, then re-render a page ──
     if (action === 'login')              return Auth_login(p);
     if (action === 'logout')             return Auth_logout(p);
+
+    // Exercises
     if (action === 'createExercise')     return Exercises_create(p);
     if (action === 'editExercise')       return Exercises_edit(p);
     if (action === 'duplicateExercise')  return Exercises_duplicate(p);
+    if (action === 'deleteExercise')     return Exercises_delete(p);
     if (action === 'addDetail')          return Exercises_addDetail(p);
+
+    // Assignments
     if (action === 'assign')             return Assignments_assign(p);
+    if (action === 'assignTeam')         return Assignments_assignTeamAction(p);
+    if (action === 'removeAssignment')   return Assignments_remove(p);
     if (action === 'complete')           return Assignments_complete(p);
+    if (action === 'autoAssignAll')      return Assignments_autoAssignAll(p);
+    if (action === 'clearAllAssignments')return Assignments_clearAll(p);
+
+    // Users
+    if (action === 'createUser')         return Users_create(p);
+    if (action === 'deleteUser')         return Users_delete(p);
     if (action === 'updateRole')         return Users_updateRole(p);
-    if (action === 'updateProfile')       return Users_updateProfile(p);
+    if (action === 'updateProfile')      return Users_updateProfile(p);
+
+    // Teams
+    if (action === 'createTeam')         return Teams_create(p);
+    if (action === 'renameTeam')         return Teams_rename(p);
+    if (action === 'deleteTeam')         return Teams_delete(p);
+    if (action === 'setCommander')       return Teams_setCommander(p);
+    if (action === 'addMember')          return Teams_addMember(p);
+    if (action === 'removeMember')       return Teams_removeMember(p);
 
     // ── Pages (read-only renders) ──
     if (page === 'login')     return Views_login(p);
@@ -37,9 +58,6 @@ function doGet(e) {
   }
 }
 
-// We keep doPost as a thin wrapper that delegates to doGet, in case
-// any form is submitted via POST. Apps Script POST inside the iframe
-// is unreliable for redirects, so we always re-render directly.
 function doPost(e) {
   return doGet(e);
 }
@@ -65,10 +83,9 @@ function _nextId(name) {
   return max + 1;
 }
 function _findRowIndex(name, idValue) {
-  // returns 1-based sheet row number for the row whose first col == idValue
   const { data } = _rows(name);
   for (let i = 0; i < data.length; i++) {
-    if (String(data[i][0]) === String(idValue)) return i + 2; // +2: header + 1-based
+    if (String(data[i][0]) === String(idValue)) return i + 2;
   }
   return -1;
 }
@@ -105,21 +122,20 @@ function setupSheets() {
   ensureColumn('Users', 'unit_classification');
   ensureColumn('Users', 'target_role');
 
-  // Seed demo users if Users is empty
   const usersSh = ss.getSheetByName('Users');
   if (usersSh.getLastRow() === 1) {
     usersSh.appendRow(['U001','Admin User','admin','']);
     usersSh.appendRow(['U002','Commander Alpha','commander','T1']);
     usersSh.appendRow(['U003','Trainee One','trainee','T1']);
+    usersSh.appendRow(['U004','Trainee Two','trainee','T1']);
     ss.getSheetByName('Credentials').appendRow(['U001','admin123']);
     ss.getSheetByName('Credentials').appendRow(['U002','cmd123']);
     ss.getSheetByName('Credentials').appendRow(['U003','train123']);
+    ss.getSheetByName('Credentials').appendRow(['U004','train123']);
     ss.getSheetByName('Teams').appendRow(['T1','Alpha Team','U002']);
   }
 }
 
-// FULL RESET — run this once if sheets/headers are broken.
-// WARNING: this clears all app data and recreates clean tables.
 function resetTrainingTables() {
   const ss = SS();
   const schemas = {
@@ -138,15 +154,14 @@ function resetTrainingTables() {
     sh.getRange(1, 1, 1, schemas[name].length).setValues([schemas[name]]);
   });
 
-  ss.getSheetByName('Users').appendRow(['1','Admin','admin','']);
-  ss.getSheetByName('Credentials').appendRow(['1','admin123']);
-
-  // Optional demo data so dashboard/exercise page is not empty.
-  ss.getSheetByName('Users').appendRow(['2','Commander Alpha','commander','T1']);
-  ss.getSheetByName('Users').appendRow(['3','Trainee One','trainee','T1']);
-  ss.getSheetByName('Credentials').appendRow(['2','cmd123']);
-  ss.getSheetByName('Credentials').appendRow(['3','train123']);
-  ss.getSheetByName('Teams').appendRow(['T1','Alpha Team','2']);
-  ss.getSheetByName('Exercises').appendRow(['E1','Exercise 1','Demo exercise','1','2026-04-21']);
-  ss.getSheetByName('Assignments').appendRow(['A1','E1','3','pending','','Rifleman']);
+  ss.getSheetByName('Users').appendRow(['U001','Admin','admin','']);
+  ss.getSheetByName('Credentials').appendRow(['U001','admin123']);
+  ss.getSheetByName('Users').appendRow(['U002','Commander Alpha','commander','T1']);
+  ss.getSheetByName('Users').appendRow(['U003','Trainee One','trainee','T1']);
+  ss.getSheetByName('Users').appendRow(['U004','Trainee Two','trainee','T1']);
+  ss.getSheetByName('Credentials').appendRow(['U002','cmd123']);
+  ss.getSheetByName('Credentials').appendRow(['U003','train123']);
+  ss.getSheetByName('Credentials').appendRow(['U004','train123']);
+  ss.getSheetByName('Teams').appendRow(['T1','Alpha Team','U002']);
+  ss.getSheetByName('Exercises').appendRow(['E1','תרגיל ראשון','תרגיל הדגמה','U001','2026-04-21']);
 }
