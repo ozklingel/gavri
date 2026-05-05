@@ -217,21 +217,17 @@ function _adminDashboard(sid) {
     '<div class="stat-box"><div class="stat-num">' + completed + '</div><div class="stat-label">הושלמו</div></div>' +
     '</div>';
 
-  // 🤖 Auto-assign panel
-  s += '<div class="card" style="margin-bottom:14px;border:1px solid var(--accent,#888)">' +
-    '<div class="card-header">' +
-    '<span class="card-title">🤖 שיבוץ אוטומטי</span>' +
-    '</div>' +
-    '<div class="card-body">' +
-    '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">' +
-    'משבץ אוטומטית לכל תרגיל: מפקד צוות + 2 חניכים. ' +
-    'חניך לא ישובץ ביותר מתרגיל אחד. תרגילים עם שיבוצים קיימים — מדולגים.' +
-    '</p>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-    _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-primary') +
-    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 נקה את כל השיבוצים', 'פעולה זו תמחק את כל השיבוצים הקיימים. להמשיך?', 'btn btn-secondary') +
-    '</div>' +
-    '</div></div>';
+// 🤖 Auto-assign panel
+s += '<div class="card" style="margin-bottom:14px;border:1px solid var(--accent,#888)">' +
+  '<div class="card-header">' +
+  '<span class="card-title">🤖 שיבוץ אוטומטי</span>' +
+  '</div>' +
+  '<div class="card-body">' +
+  '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+  _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-primary') +
+  _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 נקה את כל השיבוצים', 'פעולה זו תמחק את כל השיבוצים הקיימים. להמשיך?', 'btn btn-secondary') +
+  '</div>' +
+  '</div></div>';
 
   // Exercises list (compact)
   let exList = '<div class="card" style="margin-bottom:14px">' +
