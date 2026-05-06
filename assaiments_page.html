@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>שיבוצים</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Heebo:wght@400;600;700&display=swap');
+    :root {
+      --bg:#0b0f0b; --bg2:#111811; --bg3:#172017; --bg4:#1e2b1e;
+      --border:#2a4a2a; --border2:#3a6a3a;
+      --green:#4ade80; --green2:#22c55e; --green3:#16a34a; --green-dim:#2d5a3d;
+      --text:#d1fae5; --text2:#86efac; --muted:#4b7a5a;
+      --danger:#f87171; --warn:#fbbf24; --blue:#60a5fa;
+      --mono:'Share Tech Mono',monospace; --body:'Heebo',sans-serif;
+      --r:6px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+    /* topbar */
+    .bar{background:var(--bg2);border-bottom:2px solid var(--border2);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:48px;flex-shrink:0}
+    .brand{font-family:var(--mono);color:var(--green);font-size:15px;font-weight:bold}
+    .nav{display:flex;align-items:center;gap:6px}
+    .btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:var(--r);font-family:var(--mono);font-size:12px;font-weight:bold;cursor:pointer;border:none;text-decoration:none;white-space:nowrap;transition:all .15s}
+    .btn-primary{background:var(--green3);color:#fff;border:1px solid var(--green2)}.btn-primary:hover{background:var(--green2)}
+    .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--green);color:var(--green)}
+    .btn-sm{padding:3px 9px;font-size:11px}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    a.btn{color:inherit}
+
+    /* toolbar */
+    .toolbar{background:var(--bg3);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+    .toolbar-sep{width:1px;height:24px;background:var(--border2);margin:0 4px}
+    .lbl{font-family:var(--mono);font-size:11px;color:var(--muted)}
+    input[type=number].small{width:56px;background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);padding:4px 6px;font-family:var(--mono);font-size:12px;text-align:center}
+
+    /* main board */
+    .board{flex:1;overflow-x:auto;overflow-y:hidden;display:flex;gap:12px;padding:14px 16px;align-items:flex-start}
+
+    /* exercise column */
+    .ex-col{width:240px;min-width:240px;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);max-height:100%;flex-shrink:0}
+    .ex-col.drag-over{border-color:var(--green);box-shadow:0 0 0 2px rgba(74,222,128,.2)}
+    .ex-col-head{background:var(--bg3);border-bottom:1px solid var(--border);border-radius:var(--r) var(--r) 0 0;padding:9px 11px;flex-shrink:0}
+    .ex-col-title{font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ex-col-meta{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+    .ex-col-body{flex:1;overflow-y:auto;padding:8px;min-height:80px}
+    .ex-col-body:empty::after{content:'// גרור לכאן';font-family:var(--mono);font-size:11px;color:var(--muted);display:block;padding:12px 4px;text-align:center}
+    .ex-col-footer{border-top:1px solid var(--border);padding:6px 8px;flex-shrink:0}
+
+    /* person card */
+    .person{display:flex;align-items:center;gap:7px;padding:7px 8px;margin-bottom:5px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);cursor:grab;user-select:none;transition:border-color .12s,box-shadow .12s}
+    .person:hover{border-color:var(--border2);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+    .person.dragging{opacity:.35;cursor:grabbing}
+    .person-avatar{width:28px;height:28px;border-radius:50%;background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+    .person-info{flex:1;min-width:0}
+    .person-name{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .person-role{font-family:var(--mono);font-size:10px;color:var(--muted)}
+    .person-remove{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:3px;line-height:1;flex-shrink:0}
+    .person-remove:hover{color:var(--danger);background:rgba(248,113,113,.1)}
+
+    /* status bar */
+    .statusbar{background:var(--bg2);border-top:1px solid var(--border);padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:12px;flex-shrink:0}
+    #status-msg{color:var(--warn)}
+    .dot{color:var(--border2)}
+
+    /* flash */
+    .flash{position:fixed;top:56px;right:50%;transform:translateX(50%);background:#052e16;border:1px solid var(--green3);color:var(--text2);padding:8px 18px;border-radius:var(--r);font-size:13px;z-index:999;font-family:var(--mono);box-shadow:0 4px 20px rgba(0,0,0,.5)}
+
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+  </style>
+</head>
+<body>
+
+<!-- Server data -->
+<script type="application/json" id="d-users"><?= usersJson ?></script>
+<script type="application/json" id="d-exercises"><?= exercisesJson ?></script>
+<script type="application/json" id="d-assignments"><?= assignmentsJson ?></script>
+<script type="application/json" id="d-teams"><?= teamsJson ?></script>
+
+<? if (flashInfo) { ?>
+<div class="flash" id="flash-msg">✓ <?= flashInfo ?></div>
+<? } ?>
+
+<!-- Topbar -->
+<div class="bar">
+  <div class="brand">★ צה״ל <span style="color:var(--muted);font-size:12px">// שיבוצים</span></div>
+  <div class="nav">
+    <a target="_top" href="<?= dashUrl ?>"   class="btn btn-ghost btn-sm">⊞ לוח בקרה</a>
+    <a target="_top" href="<?= usersUrl ?>"  class="btn btn-ghost btn-sm">👤 משתמשים</a>
+    <a target="_top" href="<?= logoutUrl ?>" class="btn btn-ghost btn-sm">⏻ יציאה</a>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="btn btn-primary" onclick="autoAssign(this)">⚡ שיבוץ אוטומטי</button>
+  <div class="toolbar-sep"></div>
+  <span class="lbl">חניכים לתרגיל:</span>
+  <input type="number" id="cfg-trainees"   class="small" value="6" min="1" max="50">
+  <span class="lbl">מפקדים:</span>
+  <input type="number" id="cfg-commanders" class="small" value="1" min="0" max="10">
+  <div class="toolbar-sep"></div>
+  <button class="btn btn-primary" onclick="saveAll(this)" id="btn-save">💾 שמור שיבוצים</button>
+  <button class="btn btn-ghost btn-sm" onclick="resetAll()">↺ בטל שינויים</button>
+</div>
+
+<!-- Board -->
+<div class="board" id="board"></div>
+
+<!-- Status bar -->
+<div class="statusbar">
+  <span>📋 שיבוצים</span>
+  <span class="dot">·</span>
+  <span id="status-msg"></span>
+  <span class="dot">·</span>
+  <span id="status-total" style="color:var(--text2)"></span>
+</div>
+
+<script>
+// ── Data ──
+var USERS     = JSON.parse(document.getElementById('d-users').textContent);
+var EXERCISES = JSON.parse(document.getElementById('d-exercises').textContent);
+var SAVED     = JSON.parse(document.getElementById('d-assignments').textContent);
+var TEAMS     = JSON.parse(document.getElementById('d-teams').textContent);
+var APP_URL   = '<?= appUrl ?>';
+var SID       = '<?= sid ?>';
+
+// pending: { [exId]: [userId, ...] }
+var pending = {};
+
+function initPending() {
+  pending = {};
+  EXERCISES.forEach(function(ex) { pending[ex.id] = []; });
+  SAVED.forEach(function(a) {
+    if (pending[a.exercise_id] && pending[a.exercise_id].indexOf(a.user_id) === -1) {
+      pending[a.exercise_id].push(a.user_id);
+    }
+  });
+}
+
+// ── Helpers ──
+function getUser(id) { return USERS.find(function(u) { return u.id === id; }); }
+function roleHe(r)   { return r === 'commander' ? 'מפקד' : r === 'admin' ? 'מנהל' : 'חניך'; }
+function roleEmoji(r){ return r === 'commander' ? '⭐' : r === 'admin' ? '★' : '🪖'; }
+function roleColor(r){ return r === 'commander' ? 'var(--blue)' : r === 'admin' ? 'var(--green)' : 'var(--text2)'; }
+
+// ── Drag state ──
+var dragging = null; // { userId, fromExId }
+
+// ── Render ──
+function render() {
+  var board = document.getElementById('board');
+  board.innerHTML = '';
+
+  if (!EXERCISES.length) {
+    board.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);padding:40px;font-size:13px">// אין תרגילים במערכת. צור תרגיל תחילה.</div>';
+    updateStatus();
+    return;
+  }
+
+  EXERCISES.forEach(function(ex) {
+    var members = (pending[ex.id] || []);
+    var col = document.createElement('div');
+    col.className = 'ex-col';
+    col.dataset.exid = ex.id;
+
+    // Head
+    var head = document.createElement('div');
+    head.className = 'ex-col-head';
+    head.innerHTML =
+      '<div class="ex-col-title" title="' + ex.title + '">' + ex.title + '</div>' +
+      '<div class="ex-col-meta">' +
+        (ex.date ? '<span>' + ex.date + '</span>' : '<span></span>') +
+        '<span id="cnt-' + ex.id + '" style="color:var(--green2)">' + members.length + ' משתתפים</span>' +
+      '</div>';
+
+    // Body
+    var body = document.createElement('div');
+    body.className = 'ex-col-body';
+    body.id = 'body-' + ex.id;
+
+    members.forEach(function(uid) {
+      var card = makePersonCard(uid, ex.id);
+      if (card) body.appendChild(card);
+    });
+
+    // Drop events
+    col.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', function(e) {
+      if (!col.contains(e.relatedTarget)) col.classList.remove('drag-over');
+    });
+    col.addEventListener('drop', function(e) {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      if (!dragging) return;
+      var uid    = dragging.userId;
+      var fromEx = dragging.fromExId;
+      var toEx   = ex.id;
+      if (fromEx === toEx) return; // same column, no-op
+      // Move
+      pending[fromEx] = pending[fromEx].filter(function(id) { return id !== uid; });
+      if ((pending[toEx] || []).indexOf(uid) === -1) {
+        if (!pending[toEx]) pending[toEx] = [];
+        pending[toEx].push(uid);
+      }
+      markUnsaved();
+      render();
+    });
+
+    // Footer: count
+    var footer = document.createElement('div');
+    footer.className = 'ex-col-footer';
+    footer.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--muted)">// ' + ex.id + '</span>';
+
+    col.appendChild(head);
+    col.appendChild(body);
+    col.appendChild(footer);
+    board.appendChild(col);
+  });
+
+  updateStatus();
+}
+
+function makePersonCard(uid, exId) {
+  var u = getUser(uid);
+  if (!u) return null;
+  var card = document.createElement('div');
+  card.className = 'person';
+  card.draggable = true;
+  card.dataset.uid  = uid;
+  card.dataset.exid = exId;
+  card.innerHTML =
+    '<div class="person-avatar" style="color:' + roleColor(u.role) + '">' + roleEmoji(u.role) + '</div>' +
+    '<div class="person-info">' +
+      '<div class="person-name">' + u.name + '</div>' +
+      '<div class="person-role" style="color:' + roleColor(u.role) + '">' + roleHe(u.role) +
+        (u.unit ? ' · ' + u.unit : '') + '</div>' +
+    '</div>' +
+    '<button class="person-remove" title="הסר מתרגיל">✕</button>';
+
+  card.addEventListener('dragstart', function(e) {
+    dragging = { userId: uid, fromExId: exId };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', uid);
+    setTimeout(function() { card.classList.add('dragging'); }, 0);
+  });
+  card.addEventListener('dragend', function() {
+    card.classList.remove('dragging');
+    dragging = null;
+  });
+  card.querySelector('.person-remove').addEventListener('click', function(e) {
+    e.stopPropagation();
+    pending[exId] = pending[exId].filter(function(id) { return id !== uid; });
+    markUnsaved();
+    render();
+  });
+  return card;
+}
+
+// ── Status ──
+function markUnsaved() {
+  document.getElementById('status-msg').textContent = '● יש שינויים שלא נשמרו';
+}
+function clearUnsaved() {
+  document.getElementById('status-msg').textContent = '';
+}
+function updateStatus() {
+  var total = 0;
+  EXERCISES.forEach(function(ex) { total += (pending[ex.id] || []).length; });
+  document.getElementById('status-total').textContent = total + ' שיבוצים סה"כ';
+}
+
+function resetAll() {
+  initPending();
+  clearUnsaved();
+  render();
+}
+
+// ── Auto assign ──
+function autoAssign(btn) {
+  var nT = parseInt(document.getElementById('cfg-trainees').value)   || 6;
+  var nC = parseInt(document.getElementById('cfg-commanders').value) || 1;
+
+  if (!EXERCISES.length) { alert('אין תרגילים במערכת'); return; }
+
+  // Separate by role
+  var trainees   = USERS.filter(function(u) { return u.role === 'trainee'; });
+  var commanders = USERS.filter(function(u) { return u.role === 'commander'; });
+
+  // Reset pending
+  EXERCISES.forEach(function(ex) { pending[ex.id] = []; });
+
+  // Shuffle
+  function shuffle(arr) { return arr.slice().sort(function() { return Math.random() - .5; }); }
+
+  // Distribute trainees round-robin, nT per exercise
+  var tIdx = 0;
+  shuffle(trainees).forEach(function(u) {
+    var exId = EXERCISES[tIdx % EXERCISES.length].id;
+    if ((pending[exId] || []).filter(function(id) {
+      var usr = getUser(id); return usr && usr.role === 'trainee';
+    }).length < nT) {
+      pending[exId].push(u.id);
+    } else {
+      // find first exercise with room
+      for (var i = 0; i < EXERCISES.length; i++) {
+        var eid = EXERCISES[i].id;
+        var cnt = (pending[eid] || []).filter(function(id) {
+          var usr = getUser(id); return usr && usr.role === 'trainee';
+        }).length;
+        if (cnt < nT) { pending[eid].push(u.id); break; }
+      }
+    }
+    tIdx++;
+  });
+
+  // Distribute commanders round-robin, nC per exercise
+  var cIdx = 0;
+  shuffle(commanders).forEach(function(u) {
+    var exId = EXERCISES[cIdx % EXERCISES.length].id;
+    var cnt = (pending[exId] || []).filter(function(id) {
+      var usr = getUser(id); return usr && usr.role === 'commander';
+    }).length;
+    if (cnt < nC) {
+      pending[exId].push(u.id);
+    } else {
+      for (var i = 0; i < EXERCISES.length; i++) {
+        var eid = EXERCISES[i].id;
+        var c2 = (pending[eid] || []).filter(function(id) {
+          var usr = getUser(id); return usr && usr.role === 'commander';
+        }).length;
+        if (c2 < nC) { pending[eid].push(u.id); break; }
+      }
+    }
+    cIdx++;
+  });
+
+  markUnsaved();
+  render();
+}
+
+// ── Save ──
+function saveAll(btn) {
+  btn.disabled = true; btn.textContent = '⏳ שומר...';
+  var items = [];
+  EXERCISES.forEach(function(ex) {
+    (pending[ex.id] || []).forEach(function(uid) {
+      var u = getUser(uid);
+      items.push({
+        exerciseId:     ex.id,
+        userId:         uid,
+        responsibility: u ? (u.role === 'commander' ? 'מפקד' : 'לוחם') : 'לוחם'
+      });
+    });
+  });
+  var url = APP_URL +
+    '?action=bulkAssign' +
+    '&sid='        + encodeURIComponent(SID) +
+    '&clearFirst=true' +
+    '&assignments=' + encodeURIComponent(JSON.stringify(items));
+  window.top.location.href = url;
+}
+
+// ── Init ──
+initPending();
+render();
+
+// Auto-hide flash
+var fl = document.getElementById('flash-msg');
+if (fl) setTimeout(function() { fl.style.display = 'none'; }, 3000);
+</script>
+</body>
+</html>
