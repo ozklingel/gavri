@@ -958,153 +958,83 @@ function Views_timeline(p) {
     if (tickInterval >= 30) return months[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
     return d.getUTCDate() + '/' + (d.getUTCMonth()+1);
   }
+// --- המשך הפונקציה Views_timeline ---
 
-  // ── Colors (cycle through) ──
-  const COLORS = [
-    '#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be123c',
-    '#065f46','#1d4ed8','#7e22ce','#c2410c','#0e7490','#9f1239'
-  ];
+  const COLORS = ['#4ade80', '#22c55e', '#60a5fa', '#fbbf24', '#f87171', '#c084fc'];
+  const today = new Date().setHours(0,0,0,0);
 
-  // ── Build SVG ruler ──
-  let rulerSvg = '<svg width="100%" height="' + headerH + '" style="display:block;overflow:visible">';
-  ticks.forEach(ts => {
-    const x = pct(ts);
-    rulerSvg +=
-      '<line x1="' + x + '" y1="0" x2="' + x + '" y2="100%" stroke="#2a4a2a" stroke-width="1"/>' +
-      '<text x="' + x + '" y="' + (headerH - 6) + '" fill="#4b7a5a" font-family="Share Tech Mono,monospace" font-size="11" text-anchor="middle">' +
-      _esc(fmtTick(ts)) + '</text>';
+  let s = _topbar(user, sid);
+  s += '<div class="page">';
+  s += '<div class="page-title">📅 ציר זמן תרגילים</div>';
+  
+  s += '<div class="card" style="padding:0; overflow:hidden;">';
+  
+  // התיקון הקריטי: הגדרת גובה דינמי ל-Wrapper לפי ה-totalH שחישבת
+  s += '<div class="gantt-container" style="position:relative; width:100%; min-width:800px; height:' + totalH + 'px; background:var(--bg2); overflow-x:auto;">';
+
+  // 1. ציור קווי הרקע (ימים/תאריכים)
+  ticks.forEach(t => {
+    const pos = pct(t);
+    // קו אנכי
+    s += '<div style="position:absolute; top:0; bottom:0; right:' + pos + '; width:1px; background:var(--border); z-index:1;"></div>';
+    // כיתוב תאריך
+    s += '<div class="mono" style="position:absolute; top:8px; right:' + pos + '; transform:translateX(50%); font-size:10px; color:var(--muted); z-index:2;">' + fmtTick(t) + '</div>';
   });
-  rulerSvg += '</svg>';
 
-  // ── Build bars ──
-  let bars = '';
-  const today = Date.now();
-  const todayPct = today >= chartMin && today <= chartMax ? pct(today) : null;
-
+  // 2. ציור התרגילים (הברים)
   parsed.forEach((item, idx) => {
-    const lane  = itemLanes[idx];
-    const ex    = item.ex;
-    const color = COLORS[idx % COLORS.length];
-    const top   = headerH + lane * laneH + 6;
-    const barH  = laneH - 12;
-    const left  = pct(item.start);
-    const width = pctW(item.start, item.end);
+    const laneIndex = itemLanes[idx];
+    const top       = headerH + (laneIndex * laneH);
+    const right     = pct(item.start);
+    const width     = pctW(item.start, item.end);
+    const color     = COLORS[idx % COLORS.length];
+    
+    // בדיקת סטטוס לטובת עיצוב (אופציונלי)
+    const isPast = today > item.end;
+    const opacity = isPast ? '0.4' : '1';
 
-    const isActive  = today >= item.start && today <= item.end;
-    const isPast    = today > item.end;
-    const opacity   = isPast ? '0.55' : '1';
-    const glowStyle = isActive ? 'box-shadow:0 0 0 2px ' + color + ',0 0 12px ' + color + '44;' : '';
-
-    const href = '?page=exercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ;
-
-    bars +=
-      '<a target="_top" href="' + _esc(href) + '" title="' + _esc(ex.title) +
-        ' | ' + _esc(ex.start_date) + (ex.end_date ? ' — ' + _esc(ex.end_date) : '') + '"' +
-        ' style="position:absolute;top:' + top + 'px;left:' + left + ';width:' + width +
-        ';height:' + barH + 'px;background:' + color + ';border-radius:4px;' +
-        'display:flex;align-items:center;padding:0 8px;overflow:hidden;' +
-        'opacity:' + opacity + ';text-decoration:none;' + glowStyle +
-        'transition:opacity .15s,filter .15s;cursor:pointer"' +
-        ' onmouseover="this.style.filter=\'brightness(1.25)\'" onmouseout="this.style.filter=\'\'">' +
-        '<span style="font-family:var(--mono);font-size:11px;color:#fff;' +
-          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;width:100%">' +
-        _esc(ex.title) + '</span>' +
-      '</a>';
+    s += '<a href="' + _url('page=exercise&id=' + item.ex.id + '&sid=' + sidQ) + '" ';
+    s += ' class="gantt-bar" style="position:absolute; top:' + (top + 6) + 'px; right:' + right + '; width:' + width + '; ';
+    s += ' height:32px; background:' + color + '22; border:1px solid ' + color + '; border-radius:4px; ';
+    s += ' display:flex; align-items:center; padding:0 8px; text-decoration:none; color:var(--text); z-index:3; ';
+    s += ' overflow:hidden; white-space:nowrap; opacity:' + opacity + ';">';
+    
+    // סימון קטן של צבע וטקסט
+    s += '<span style="width:8px; height:8px; background:' + color + '; border-radius:2px; margin-left:8px; flex-shrink:0;"></span>';
+    s += '<span class="mono" style="font-size:12px; font-weight:bold; text-overflow:ellipsis; overflow:hidden;">' + _esc(item.ex.title) + '</span>';
+    s += '</a>';
   });
 
-  // ── Today line ──
-  let todayLine = '';
-  if (todayPct) {
-    todayLine = '<div style="position:absolute;top:0;left:' + todayPct +
-      ';width:2px;height:100%;background:#fbbf24;opacity:.7;pointer-events:none">' +
-      '<div style="position:absolute;top:4px;left:4px;font-family:var(--mono);' +
-        'font-size:10px;color:#fbbf24;white-space:nowrap">היום</div></div>';
-  }
-
-  // ── Grid vertical lines ──
-  let gridLines = '';
-  ticks.forEach(ts => {
-    gridLines += '<div style="position:absolute;top:0;left:' + pct(ts) +
-      ';width:1px;height:100%;background:#2a4a2a;pointer-events:none"></div>';
+  s += '</div>'; // סגירת gantt-container
+  s += '</div>'; // סגירת card
+  
+  // הוספת טבלת סיכום מתחת לגרף (שכבר התחלת לכתוב ב-views.gs)
+  s += '<div class="page-title" style="margin-top:30px;">📋 פירוט תרגילים</div>';
+  s += '<div class="card" style="padding:0">';
+  s += '<table class="tbl"><thead><tr>';
+  s += '<th>שם התרגיל</th><th>תאריך התחלה</th><th>תאריך סיום</th><th>סטטוס</th><th>פתיחה</th>';
+  s += '</tr></thead><tbody>';
+  
+  parsed.forEach((item, idx) => {
+    const ex = item.ex;
+    const isActive = today >= item.start && today <= item.end;
+    const isPast   = today > item.end;
+    const status   = isActive ? '<span class="badge" style="background:#1e3a1e; color:#4ade80;">● פעיל</span>' 
+                   : isPast   ? '<span class="badge" style="background:#2a2a2a; color:#888;">✓ הסתיים</span>' 
+                   :            '<span class="badge" style="background:#1e2a3a; color:#60a5fa;">◌ עתידי</span>';
+    
+    s += '<tr>';
+    s += '<td><b>' + _esc(ex.title) + '</b></td>';
+    s += '<td class="mono">' + _esc(ex.start_date || '—') + '</td>';
+    s += '<td class="mono">' + _esc(ex.end_date || '—') + '</td>';
+    s += '<td>' + status + '</td>';
+    s += '<td>' + _a('page=exercise&id=' + ex.id + '&sid=' + sidQ, '🔎 ניהול', 'btn btn-secondary btn-sm') + '</td>';
+    s += '</tr>';
   });
 
-  // ── Legend / summary ──
-  const totalEx    = parsed.length;
-  const activeEx   = parsed.filter(x => today >= x.start && today <= x.end).length;
-  const upcomingEx = parsed.filter(x => today < x.start).length;
-  const pastEx     = parsed.filter(x => today > x.end).length;
+  s += '</tbody></table></div>';
+  s += '</div>'; // סגירת page
 
-  // ── Assemble HTML ──
-  const chartWrap =
-    // Ruler
-    '<div style="position:relative;width:100%;height:' + headerH + 'px;' +
-      'border-bottom:1px solid #2a4a2a;overflow:hidden">' +
-    rulerSvg +
-    '</div>' +
-    // Bars area
-    '<div style="position:relative;width:100%;height:' + (laneCount * laneH) + 'px">' +
-    gridLines +
-    bars +
-    todayLine +
-    '</div>';
+  return _html(s, 'ציר זמן');
 
-  const body = _topbar(user, sid) +
-    '<div class="page">' +
-    _flash(p) +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
-    '<div class="page-title" style="margin:0">📅 ציר זמן תרגילים</div>' +
-    '<div style="display:flex;gap:6px">' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div></div>' +
-
-    // Stats strip
-    '<div class="grid-3" style="margin-bottom:16px">' +
-    '<div class="stat-box"><div class="stat-num" style="color:#fbbf24">' + activeEx + '</div><div class="stat-label">פעילים כעת</div></div>' +
-    '<div class="stat-box"><div class="stat-num">' + upcomingEx + '</div><div class="stat-label">עתידיים</div></div>' +
-    '<div class="stat-box"><div class="stat-num" style="color:var(--muted)">' + pastEx + '</div><div class="stat-label">הסתיימו</div></div>' +
-    '</div>' +
-
-    // Legend
-    '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--muted)">' +
-    '<span><span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:2px;margin-left:4px;opacity:.8"></span>קו היום</span>' +
-    '<span style="color:var(--text2)">לחץ על תרגיל לפתיחה</span>' +
-    '<span>תרגילים שהסתיימו מוצגים בשקיפות</span>' +
-    '</div>' +
-
-    // Chart
-    '<div class="card" style="overflow-x:auto">' +
-    '<div style="min-width:600px;padding:0 4px 8px">' +
-    chartWrap +
-    '</div></div>' +
-
-    // Exercise list table below chart
-    '<div class="card" style="margin-top:14px">' +
-    '<div class="card-header"><span class="card-title">📋 רשימת תרגילים (' + totalEx + ')</span></div>' +
-    '<div class="card-body" style="padding:0">' +
-    '<table class="tbl"><thead><tr>' +
-    '<th>שם התרגיל</th><th>תאריך התחלה</th><th>תאריך סיום</th><th>משך (ימים)</th><th>סטטוס</th><th>פתיחה</th>' +
-    '</tr></thead><tbody>' +
-    parsed.map((item, idx) => {
-      const ex       = item.ex;
-      const durationDays = Math.round((item.end - item.start) / DAY_MS) + 1;
-      const isActive = today >= item.start && today <= item.end;
-      const isPast   = today > item.end;
-      const status   = isActive ? _badge('● פעיל', 'yellow')
-                     : isPast   ? _badge('✓ הסתיים', 'muted')
-                     :            _badge('◌ עתידי', 'blue');
-      const color    = COLORS[idx % COLORS.length];
-      return '<tr>' +
-        '<td><span style="display:inline-block;width:10px;height:10px;background:' + color + ';border-radius:2px;margin-left:6px"></span>' +
-        '<b>' + _esc(ex.title) + '</b></td>' +
-        '<td class="mono">' + _esc(ex.start_date || '—') + '</td>' +
-        '<td class="mono">' + _esc(ex.end_date   || '—') + '</td>' +
-        '<td class="mono" style="text-align:center">' + durationDays + '</td>' +
-        '<td>' + status + '</td>' +
-        '<td>' + _a('page=exercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-secondary btn-sm') + '</td>' +
-        '</tr>';
-    }).join('') +
-    '</tbody></table></div></div>' +
-    '</div>'; // end page
-
-  return _html(body, 'ציר זמן — MilEx');
 }
