@@ -116,7 +116,7 @@ function Exercises_duplicate(p) {
   const u    = Auth_requireRole(p, ['admin']);
   const orig = Exercises_get(p.id);
   if (!orig) throw new Error('התרגיל לא נמצא.');
-  const newId = 'E' + _nextId('Exercises');
+  const newId = 'E' + Date.now();
   _append('Exercises', [newId, orig.title + ' (copy)', orig.description, u.id,
     orig.rawStartDate, orig.rawEndDate]);
   Exercises_details(orig.id).forEach(d => {

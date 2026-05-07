@@ -35,8 +35,7 @@ function Assignments_assign(p) {
   const exists = Assignments_all().some(a => a.exercise_id === exId && a.user_id === userId);
   if (exists) return Views_exercise({ sid: p.sid, id: exId, info: 'החייל כבר משתתף בתרגיל.' });
 
-  const id = 'A' + _nextId('Assignments');
-  _append('Assignments', [id, exId, userId, 'pending', '', resp]);
+const id = 'A' + Date.now();  _append('Assignments', [id, exId, userId, 'pending', '', resp]);
   return Views_exercise({ sid: p.sid, id: exId, info: 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.' });
 }
 
@@ -239,7 +238,7 @@ function Assignments_autoAssignAll(p) {
     }
 
     toAdd.forEach(function(item){
-      const aid = 'A' + _nextId('Assignments');
+      const aid = 'A' + Date.now();
       _append('Assignments', [aid, ex.id, item.user.id, 'pending', '', item.resp]);
       if (item.user.role === 'trainee') traineesAssigned++;
       else if (item.user.role === 'commander') commandersAssigned++;
