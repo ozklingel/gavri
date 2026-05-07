@@ -5,29 +5,41 @@
 
 function _fmtDate(val) {
   if (!val) return '';
+
   const months = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני',
                   'יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-  const days   = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
-  let dd, mm, yy, wd;
+
+  const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+
+  let d;
+
   if (val instanceof Date) {
-    dd = val.getUTCDate(); mm = val.getUTCMonth();
-    yy = val.getUTCFullYear(); wd = val.getUTCDay();
+    d = val;
   } else {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
-    dd = d.getUTCDate(); mm = d.getUTCMonth();
-    yy = d.getUTCFullYear(); wd = d.getUTCDay();
+    d = new Date(val);
   }
+
+  if (isNaN(d.getTime())) return String(val);
+
+  const dd = d.getDate();
+  const mm = d.getMonth();
+  const yy = d.getFullYear();
+  const wd = d.getDay();
+
   return 'יום ' + days[wd] + ', ' + dd + ' ב' + months[mm] + ' ' + yy;
 }
 
 function _rawDate(val) {
   if (!val) return '';
-  let d = (val instanceof Date) ? val : new Date(val);
+
+  const d = (val instanceof Date) ? val : new Date(val);
+
   if (isNaN(d.getTime())) return '';
-  const y  = d.getUTCFullYear();
-  const m  = String(d.getUTCMonth()+1).padStart(2,'0');
-  const dd = String(d.getUTCDate()).padStart(2,'0');
+
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+
   return y + '-' + m + '-' + dd;
 }
 
