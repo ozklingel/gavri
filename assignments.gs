@@ -35,7 +35,8 @@ function Assignments_assign(p) {
   const exists = Assignments_all().some(a => a.exercise_id === exId && a.user_id === userId);
   if (exists) return Views_exercise({ sid: p.sid, id: exId, info: 'החייל כבר משתתף בתרגיל.' });
 
-const id = 'A' + Date.now();  _append('Assignments', [id, exId, userId, 'pending', '', resp]);
+  const id = 'A' + _nextId('Assignments');
+  _append('Assignments', [id, exId, userId, 'pending', '', resp]);
   return Views_exercise({ sid: p.sid, id: exId, info: 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.' });
 }
 
@@ -238,7 +239,7 @@ function Assignments_autoAssignAll(p) {
     }
 
     toAdd.forEach(function(item){
-      const aid = 'A' + Date.now();
+      const aid = 'A' + _nextId('Assignments');
       _append('Assignments', [aid, ex.id, item.user.id, 'pending', '', item.resp]);
       if (item.user.role === 'trainee') traineesAssigned++;
       else if (item.user.role === 'commander') commandersAssigned++;
@@ -267,4 +268,45 @@ function Assignments_clearAll(p) {
     sh.deleteRows(2, last - 1);
   }
   return Views_dashboard({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
+}
+
+// ═══════════════════════════════════════
+//  Board API — called via google.script.run from assign page
+// ═══════════════════════════════════════
+
+// Add assignment from drag-and-drop board
+function assignFromBoard(sid, exId, userId, resp) {
+  var p = { sid: sid };
+  Auth_requireRole(p, ['admin']);
+  if (!exId || !userId) throw new Error('חסר מזהה תרגיל או חייל.');
+
+  // Check not already assigned
+  var existing = Assignments_byExercise(exId).filter(function(a) { return a.user_id === userId; });
+  if (existing.length) throw new Error('החייל כבר משובץ לתרגיל זה.');
+
+  var id = 'A' + new Date().getTime();
+  _append('Assignments', [id, exId, userId, 'pending', '', resp || '']);
+  return { id: id, exercise_id: exId, user_id: userId, status: 'pending', responsibility: resp || '' };
+}
+
+// Remove a single assignment by ID
+function removeAssignmentById(sid, assignId) {
+  var p = { sid: sid };
+  Auth_requireRole(p, ['admin']);
+  if (!assignId) throw new Error('חסר מזהה הקצאה.');
+  var row = _findRowIndex('Assignments', assignId);
+  if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
+  _sheet('Assignments').deleteRow(row);
+  return { ok: true };
+}
+
+// Move assignment to a different exercise
+function moveAssignmentById(sid, assignId, toExId) {
+  var p = { sid: sid };
+  Auth_requireRole(p, ['admin']);
+  if (!assignId || !toExId) throw new Error('חסר מזהה הקצאה או תרגיל יעד.');
+  var row = _findRowIndex('Assignments', assignId);
+  if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
+  _sheet('Assignments').getRange(row, 2).setValue(toExId);
+  return { ok: true };
 }

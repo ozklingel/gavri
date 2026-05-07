@@ -55,6 +55,7 @@ function doGet(e) {
     if (page === 'users')     return Views_users(p);
     if (page === 'timeline')  return Views_timeline(p);
     if (page === 'user')      return Views_user(p);
+    if (page === 'assign')    return Views_assign(p);
     return Views_login(p);
   } catch (err) {
     return Views_error(err && err.message ? err.message : String(err), p);
