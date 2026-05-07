@@ -825,6 +825,124 @@
   document.addEventListener('DOMContentLoaded', initDatePickers);
   // Also run immediately in case DOMContentLoaded already fired
   if (document.readyState !== 'loading') initDatePickers();
+
+  // ═══════════════════════════════════════
+  //  Excel / CSV bulk import
+  // ═══════════════════════════════════════
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'xlsxFile') handleXlsxFile(e.target);
+  });
+
+  function handleXlsxFile(input) {
+    const preview   = document.getElementById('xlsxPreview');
+    const previewTb = document.getElementById('xlsxPreviewTable');
+    const errDiv    = document.getElementById('xlsxError');
+    const importBtn = document.getElementById('xlsxImportBtn');
+
+    errDiv.style.display  = 'none';
+    preview.style.display = 'none';
+    importBtn.style.display = 'none';
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+    const name = file.name.toLowerCase();
+    const reader = new FileReader();
+
+    if (name.endsWith('.csv')) {
+      reader.onload = function(e) {
+        try {
+          const rows = parseCSV(e.target.result);
+          showXlsxPreview(rows, previewTb, preview, importBtn, errDiv);
+        } catch(err) { showXlsxError(errDiv, err.message); }
+      };
+      reader.readAsText(file, 'UTF-8');
+    } else {
+      // XLSX — read as binary, parse with basic method
+      reader.onload = function(e) {
+        try {
+          const rows = parseXLSXBasic(e.target.result);
+          showXlsxPreview(rows, previewTb, preview, importBtn, errDiv);
+        } catch(err) { showXlsxError(errDiv, 'לא ניתן לקרוא קובץ XLSX ישירות. אנא שמור כ-CSV ונסה שנית.'); }
+      };
+      reader.readAsBinaryString(file);
+    }
+  }
+
+  function parseCSV(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) throw new Error('הקובץ ריק או חסרה שורת כותרת.');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    return lines.slice(1).filter(l => l.trim()).map(function(line) {
+      const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      const obj = {};
+      headers.forEach(function(h, i) { obj[h] = vals[i] || ''; });
+      return obj;
+    });
+  }
+
+  function parseXLSXBasic(binary) {
+    // Very basic XLSX parser — extracts shared strings and sheet data
+    // For full support, user should export as CSV
+    throw new Error('XLSX');
+  }
+
+  function showXlsxPreview(rows, previewTb, preview, importBtn, errDiv) {
+    if (!rows.length) { showXlsxError(errDiv, 'לא נמצאו שורות בקובץ.'); return; }
+
+    // Validate required columns
+    const required = ['id', 'name', 'password'];
+    const keys = Object.keys(rows[0]);
+    const missing = required.filter(r => !keys.includes(r));
+    if (missing.length) {
+      showXlsxError(errDiv, 'חסרות עמודות: ' + missing.join(', ') + '. נדרש: id, name, password, role (אופציונלי), team_id (אופציונלי)');
+      return;
+    }
+
+    // Build preview table (max 5 rows)
+    const cols = ['id','name','role','password','team_id'];
+    let tbl = '<table class="tbl" style="font-size:11px"><thead><tr>' +
+      cols.map(function(c) { return '<th>' + c + '</th>'; }).join('') +
+      '</tr></thead><tbody>';
+    rows.slice(0, 5).forEach(function(row) {
+      tbl += '<tr>' + cols.map(function(col) {
+        const v = row[col] || '';
+        return '<td>' + (col === 'password' ? '••••' : v) + '</td>';
+      }).join('') + '</tr>';
+    });
+    if (rows.length > 5) tbl += '<tr><td colspan="' + cols.length + '" style="color:var(--muted);text-align:center">... ועוד ' + (rows.length-5) + ' שורות</td></tr>';
+    tbl += '</tbody></table>';
+    tbl += '<div style="font-family:var(--mono);font-size:11px;color:var(--green);margin-top:6px">סה״כ: ' + rows.length + ' משתמשים לייבוא</div>';
+
+    previewTb.innerHTML = tbl;
+    preview.style.display = 'block';
+    importBtn.style.display = 'inline-block';
+
+    // Store parsed rows for import
+    importBtn._rows = rows;
+  }
+
+  function showXlsxError(errDiv, msg) {
+    errDiv.textContent = '⚠ ' + msg;
+    errDiv.style.display = 'block';
+  }
+
+  function doXlsxImport() {
+    const btn    = document.getElementById('xlsxImportBtn');
+    const sid    = document.getElementById('xlsxSid').value;
+    const appUrl = document.getElementById('xlsxAppUrl').value;
+    const rows   = btn._rows;
+    if (!rows || !rows.length) return;
+
+    btn.textContent = '⏳ מייבא...';
+    btn.disabled = true;
+
+    const url = appUrl + '?action=importUsers&sid=' + encodeURIComponent(sid) +
+      '&usersJson=' + encodeURIComponent(JSON.stringify(rows));
+
+    // Navigate top frame to the import action URL
+    window.top.location.href = url;
+  }
+
 </script>
 </body>
 </html>

@@ -795,9 +795,32 @@ function _usersTab(sid, sidQ) {
     '<div style="margin-top:4px">' + _submitBtn('➕ צור משתמש', 'btn btn-primary') + '</div>' +
     '</form>';
 
+  // ── Excel bulk-import form ──
+  const xlsxForm =
+    '<div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:10px">' +
+    '// עמודות נדרשות: id | name | role | password | team_id (אופציונלי)</div>' +
+    '<div style="margin-bottom:10px">' +
+    '<input type="file" id="xlsxFile" accept=".xlsx,.xls,.csv"' +
+    ' style="font-family:var(--mono);font-size:12px;color:var(--text1);background:var(--bg3);' +
+    ' border:1px solid var(--border);border-radius:3px;padding:6px;width:100%;cursor:pointer">' +
+    '</div>' +
+    '<div id="xlsxPreview" style="margin-bottom:10px;display:none">' +
+    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">// תצוגה מקדימה</div>' +
+    '<div id="xlsxPreviewTable" style="overflow-x:auto"></div>' +
+    '</div>' +
+    '<div id="xlsxError" style="color:#f87171;font-family:var(--mono);font-size:12px;margin-bottom:8px;display:none"></div>' +
+    '<button type="button" id="xlsxImportBtn" class="btn btn-primary" style="display:none" onclick="doXlsxImport()">📥 ייבא משתמשים</button>';
+
   let table = '<div class="collapsible" style="margin-bottom:14px">' +
     '<button class="collapsible-toggle">➕ צור משתמש חדש <span class="arrow">▾</span></button>' +
     '<div class="collapsible-content"><div class="card"><div class="card-body">' + createForm + '</div></div></div></div>';
+
+  table += '<div class="collapsible" style="margin-bottom:14px">' +
+    '<button class="collapsible-toggle">📥 ייבא משתמשים מאקסל <span class="arrow">▾</span></button>' +
+    '<div class="collapsible-content"><div class="card"><div class="card-body">' +
+    '<input type="hidden" id="xlsxSid" value="' + _esc(sid) + '">' +
+    '<input type="hidden" id="xlsxAppUrl" value="' + _esc(_appUrl()) + '">' +
+    xlsxForm + '</div></div></div></div>';
 
   table += '<div class="card"><div class="card-body" style="padding:0;overflow-x:auto">' +
     '<table class="tbl"><thead><tr>' +

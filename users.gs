@@ -230,5 +230,69 @@ function Users_updateProfile(p) {
   sh.getRange(row, 7).setValue((p.military_affiliation || '').trim());
   sh.getRange(row, 8).setValue((p.unit_classification  || '').trim());
   sh.getRange(row, 9).setValue((p.target_role          || '').trim());
+  // Update team if provided via profile edit form
+  if (p.newTeamId !== undefined) {
+    const tRow = _findRowIndex('Users', targetId);
+    if (tRow > 0) _sheet('Users').getRange(tRow, 4).setValue((p.newTeamId || '').trim());
+  }
+  // Update role if provided
+  if (p.newRole) {
+    const rRow = _findRowIndex('Users', targetId);
+    if (rRow > 0) _sheet('Users').getRange(rRow, 3).setValue(p.newRole.trim());
+  }
+  if (p.returnTo === 'user') {
+    return Views_user({ sid: p.sid, id: targetId, info: 'פרופיל המשתמש עודכן בהצלחה.' });
+  }
   return Views_users({ sid: p.sid, tab: 'users', info: 'פרופיל המשתמש עודכן.' });
+}
+// ═══════════════════════════════════════
+//  Users_importBulk — ייבוא משתמשים מאקסל
+//  p.usersJson = JSON array of {id, name, role, password, team_id?}
+// ═══════════════════════════════════════
+function Users_importBulk(p) {
+  Auth_requireRole(p, ['admin']);
+
+  let rows;
+  try {
+    rows = JSON.parse(p.usersJson || '[]');
+  } catch(e) {
+    throw new Error('JSON לא תקין: ' + e.message);
+  }
+
+  if (!Array.isArray(rows) || !rows.length) throw new Error('לא נמצאו שורות לייבוא.');
+
+  const usersSh = _sheet('Users');
+  const credsSh = _sheet('Credentials');
+
+  // Build lookup of existing IDs to avoid duplicates
+  const existing = new Set(_rows('Users').data.map(r => String(r[0]).trim()));
+
+  let added = 0, skipped = 0, errors = [];
+
+  rows.forEach(function(row, i) {
+    const id       = String(row.id       || '').trim();
+    const name     = String(row.name     || '').trim();
+    const role     = String(row.role     || 'trainee').trim().toLowerCase();
+    const password = String(row.password || '').trim();
+    const teamId   = String(row.team_id  || '').trim();
+
+    if (!id || !name) { errors.push('שורה ' + (i+1) + ': חסר id או שם'); return; }
+    if (!password)    { errors.push('שורה ' + (i+1) + ': חסרה סיסמה ל-' + id); return; }
+
+    const validRoles = ['admin','commander','trainee'];
+    const finalRole  = validRoles.includes(role) ? role : 'trainee';
+
+    if (existing.has(id)) { skipped++; return; }
+
+    usersSh.appendRow([id, name, finalRole, teamId, '', '', '', '', '']);
+    credsSh.appendRow([id, password]);
+    existing.add(id);
+    added++;
+  });
+
+  let info = 'ייבוא הושלם: ' + added + ' משתמשים נוספו.';
+  if (skipped) info += ' ' + skipped + ' דולגו (קיימים כבר).';
+  if (errors.length) info += ' שגיאות: ' + errors.slice(0,3).join(' | ');
+
+  return Views_users({ sid: p.sid, tab: 'users', info: info });
 }
