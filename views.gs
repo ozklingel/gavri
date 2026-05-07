@@ -516,7 +516,18 @@ function Views_exercise(p) {
     if (!available.length) {
       indivForm = '<div class="empty">כל המשתמשים כבר הוקצו</div>';
     } else {
-      const respOptions = ['מפקד','נווט','חובש','קשר','צלף','נהג','לוחם','תצפיתן','לוגיסטיקה'];
+const respOptions = [
+  'קמבצ',
+  'מפ חיר',
+  'מפ חהן',
+  'סמפ',
+  'מפ סיוע מנהלתי',
+  'קצין בטיחות',
+  'מנהל תרגיל',
+  'קצין עורף',
+  'מפ חשן',
+  'מפ מסיעת'
+];
       const userOptions = available.map(function(u){ return [u.id, u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')']; });
       indivForm =
         _formOpen() +
@@ -584,13 +595,11 @@ function Views_users(p) {
     '<div class="tabs">' +
     _a('page=users&sid=' + sidQ + '&tab=teams',  '🪖 צוותים',       'tab-link' + (tab === 'teams'  ? ' active' : '')) +
     _a('page=users&sid=' + sidQ + '&tab=users',  '👤 משתמשים',      'tab-link' + (tab === 'users'  ? ' active' : '')) +
-    _a('page=users&sid=' + sidQ + '&tab=create', '➕ יצירת משתמש', 'tab-link' + (tab === 'create' ? ' active' : '')) +
     '</div>';
 
   let content = '';
   if (tab === 'teams')  content = _teamsTab(sid, sidQ);
   else if (tab === 'users')  content = _usersTab(sid, sidQ);
-  else if (tab === 'create') content = _createUserTab(sid, sidQ);
 
   const body = _topbar(user, sid) +
     '<div class="page">' +
@@ -624,7 +633,7 @@ function _extraProfileFields(u) {
     '<div class="form-row"><label class="form-label">אפיון יחידתי</label>' +
       _input('unit_classification', 'קרבי / תומכי לחימה...', u.unit_classification || '') + '</div>' +
     '</div>' +
-    '<div class="form-row"><label class="form-label">תפקיד אל"חיו מיועד</label>' +
+    '<div class="form-row"><label class="form-label">תפקיד מיועד מיועד</label>' +
       _input('target_role', 'מ"כ / קמ"ן...', u.target_role || '') + '</div>';
 }
 // ── טאב צוותות ──
@@ -764,14 +773,36 @@ function _teamsTab(sid, sidQ) {
 function _usersTab(sid, sidQ) {
   const users = Users_all();
   const teams = Teams_all();
-
   const teamMap = {};
   teams.forEach(function(t) { teamMap[t.id] = t.name; });
 
-  let table = '<div class="card"><div class="card-body" style="padding:0;overflow-x:auto">' +
+  // ── Create user form (collapsible at top of tab) ──
+  const teamOptsCreate = [['', '— ללא צוות —']].concat(
+    teams.map(function(t) { return [t.id, t.id + ' — ' + t.name]; })
+  );
+  const createForm =
+    _formOpen() +
+    '<input type="hidden" name="action" value="createUser">' +
+    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">מספר אישי *</label>' + _input('newUserId', 'U004', '', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">שם מלא *</label>'    + _input('newName', 'שם ושם משפחה', '', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">סיסמה *</label>'     + _input('newPassword', 'סיסמה ראשונית', '', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">תפקיד</label>'       + _select('newRole', [['trainee','חניך'],['commander','מפקד צוות'],['admin','מפקד קורס']]) + '</div>' +
+    '<div class="form-row"><label class="form-label">צוות</label>'        + _select('newTeamId', teamOptsCreate) + '</div>' +
+    '</div>' +
+    _extraProfileFields() +
+    '<div style="margin-top:4px">' + _submitBtn('➕ צור משתמש', 'btn btn-primary') + '</div>' +
+    '</form>';
+
+  let table = '<div class="collapsible" style="margin-bottom:14px">' +
+    '<button class="collapsible-toggle">➕ צור משתמש חדש <span class="arrow">▾</span></button>' +
+    '<div class="collapsible-content"><div class="card"><div class="card-body">' + createForm + '</div></div></div></div>';
+
+  table += '<div class="card"><div class="card-body" style="padding:0;overflow-x:auto">' +
     '<table class="tbl"><thead><tr>' +
     '<th>מספר אישי</th><th>שם</th><th>תפקיד</th><th>צוות</th>' +
-    '<th>שיוך יחידתי</th><th>סוג שירות</th><th>שיוך חיילי</th><th>אפיון יחידתי</th><th>תפקיד אל"חיו</th>' +
+    '<th>שיוך יחידתי</th><th>סוג שירות</th><th>שיוך חיילי</th><th>אפיון יחידתי</th><th>תפקיד מיועד</th>' +
     '<th>עריכה</th><th>מחיקה</th>' +
     '</tr></thead><tbody>';
 
