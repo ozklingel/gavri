@@ -230,18 +230,5 @@ function Users_updateProfile(p) {
   sh.getRange(row, 7).setValue((p.military_affiliation || '').trim());
   sh.getRange(row, 8).setValue((p.unit_classification  || '').trim());
   sh.getRange(row, 9).setValue((p.target_role          || '').trim());
-  // Update team if provided via profile edit form
-  if (p.newTeamId !== undefined) {
-    const tRow = _findRowIndex('Users', targetId);
-    if (tRow > 0) _sheet('Users').getRange(tRow, 4).setValue((p.newTeamId || '').trim());
-  }
-  // Update role if provided
-  if (p.newRole) {
-    const rRow = _findRowIndex('Users', targetId);
-    if (rRow > 0) _sheet('Users').getRange(rRow, 3).setValue(p.newRole.trim());
-  }
-  if (p.returnTo === 'user') {
-    return Views_user({ sid: p.sid, id: targetId, info: 'פרופיל המשתמש עודכן בהצלחה.' });
-  }
   return Views_users({ sid: p.sid, tab: 'users', info: 'פרופיל המשתמש עודכן.' });
 }

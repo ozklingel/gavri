@@ -217,17 +217,21 @@ function _adminDashboard(sid) {
     '<div class="stat-box"><div class="stat-num">' + completed + '</div><div class="stat-label">הושלמו</div></div>' +
     '</div>';
 
-// 🤖 Auto-assign panel
-s += '<div class="card" style="margin-bottom:14px;border:1px solid var(--accent,#888)">' +
-  '<div class="card-header">' +
-  '<span class="card-title">🤖 שיבוץ אוטומטי</span>' +
-  '</div>' +
-  '<div class="card-body">' +
-  '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-  _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-primary') +
-  _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 נקה את כל השיבוצים', 'פעולה זו תמחק את כל השיבוצים הקיימים. להמשיך?', 'btn btn-secondary') +
-  '</div>' +
-  '</div></div>';
+  // 🤖 Auto-assign panel
+  s += '<div class="card" style="margin-bottom:14px;border:1px solid var(--accent,#888)">' +
+    '<div class="card-header">' +
+    '<span class="card-title">🤖 שיבוץ אוטומטי</span>' +
+    '</div>' +
+    '<div class="card-body">' +
+    '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">' +
+    'משבץ אוטומטית לכל תרגיל: מפקד צוות + 2 חניכים. ' +
+    'חניך לא ישובץ ביותר מתרגיל אחד. תרגילים עם שיבוצים קיימים — מדולגים.' +
+    '</p>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-primary') +
+    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 נקה את כל השיבוצים', 'פעולה זו תמחק את כל השיבוצים הקיימים. להמשיך?', 'btn btn-secondary') +
+    '</div>' +
+    '</div></div>';
 
   // Exercises list (compact)
   let exList = '<div class="card" style="margin-bottom:14px">' +
@@ -936,31 +940,27 @@ function Views_timeline(p) {
     return (Math.max(to - from, DAY_MS) / chartSpan * 100).toFixed(3) + '%';
   }
 
-  // ── Lane assignment (greedy interval scheduling) ──
-  // Two items overlap if item B starts before item A ends.
-  // Overlapping items go to separate lanes — non-overlapping items share a lane.
-  const lanes = []; // each entry: rightmost endTs currently in that lane
+  // ── Lane assignment (greedy, prevents overlap) ──
+  // Each "lane" tracks the rightmost end-timestamp currently in it
+  const lanes = []; // array of { endTs }
   const itemLanes = parsed.map(item => {
-    // Find first lane where this item does NOT overlap the last item
-    // Overlap: item.start < lane.endTs  (they share at least one millisecond)
     let placed = -1;
     for (let i = 0; i < lanes.length; i++) {
-      if (item.start >= lanes[i]) {  // starts at or after previous item ends → no overlap
-        lanes[i] = item.end;
+      if (lanes[i].endTs <= item.start) {
+        lanes[i].endTs = item.end;
         placed = i;
         break;
       }
     }
     if (placed === -1) {
-      // All lanes occupied — open a new row
-      lanes.push(item.end);
+      lanes.push({ endTs: item.end });
       placed = lanes.length - 1;
     }
     return placed;
   });
 
   const laneCount  = lanes.length;
-  const laneH      = 48; // px per lane — enough height to clearly separate parallel exercises
+  const laneH      = 44; // px per lane
   const headerH    = 40; // px for date ruler
   const totalH     = headerH + laneCount * laneH;
 
@@ -1040,14 +1040,6 @@ function Views_timeline(p) {
       '</a>';
   });
 
-  // ── Lane separator lines (horizontal rules between rows) ──
-  let laneLines = '';
-  for (let li = 1; li < laneCount; li++) {
-    const lineTop = li * laneH;
-    laneLines += '<div style="position:absolute;top:' + lineTop + 'px;left:0;right:0;' +
-      'height:1px;background:#1a3a1a;pointer-events:none"></div>';
-  }
-
   // ── Today line ──
   let todayLine = '';
   if (todayPct) {
@@ -1080,7 +1072,6 @@ function Views_timeline(p) {
     // Bars area
     '<div style="position:relative;width:100%;height:' + (laneCount * laneH) + 'px">' +
     gridLines +
-    laneLines +
     bars +
     todayLine +
     '</div>';
