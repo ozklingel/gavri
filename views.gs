@@ -200,104 +200,76 @@ function Views_dashboard(p) {
 // ── Admin Dashboard ──
 function _adminDashboard(sid) {
   const exs = Exercises_all();
-  const users = Users_all();
   const sidQ = encodeURIComponent(sid);
-
-  // Stats row
   const assigns = Assignments_all ? Assignments_all() : [];
-  const completed = assigns.filter(function(a){ return a.status === 'completed'; }).length;
-  const pending   = assigns.filter(function(a){ return a.status !== 'completed'; }).length;
+  const completed = assigns.filter(a => a.status === 'completed').length;
 
-  let s = '<div class="page-title">⊞ לוח בקרה — מפקד קורס</div>';
+  let s = '<div class="page">';
+  s += '<h1 class="page-title">לוח בקרה מפקד</h1>';
 
-  // Stat boxes
-  s += '<div class="grid-3" style="margin-bottom:16px">' +
-    '<div class="stat-box"><div class="stat-num">' + exs.length + '</div><div class="stat-label">תרגילים</div></div>' +
-    '<div class="stat-box"><div class="stat-num">' + pending + '</div><div class="stat-label">הקצאות ממתינות</div></div>' +
-    '<div class="stat-box"><div class="stat-num">' + completed + '</div><div class="stat-label">הושלמו</div></div>' +
+  // שורת סטטיסטיקה - שימוש ב-grid-3 הקיים ב-CSS שלך
+  s += '<div class="grid-3" style="margin-bottom: 20px;">' +
+    '<div class="stat-box"><div class="stat-num">' + exs.length + '</div><div class="stat-label">תרגילים פעילים</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + completed + '</div><div class="stat-label">שיבוצים שהושלמו</div></div>' +
+    '<div class="stat-box"><div class="stat-num" style="color:var(--green)">ON</div><div class="stat-label">סטטוס מערכת</div></div>' +
     '</div>';
 
-  // 🤖 Auto-assign panel
-  s += '<div class="card" style="margin-bottom:14px;border:1px solid var(--accent,#888)">' +
-    '<div class="card-header">' +
-    '<span class="card-title">🤖 שיבוץ אוטומטי</span>' +
-    '</div>' +
+  // חלוקה לטורים (טור מרכזי וטור צד)
+  s += '<div style="display: flex; gap: 20px; flex-wrap: wrap;">';
+
+  // --- טור מרכזי: רשימת תרגילים ---
+  s += '<div style="flex: 2; min-width: 300px;">';
+  s += '<div class="card">' +
+    '<div class="card-header"><div class="card-title">📋 ניהול תרגילים</div></div>';
+  
+  if (!exs.length) {
+    s += '<div class="empty">אין תרגילים פעילים במערכת</div>';
+  } else {
+    s += '<table class="tbl"><thead><tr><th>שם התרגיל</th><th>תאריך</th><th style="text-align:left">פעולות</th></tr></thead><tbody>';
+    exs.forEach(e => {
+      s += '<tr>' +
+        '<td><div class="ex-title">' + _esc(e.title) + '</div><div class="mono" style="font-size:10px opacity:0.6">' + e.id + '</div></td>' +
+        '<td>' + _esc(e.start_date || '—') + '</td>' +
+        '<td style="text-align:left">' + 
+          _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, 'ניהול', 'btn btn-primary btn-sm') + 
+        '</td>' +
+        '</tr>';
+    });
+    s += '</tbody></table>';
+  }
+  s += '</div></div>';
+
+  // --- טור צד: פעולות מהירות ---
+  s += '<div style="flex: 1; min-width: 250px;">';
+  
+  // כרטיס פעולות
+  s += '<div class="card" style="margin-bottom: 15px;">' +
+    '<div class="card-header"><div class="card-title">⚡ פעולות מהירות</div></div>' +
     '<div class="card-body">' +
-    '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">' +
-    'משבץ אוטומטית לכל תרגיל: מפקד צוות + 2 חניכים. ' +
-    'חניך לא ישובץ ביותר מתרגיל אחד. תרגילים עם שיבוצים קיימים — מדולגים.' +
-    '</p>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-    _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-primary') +
-    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 נקה את כל השיבוצים', 'פעולה זו תמחק את כל השיבוצים הקיימים. להמשיך?', 'btn btn-secondary') +
-    '</div>' +
+    _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-secondary btn-full', 'style="margin-bottom:10px"') +
+    _a('page=users&sid=' + sidQ, '👥 ניהול סד"כ משתמשים', 'btn btn-ghost btn-full') +
     '</div></div>';
 
-  // Exercises list (compact)
-  let exList = '<div class="card" style="margin-bottom:14px">' +
-    '<div class="card-header">' +
-    '<span class="card-title">📋 תרגילים (' + exs.length + ')</span>' +
-    '</div>';
-
-  if (!exs.length) {
-    exList += '<div class="empty">אין תרגילים עדיין</div>';
-  } else {
-    exs.forEach(function(e) {
-      exList += '<div class="ex-row">' +
-        '<div class="ex-info">' +
-        '<div class="ex-title">' + _esc(e.title) + '</div>' +
-        '<div class="ex-meta">' + _esc(e.id) + (e.start_date ? ' · ' + _esc(e.start_date) : '') + (e.end_date ? ' — ' + _esc(e.end_date) : '') + '</div>' +
-        '</div>' +
-        '<div class="ex-btns">' +
-        _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-primary btn-sm') +
-        _a('action=duplicateExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '⎘ שכפול', 'btn btn-ghost btn-sm') +
-        _confirmDelete('action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, 'מחיקת תרגיל "' + e.title + '" תסיר גם את כל ההקצאות שלו. להמשיך?') +
-        '</div>' +
-        '</div>';
-    });
-  }
-  exList += '</div>';
-  s += exList;
-
-  // Create exercise (collapsible)
-  const allTeams = Teams_all();
-  const teamOptions = [['', '— ללא צוות —']].concat(
-    allTeams.map(function(t) { return [t.id, t.name + ' (' + t.id + ')']; })
-  );
-  const createForm =
+  // כרטיס יצירת תרגיל חדש
+  s += '<div class="card">' +
+    '<div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div>' +
+    '<div class="card-body">' +
     _formOpen() +
     '<input type="hidden" name="action" value="createExercise">' +
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-    '<div class="form-grid">' +
-    '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', 'שם התרגיל', '', 'text', 'required') + '</div>' +
-    '<div class="form-grid">' + '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', '') + '</div>' + '<div class="form-row"><label class="form-label">תאריך סיום</label>' + _dateInput('end_date', '') + '</div>' + '</div>' +
-    '</div>' +
-    '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', 'תיאור קצר...') + '</div>' +
     '<div class="form-row">' +
-    '<label class="form-label">🪖 צוות משתתף <span style="color:var(--muted)">(אופציונלי — מפקד הצוות + 2 חניכים ראשונים ישובצו אוטומטית)</span></label>' +
-    _select('teamId', teamOptions) +
+      '<label class="form-label">שם התרגיל</label>' +
+      '<input type="text" name="title" class="form-input" required placeholder="לדוגמה: אימון הקמת קשר">' +
     '</div>' +
-    '<div style="display:flex;gap:8px;margin-top:4px">' + _submitBtn('➕ צור תרגיל', 'btn btn-primary') + '</div>' +
-    '</form>';
+    _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
+    '</form></div></div>';
 
-  s += '<div class="collapsible" style="margin-bottom:14px">' +
-    '<button class="collapsible-toggle">➕ צור תרגיל חדש <span class="arrow">▾</span></button>' +
-    '<div class="collapsible-content">' +
-    '<div class="card"><div class="card-body">' + createForm + '</div></div>' +
-    '</div></div>';
-
-  // Users summary
-  s += '<div class="collapsible">' +
-    '<button class="collapsible-toggle">👤 משתמשים (' + users.length + ') <span class="arrow">▾</span></button>' +
-    '<div class="collapsible-content">' +
-    '<div class="card"><div class="card-body">' +
-    '<p style="color:var(--muted);font-family:var(--mono);font-size:12px;margin-bottom:8px">לניהול תפקידים:</p>' +
-    _a('page=users&sid=' + sidQ, '→ עמוד ניהול משתמשים', 'btn btn-secondary') +
-    '</div></div></div></div>';
-
+  s += '</div>'; // סגירת טור צד
+  s += '</div>'; // סגירת flex layout
+  s += '</div>'; // סגירת page
+  
   return s;
 }
-
 // ── Commander Dashboard ──
 function _commanderDashboard(user, sid) {
   const sidQ = encodeURIComponent(sid);
