@@ -35,7 +35,7 @@ function Assignments_assign(p) {
   const exists = Assignments_all().some(a => a.exercise_id === exId && a.user_id === userId);
   if (exists) return Views_exercise({ sid: p.sid, id: exId, info: 'החייל כבר משתתף בתרגיל.' });
 
-  const id = 'A' + _nextId('Assignments');
+  const id = 'A' + new Date().getTime();
   _append('Assignments', [id, exId, userId, 'pending', '', resp]);
   return Views_exercise({ sid: p.sid, id: exId, info: 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.' });
 }
@@ -105,7 +105,7 @@ function Assignments_assignTeam(exerciseId, teamId, sid) {
   let added = 0, skipped = 0;
   toAssign.forEach(function(item){
     if (existing.indexOf(item.user.id) !== -1) { skipped++; return; }
-    const aid = 'A' + _nextId('Assignments');
+    const aid = 'A' + new Date().getTime();
     _append('Assignments', [aid, exerciseId, item.user.id, 'pending', '', item.resp]);
     added++;
   });
@@ -239,7 +239,7 @@ function Assignments_autoAssignAll(p) {
     }
 
     toAdd.forEach(function(item){
-      const aid = 'A' + _nextId('Assignments');
+      const aid = 'A' + new Date().getTime();
       _append('Assignments', [aid, ex.id, item.user.id, 'pending', '', item.resp]);
       if (item.user.role === 'trainee') traineesAssigned++;
       else if (item.user.role === 'commander') commandersAssigned++;
@@ -256,7 +256,7 @@ function Assignments_autoAssignAll(p) {
     msg += ' אין יותר חניכים פנויים.';
   }
 
-  return Views_dashboard({ sid: p.sid, info: msg });
+  return Views_assign({ sid: p.sid, info: msg });
 }
 
 // פעולה: ניקוי כל השיבוצים (לפני הרצה מחדש של שיבוץ אוטומטי)
@@ -267,7 +267,7 @@ function Assignments_clearAll(p) {
   if (last > 1) {
     sh.deleteRows(2, last - 1);
   }
-  return Views_dashboard({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
+  return Views_assign({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
 }
 
 // ═══════════════════════════════════════
