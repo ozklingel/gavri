@@ -52,6 +52,7 @@ function doGet(e) {
     if (page === 'login')     return Views_login(p);
     if (page === 'dashboard') return Views_dashboard(p);
     if (page === 'exercise')  return Views_exercise(p);
+    if (page === 'exercises') return Views_exercises(p);
     if (page === 'users')     return Views_users(p);
     if (page === 'timeline')  return Views_timeline(p);
     if (page === 'user')      return Views_user(p);
