@@ -243,14 +243,6 @@ function _adminDashboard(sid) {
   // --- טור צד: פעולות מהירות ---
   s += '<div style="flex: 1; min-width: 250px;">';
   
-  // כרטיס פעולות
-  s += '<div class="card" style="margin-bottom: 15px;">' +
-    '<div class="card-header"><div class="card-title">⚡ פעולות מהירות</div></div>' +
-    '<div class="card-body">' +
-    _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-secondary btn-full', 'style="margin-bottom:10px"') +
-    _a('page=users&sid=' + sidQ, '👥 ניהול סד"כ משתמשים', 'btn btn-ghost btn-full') +
-    '</div></div>';
-
   // כרטיס יצירת תרגיל חדש
   s += '<div class="card">' +
     '<div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div>' +
