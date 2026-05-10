@@ -193,6 +193,55 @@ function Views_dashboard(p) {
 }
 
 // ─────────── EXERCISES MANAGEMENT ───────────
+function Views_exercises(p) {
+  const user = Auth_requireRole(p, ['admin']);
+  const sid = user.id;
+  const sidQ = encodeURIComponent(sid);
+  const exs = Exercises_all();
+
+  let s = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
+
+  s += '<div style="flex:2;min-width:300px">';
+  s += '<div class="card"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
+  if (!exs.length) {
+    s += '<div class="empty">אין תרגילים במערכת</div>';
+  } else {
+    s += '<table class="tbl"><thead><tr><th>שם</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th></tr></thead><tbody>';
+    exs.forEach(function(e){
+      s += '<tr>' +
+        '<td><div class="ex-title">' + _esc(e.title) + '</div><div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div></td>' +
+        '<td>' + _esc(e.start_date || '—') + '</td>' +
+        '<td>' + _esc(e.end_date || '—') + '</td>' +
+        '<td style="text-align:left;white-space:nowrap">' +
+          _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '✎ ערוך', 'btn btn-primary btn-sm') + ' ' +
+          _confirmDelete('action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, 'למחוק את התרגיל "' + e.title + '"?') +
+        '</td></tr>';
+    });
+    s += '</tbody></table>';
+  }
+  s += '</div></div>';
+
+  s += '<div style="flex:1;min-width:260px">';
+  s += '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div><div class="card-body">' +
+    _formOpen() +
+    '<input type="hidden" name="action" value="createExercise">' +
+    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+    '<div class="form-row"><label class="form-label">שם התרגיל</label>' +
+    '<input type="text" name="title" class="form-input" required placeholder="לדוגמה: אימון הקמת קשר"></div>' +
+    _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
+    '</form></div></div>';
+  s += '</div>';
+
+  s += '</div>';
+
+  const body = _topbar(user, sid) + '<div class="page">' + _flash(p) +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+    '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
+    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+    '</div>' + s + '</div>';
+  return _html(body, 'ניהול תרגילים');
+}
+
 // ── Admin Dashboard ──
 function _adminDashboard(sid) {
   const exs = Exercises_all();
@@ -572,7 +621,10 @@ function Views_users(p) {
   const body = _topbar(user, sid) +
     '<div class="page">' +
     _flash(p) +
-    '<div class="page-title">⚙ ניהול משתמשים וצוותות</div>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+    '<div class="page-title" style="margin:0">⚙ ניהול משתמשים וצוותות</div>' +
+    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+    '</div>' +
     tabs + content +
     '</div>';
   return _html(body, 'ניהול משתמשים');
@@ -862,7 +914,11 @@ function Views_timeline(p) {
 
   if (!parsed.length) {
     const body = _topbar(user, sid) +
-      '<div class="page"><div class="page-title">📅 ציר זמן תרגילים</div>' +
+      '<div class="page">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+      '<div class="page-title" style="margin:0">📅 ציר זמן תרגילים</div>' +
+      _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+      '</div>' +
       '<div class="card"><div class="empty">אין תרגילים עם תאריכים להצגה. הוסף תאריך התחלה לפחות לתרגיל אחד.</div></div></div>';
     return _html(body, 'ציר זמן');
   }
@@ -942,7 +998,10 @@ function Views_timeline(p) {
 
   let s = _topbar(user, sid);
   s += '<div class="page">';
-  s += '<div class="page-title">📅 ציר זמן תרגילים</div>';
+  s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+    '<div class="page-title" style="margin:0">📅 ציר זמן תרגילים</div>' +
+    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+    '</div>';
   
   s += '<div class="card" style="padding:0; overflow:hidden;">';
   
@@ -1015,82 +1074,6 @@ function Views_timeline(p) {
   return _html(s, 'ציר זמן');
 
 }
-// ─────────── EXERCISES LIST PAGE ───────────
-function Views_exercises(p) {
-  const user = Auth_current(p);
-  if (!user) return Views_login({ error: 'נדרשת התחברות.' });
-  if (user.role !== 'admin') return Views_error('גישה למפקדי קורס בלבד.', p);
-
-  const sid  = user.id;
-  const sidQ = encodeURIComponent(sid);
-  const exs  = Exercises_all();
-  const assigns = Assignments_all ? Assignments_all() : [];
-
-  // Count assignments per exercise
-  const countMap = {};
-  assigns.forEach(function(a) {
-    countMap[a.exercise_id] = (countMap[a.exercise_id] || 0) + 1;
-  });
-
-  // Create exercise form (collapsible)
-  const createForm =
-    _formOpen() +
-    '<input type="hidden" name="action" value="createExercise">' +
-    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-    '<div class="form-grid">' +
-    '<div class="form-row"><label class="form-label">שם התרגיל *</label>' + _input('title', 'שם התרגיל', '', 'text', 'required') + '</div>' +
-    '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', '') + '</div>' +
-    '<div class="form-row"><label class="form-label">תאריך סיום</label>'   + _dateInput('end_date',   '') + '</div>' +
-    '</div>' +
-    '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', 'תיאור קצר...') + '</div>' +
-    _submitBtn('➕ צור תרגיל', 'btn btn-primary') +
-    '</form>';
-
-  // Exercises table
-  let rows = '';
-  exs.forEach(function(e) {
-    const cnt = countMap[e.id] || 0;
-    rows +=
-      '<tr>' +
-      '<td><b>' + _esc(e.title) + '</b><div class="mono" style="font-size:10px;color:var(--muted)">' + _esc(e.id) + '</div></td>' +
-      '<td class="mono">' + _esc(e.start_date || '—') + '</td>' +
-      '<td class="mono">' + _esc(e.end_date   || '—') + '</td>' +
-      '<td style="text-align:center">' + cnt + '</td>' +
-      '<td style="white-space:nowrap">' +
-        _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-primary btn-sm') + ' ' +
-        _confirmDelete('action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
-          'מחיקת תרגיל "' + e.title + '" תסיר גם את כל ההקצאות וציר הזמן שלו. להמשיך?') +
-      '</td>' +
-      '</tr>';
-  });
-
-  const body = _topbar(user, sid) +
-    '<div class="page">' +
-    _flash(p) +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0">🎯 תרגילים (' + exs.length + ')</div>' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div>' +
-
-    // Create form collapsible
-    '<div class="collapsible" style="margin-bottom:14px">' +
-    '<button class="collapsible-toggle">➕ צור תרגיל חדש <span class="arrow">▾</span></button>' +
-    '<div class="collapsible-content"><div class="card"><div class="card-body">' + createForm + '</div></div></div>' +
-    '</div>' +
-
-    // Table
-    '<div class="card">' +
-    (exs.length
-      ? '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
-        '<th>שם התרגיל</th><th>תאריך התחלה</th><th>תאריך סיום</th><th style="text-align:center">משתתפים</th><th>פעולות</th>' +
-        '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      : '<div class="empty">אין תרגילים עדיין. צור תרגיל ראשון למעלה.</div>') +
-    '</div>' +
-    '</div>';
-
-  return _html(body, 'תרגילים');
-}
-
 // ═══════════════════════════════════════
 //  Views_assign — דף שיבוץ drag & drop
 //  נתונים נטענים בתוך ה-HTML כ-JSON
