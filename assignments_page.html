@@ -97,7 +97,8 @@
 
 <!-- Toolbar -->
 <div class="toolbar">
-  <button class="btn btn-primary" onclick="autoAssign(this)">⚡ שיבוץ אוטומטי</button>
+  <button id="btn-server-auto"  class="btn btn-primary"  data-url="<?= autoUrl ?>">⚡ שיבוץ אוטומטי</button>
+  <button id="btn-server-clear" class="btn btn-sm" style="background:#7f1d1d;color:var(--danger);border:1px solid #b91c1c" data-url="<?= clearUrl ?>">🗑 איפוס שיבוצים</button>
   <div class="toolbar-sep"></div>
   <span class="lbl">חניכים לתרגיל:</span>
   <input type="number" id="cfg-trainees"   class="small" value="6" min="1" max="50">
@@ -370,6 +371,14 @@ function saveAll(btn) {
 }
 
 // ── Init ──
+document.getElementById('btn-server-auto').addEventListener('click', function() {
+  if (confirm('לבצע שיבוץ אוטומטי? תרגילים שכבר משובצים לא יושפעו.'))
+    window.top.location.href = this.dataset.url;
+});
+document.getElementById('btn-server-clear').addEventListener('click', function() {
+  if (confirm('לאפס את כל השיבוצים? פעולה בלתי הפיכה.'))
+    window.top.location.href = this.dataset.url;
+});
 initPending();
 render();
 
