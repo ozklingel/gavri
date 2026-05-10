@@ -247,6 +247,7 @@ function _adminDashboard(sid) {
   s += '<div class="card" style="margin-bottom: 15px;">' +
     '<div class="card-header"><div class="card-title">⚡ פעולות מהירות</div></div>' +
     '<div class="card-body">' +
+    _a('action=autoAssignAll&sid=' + sidQ, '🤖 הרץ שיבוץ אוטומטי', 'btn btn-secondary btn-full', 'style="margin-bottom:10px"') +
     _a('page=users&sid=' + sidQ, '👥 ניהול סד"כ משתמשים', 'btn btn-ghost btn-full') +
     '</div></div>';
 
@@ -1100,17 +1101,7 @@ function Views_assign(p) {
     '<div style="display:flex;gap:6px;align-items:center">' +
     '<span id="assignStatus" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></span>' +
     _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div></div>' +'<div style="display:flex;gap:6px;align-items:center">' +
-  '<span id="assignStatus" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></span>' +
-
-  _a(
-    'action=autoAssignAll&sid=' + sidQ,
-    '🤖 שיבוץ אוטומטי',
-    'btn btn-secondary btn-sm'
-  ) +
-
-  _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-'</div></div>' +
+    '</div></div>' +
 
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
     '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה' +
