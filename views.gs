@@ -272,6 +272,31 @@ function Views_exercises(p) {
         '<input type="text" name="end_date" class="form-input datepicker" required>' +
       '</div>' +
 
+      '<div class="form-row">' +
+        '<label class="form-label">אקט</label>' +
+        '<input type="text" name="act" class="form-input" placeholder="אקט">' +
+      '</div>' +
+
+      '<div class="form-row">' +
+        '<label class="form-label">סוג תרגיל</label>' +
+        '<input type="text" name="exercise_type" class="form-input" placeholder="סוג תרגיל">' +
+      '</div>' +
+
+      '<div class="form-row">' +
+        '<label class="form-label">גדוד שת״פ</label>' +
+        '<input type="text" name="partner_battalion" class="form-input" placeholder="גדוד שת״פ">' +
+      '</div>' +
+
+      '<div class="form-row">' +
+        '<label class="form-label">מחנה / מגנן</label>' +
+        '<input type="text" name="camp" class="form-input" placeholder="מחנה / מגנן">' +
+      '</div>' +
+
+      '<div class="form-row">' +
+        '<label class="form-label">מפקד אחראי גדוד</label>' +
+        '<input type="text" name="battalion_commander" class="form-input" placeholder="מפקד אחראי גדוד">' +
+      '</div>' +
+
       _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
     '</form>' +
     '</div></div>';
@@ -483,6 +508,18 @@ function Views_exercise(p) {
     '<b>' + _esc(ex.end_date || '—') + '</b></div>' +
     '<div style="flex:1"><span style="color:var(--muted);font-family:var(--mono);font-size:11px">תיאור</span><br>' +
     _esc(ex.description || '—') + '</div>' +
+    '</div>' +
+    '<div class="card-body" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border)">' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">אקט</span><br>' +
+    '<b>' + _esc(ex.act || '—') + '</b></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">סוג תרגיל</span><br>' +
+    '<b>' + _esc(ex.exercise_type || '—') + '</b></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">גדוד שת״פ</span><br>' +
+    '<b>' + _esc(ex.partner_battalion || '—') + '</b></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">מחנה / מגנן</span><br>' +
+    '<b>' + _esc(ex.camp || '—') + '</b></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">מפקד אחראי גדוד</span><br>' +
+    '<b>' + _esc(ex.battalion_commander || '—') + '</b></div>' +
     '</div></div>';
 
   // ── Two-column layout for timeline + participants ──
@@ -606,6 +643,15 @@ function Views_exercise(p) {
       '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', ex.rawStartDate) + '</div>' +
       '<div class="form-row"><label class="form-label">תאריך סיום</label>' + _dateInput('end_date', ex.rawEndDate) + '</div>' +
       '</div>' +
+      '<div class="form-grid">' +
+      '<div class="form-row"><label class="form-label">אקט</label>' + _input('act', 'אקט', ex.act) + '</div>' +
+      '<div class="form-row"><label class="form-label">סוג תרגיל</label>' + _input('exercise_type', 'סוג תרגיל', ex.exercise_type) + '</div>' +
+      '</div>' +
+      '<div class="form-grid">' +
+      '<div class="form-row"><label class="form-label">גדוד שת״פ</label>' + _input('partner_battalion', 'גדוד שת״פ', ex.partner_battalion) + '</div>' +
+      '<div class="form-row"><label class="form-label">מחנה / מגנן</label>' + _input('camp', 'מחנה / מגנן', ex.camp) + '</div>' +
+      '</div>' +
+      '<div class="form-row"><label class="form-label">מפקד אחראי גדוד</label>' + _input('battalion_commander', 'מפקד אחראי גדוד', ex.battalion_commander) + '</div>' +
       _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
       '</form>' +
       '</div></div></div></div>';

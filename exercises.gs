@@ -64,7 +64,13 @@ function Exercises_all() {
     rawEndDate:    _rawDate(r[5]),
     // keep .date as alias = start_date (backwards compat for dashboard display)
     date:          _fmtDate(r[4]),
-    rawDate:       _rawDate(r[4])
+    rawDate:       _rawDate(r[4]),
+    // col 7–11: new fields
+    act:                 r[6] == null ? '' : String(r[6]),
+    exercise_type:       r[7] == null ? '' : String(r[7]),
+    partner_battalion:   r[8] == null ? '' : String(r[8]),
+    camp:                r[9] == null ? '' : String(r[9]),
+    battalion_commander: r[10] == null ? '' : String(r[10])
   }));
 }
 
@@ -110,6 +116,11 @@ function Exercises_create(p) {
   // ── Create exercise ──
   const id     = 'E' + new Date().getTime();
   const teamId = (p.teamId || '').trim();
+  const act               = String(p.act || '').trim();
+  const exerciseType      = String(p.exercise_type || '').trim();
+  const partnerBattalion  = String(p.partner_battalion || '').trim();
+  const camp              = String(p.camp || '').trim();
+  const battalionCommander = String(p.battalion_commander || '').trim();
 
   _append('Exercises', [
     id,
@@ -117,7 +128,12 @@ function Exercises_create(p) {
     description,
     u.id,
     startDate,
-    endDate
+    endDate,
+    act,
+    exerciseType,
+    partnerBattalion,
+    camp,
+    battalionCommander
   ]);
 
   let info = 'התרגיל נוצר בהצלחה (' + id + ').';
@@ -151,6 +167,11 @@ function Exercises_edit(p) {
   sh.getRange(row, 3).setValue(p.description || '');
   sh.getRange(row, 5).setValue(p.start_date  || '');
   sh.getRange(row, 6).setValue(p.end_date    || '');
+  sh.getRange(row, 7).setValue(p.act                  || '');
+  sh.getRange(row, 8).setValue(p.exercise_type        || '');
+  sh.getRange(row, 9).setValue(p.partner_battalion    || '');
+  sh.getRange(row, 10).setValue(p.camp                 || '');
+  sh.getRange(row, 11).setValue(p.battalion_commander  || '');
   return Views_exercise({ sid: p.sid, id: p.id, info: 'התרגיל עודכן בהצלחה.' });
 }
 
@@ -160,7 +181,8 @@ function Exercises_duplicate(p) {
   if (!orig) throw new Error('התרגיל לא נמצא.');
   const newId = 'E' + _nextId('Exercises');
   _append('Exercises', [newId, orig.title + ' (copy)', orig.description, u.id,
-    orig.rawStartDate, orig.rawEndDate]);
+    orig.rawStartDate, orig.rawEndDate, orig.act, orig.exercise_type,
+    orig.partner_battalion, orig.camp, orig.battalion_commander]);
   Exercises_details(orig.id).forEach(d => {
     const did = 'D' + _nextId('ExerciseDetails');
     _append('ExerciseDetails', [did, newId, d.time, d.location, d.description]);
@@ -240,7 +262,13 @@ function Exercises_all() {
     rawEndDate:    _rawDate(r[5]),
     // keep .date as alias = start_date (backwards compat for dashboard display)
     date:          _fmtDate(r[4]),
-    rawDate:       _rawDate(r[4])
+    rawDate:       _rawDate(r[4]),
+    // col 7–11: new fields
+    act:                 r[6] == null ? '' : String(r[6]),
+    exercise_type:       r[7] == null ? '' : String(r[7]),
+    partner_battalion:   r[8] == null ? '' : String(r[8]),
+    camp:                r[9] == null ? '' : String(r[9]),
+    battalion_commander: r[10] == null ? '' : String(r[10])
   }));
 }
 
@@ -260,7 +288,9 @@ function Exercises_create(p) {
   const teamId = (p.teamId || '').trim();
 
   _append('Exercises', [id, p.title || '', p.description || '', u.id,
-    p.start_date || '', p.end_date || '']);
+    p.start_date || '', p.end_date || '',
+    p.act || '', p.exercise_type || '', p.partner_battalion || '',
+    p.camp || '', p.battalion_commander || '']);
 
   let info = 'התרגיל נוצר בהצלחה (' + id + ').';
 
@@ -285,6 +315,11 @@ function Exercises_edit(p) {
   sh.getRange(row, 3).setValue(p.description || '');
   sh.getRange(row, 5).setValue(p.start_date  || '');
   sh.getRange(row, 6).setValue(p.end_date    || '');
+  sh.getRange(row, 7).setValue(p.act                  || '');
+  sh.getRange(row, 8).setValue(p.exercise_type        || '');
+  sh.getRange(row, 9).setValue(p.partner_battalion    || '');
+  sh.getRange(row, 10).setValue(p.camp                 || '');
+  sh.getRange(row, 11).setValue(p.battalion_commander  || '');
   return Views_exercise({ sid: p.sid, id: p.id, info: 'התרגיל עודכן בהצלחה.' });
 }
 
@@ -294,7 +329,8 @@ function Exercises_duplicate(p) {
   if (!orig) throw new Error('התרגיל לא נמצא.');
   const newId = 'E' + _nextId('Exercises');
   _append('Exercises', [newId, orig.title + ' (copy)', orig.description, u.id,
-    orig.rawStartDate, orig.rawEndDate]);
+    orig.rawStartDate, orig.rawEndDate, orig.act, orig.exercise_type,
+    orig.partner_battalion, orig.camp, orig.battalion_commander]);
   Exercises_details(orig.id).forEach(d => {
     const did = 'D' + _nextId('ExerciseDetails');
     _append('ExerciseDetails', [did, newId, d.time, d.location, d.description]);
