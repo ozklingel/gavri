@@ -533,26 +533,52 @@ function Views_exercise(p) {
 
   if (!parts.length) {
     pHtml += '<div class="empty">אין משתתפים</div>';
+  } else if (user.role === 'admin') {
+    // Admin: inline-editable rows — each row is its own form
+    pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
+      '<th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>פעולות</th>' +
+      '</tr></thead><tbody>';
+    parts.forEach(function(a) {
+      const u = Users_get(a.user_id);
+      pHtml += '<tr>' +
+        '<form action="' + _esc(_appUrl()) + '" method="get" target="_top">' +
+        '<input type="hidden" name="action" value="updateAssignment">' +
+        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+        '<input type="hidden" name="assignmentId" value="' + _esc(a.id) + '">' +
+        '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+        '<td><b>' + _esc(u ? u.name : a.user_id) + '</b></td>' +
+        '<td><input type="text" name="responsibility" value="' + _esc(a.responsibility) + '" class="form-input" style="min-width:80px"></td>' +
+        '<td><select name="status" class="form-select">' +
+        '<option value="pending"' + (a.status === 'pending' ? ' selected' : '') + '>◌ ממתין</option>' +
+        '<option value="in_progress"' + (a.status === 'in_progress' ? ' selected' : '') + '>⟳ בביצוע</option>' +
+        '<option value="completed"' + (a.status === 'completed' ? ' selected' : '') + '>✓ הושלם</option>' +
+        '</select></td>' +
+        '<td><input type="text" name="score" value="' + _esc(a.score) + '" class="form-input" style="width:60px" placeholder="—"></td>' +
+        '<td style="display:flex;gap:4px">' +
+        '<button type="submit" class="btn btn-primary btn-sm">💾</button>' +
+        '</form>' +
+        _formOpen('form-inline') +
+        '<input type="hidden" name="action" value="removeAssignment">' +
+        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+        '<input type="hidden" name="assignmentId" value="' + _esc(a.id) + '">' +
+        '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+        _submitBtn('✕', 'btn btn-danger btn-sm btn-icon') +
+        '</form></td>' +
+        '</tr>';
+    });
+    pHtml += '</tbody></table></div>';
   } else {
-    pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr><th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
-      (user.role === 'admin' ? '<th>הסרה</th>' : '') + '</tr></thead><tbody>';
+    // Non-admin: read-only table
+    pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
+      '<th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
+      '</tr></thead><tbody>';
     parts.forEach(function(a) {
       const u = Users_get(a.user_id);
       pHtml += '<tr><td><b>' + _esc(u ? u.name : a.user_id) + '</b></td>' +
         '<td>' + _esc(a.responsibility) + '</td>' +
         '<td>' + _statusBadge(a.status) + '</td>' +
-        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>';
-      if (user.role === 'admin') {
-        pHtml += '<td>' +
-          _formOpen('form-inline') +
-          '<input type="hidden" name="action" value="removeAssignment">' +
-          '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-          '<input type="hidden" name="assignmentId" value="' + _esc(a.id) + '">' +
-          '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-          _submitBtn('✕', 'btn btn-danger btn-sm btn-icon') +
-          '</form></td>';
-      }
-      pHtml += '</tr>';
+        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
+        '</tr>';
     });
     pHtml += '</tbody></table></div>';
   }
