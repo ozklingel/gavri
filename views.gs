@@ -208,47 +208,104 @@ function Views_exercises(p) {
 
   let s = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
 
+  // ───── רשימת תרגילים ─────
   s += '<div style="flex:2;min-width:300px">';
   s += '<div class="card"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
+
   if (!exs.length) {
     s += '<div class="empty">אין תרגילים במערכת</div>';
   } else {
-    s += '<table class="tbl"><thead><tr><th>שם</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th></tr></thead><tbody>';
-    exs.forEach(function(e){
+    s += '<table class="tbl"><thead><tr>' +
+      '<th>שם</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
+      '</tr></thead><tbody>';
+
+    exs.forEach(function(e) {
       s += '<tr>' +
-        '<td><div class="ex-title">' + _esc(e.title) + '</div><div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div></td>' +
+        '<td>' +
+          '<div class="ex-title">' + _esc(e.title) + '</div>' +
+          '<div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div>' +
+        '</td>' +
         '<td>' + _esc(e.start_date || '—') + '</td>' +
         '<td>' + _esc(e.end_date || '—') + '</td>' +
         '<td style="text-align:left;white-space:nowrap">' +
-          _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, '✎ ערוך', 'btn btn-primary btn-sm') + ' ' +
-          _confirmDelete('action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ, 'למחוק את התרגיל "' + e.title + '"?') +
-        '</td></tr>';
+          _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
+             '✎ ערוך', 'btn btn-primary btn-sm') +
+          ' ' +
+          _confirmDelete(
+            'action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
+            'למחוק את התרגיל "' + e.title + '"?'
+          ) +
+        '</td>' +
+      '</tr>';
     });
+
     s += '</tbody></table>';
   }
+
   s += '</div></div>';
 
+  // ───── יצירת תרגיל חדש ─────
   s += '<div style="flex:1;min-width:260px">';
-  s += '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div><div class="card-body">' +
+  s += '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div>' +
+    '<div class="card-body">' +
     _formOpen() +
-    '<input type="hidden" name="action" value="createExercise">' +
-    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-    '<div class="form-row"><label class="form-label">שם התרגיל</label>' +
-    '<input type="text" name="title" class="form-input" required placeholder="לדוגמה: אימון הקמת קשר"></div>' +
-    _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
-    '</form></div></div>';
-  s += '</div>';
+      '<input type="hidden" name="action" value="createExercise">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
 
-  s += '</div>';
+      '<div class="form-row">' +
+        '<label class="form-label">שם התרגיל</label>' +
+        '<input type="text" name="title" class="form-input" required>' +
+      '</div>' +
 
-  const body = _topbar(user, sid) + '<div class="page">' + _flash(p) +
+      '<div class="form-row">' +
+        '<label class="form-label">תיאור</label>' +
+        '<textarea name="description" class="form-input"></textarea>' +
+      '</div>' +
+
+      '<div class="form-row">' +
+        '<label class="form-label">תאריך התחלה</label>' +
+        '<input type="text" name="start_date" class="form-input datepicker" required>' +
+      '</div>' +
+
+      '<div class="form-row">' +
+        '<label class="form-label">תאריך סיום</label>' +
+        '<input type="text" name="end_date" class="form-input datepicker" required>' +
+      '</div>' +
+
+      _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
+    '</form>' +
+    '</div></div>';
+
+  s += '</div></div>';
+
+  // ───── JS + Flatpickr ─────
+  s += `
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  flatpickr(".datepicker", {
+    dateFormat: "Y-m-d",
+    allowInput: true,
+    disableMobile: true
+  });
+});
+</script>
+`;
+
+  const body =
+    _topbar(user, sid) +
+    '<div class="page">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div>' + s + '</div>';
+      '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
+      _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+    '</div>' +
+    s +
+    '</div>';
+
   return _html(body, 'ניהול תרגילים');
 }
-
 // ── Admin Dashboard ──
 function _adminDashboard(sid) {
   const exs = Exercises_all();
