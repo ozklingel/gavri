@@ -118,7 +118,12 @@ function setupSheets() {
   ensure('Users',            ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role']);
   ensure('Credentials',      ['user_id','password']);
   ensure('Teams',            ['id','name','commander_id']);
-  ensure('Exercises',        ['id','title','description','created_by','start_date','end_date']);
+  ensure('Exercises',        ['id','title','description','created_by','start_date','end_date','act','exercise_type','partner_battalion','camp','battalion_commander']);
+  ensureColumn('Exercises', 'act');
+  ensureColumn('Exercises', 'exercise_type');
+  ensureColumn('Exercises', 'partner_battalion');
+  ensureColumn('Exercises', 'camp');
+  ensureColumn('Exercises', 'battalion_commander');
   ensure('ExerciseDetails',  ['id','exercise_id','time','location','description']);
   ensure('Assignments',      ['id','exercise_id','user_id','status','score','responsibility']);
   ensureColumn('Assignments', 'responsibility');
@@ -148,7 +153,7 @@ function resetTrainingTables() {
     Users: ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role'],
     Credentials: ['user_id','password'],
     Teams: ['id','name','commander_id'],
-    Exercises: ['id','title','description','created_by','start_date','end_date'],
+    Exercises: ['id','title','description','created_by','start_date','end_date','act','exercise_type','partner_battalion','camp','battalion_commander'],
     ExerciseDetails: ['id','exercise_id','time','location','description'],
     Assignments: ['id','exercise_id','user_id','status','score','responsibility']
   };
@@ -169,5 +174,5 @@ function resetTrainingTables() {
   ss.getSheetByName('Credentials').appendRow(['U003','train123']);
   ss.getSheetByName('Credentials').appendRow(['U004','train123']);
   ss.getSheetByName('Teams').appendRow(['T1','Alpha Team','U002']);
-  ss.getSheetByName('Exercises').appendRow(['E1','תרגיל ראשון','תרגיל הדגמה','U001','2026-04-21','2026-04-23']);
+  ss.getSheetByName('Exercises').appendRow(['E1','תרגיל ראשון','תרגיל הדגמה','U001','2026-04-21','2026-04-23','','','','','']);
 }
