@@ -14,7 +14,8 @@ function Users_all() {
     service_type:          String(r[5] || ''),
     military_affiliation:  String(r[6] || ''),
     unit_classification:   String(r[7] || ''),
-    target_role:           String(r[8] || '')
+    target_role:           String(r[8] || ''),
+    phone:                 r[9] == null ? '' : String(r[9])
   }));
 }
 
@@ -56,7 +57,8 @@ function Users_create(p) {
     (p.service_type         || '').trim(),
     (p.military_affiliation || '').trim(),
     (p.unit_classification  || '').trim(),
-    (p.target_role          || '').trim()
+    (p.target_role          || '').trim(),
+    (p.phone                || '').trim()
   ]);
   _append('Credentials', [newId, pass]);
 
@@ -224,12 +226,13 @@ function Users_updateProfile(p) {
   const row = _findRowIndex('Users', targetId);
   if (row < 0) throw new Error('המשתמש לא נמצא.');
   const sh = _sheet('Users');
-  // Columns: 1=id,2=name,3=role,4=team_id,5=unit_affiliation,6=service_type,7=military_affiliation,8=unit_classification,9=target_role
+  // Columns: 1=id,2=name,3=role,4=team_id,5=unit_affiliation,6=service_type,7=military_affiliation,8=unit_classification,9=target_role,10=phone
   sh.getRange(row, 5).setValue((p.unit_affiliation     || '').trim());
   sh.getRange(row, 6).setValue((p.service_type         || '').trim());
   sh.getRange(row, 7).setValue((p.military_affiliation || '').trim());
   sh.getRange(row, 8).setValue((p.unit_classification  || '').trim());
   sh.getRange(row, 9).setValue((p.target_role          || '').trim());
+  sh.getRange(row, 10).setValue((p.phone               || '').trim());
   // Update team if provided via profile edit form
   if (p.newTeamId !== undefined) {
     const tRow = _findRowIndex('Users', targetId);
@@ -284,7 +287,7 @@ function Users_importBulk(p) {
 
     if (existing.has(id)) { skipped++; return; }
 
-    usersSh.appendRow([id, name, finalRole, teamId, '', '', '', '', '']);
+    usersSh.appendRow([id, name, finalRole, teamId, '', '', '', '', '', '']);
     credsSh.appendRow([id, password]);
     existing.add(id);
     added++;
