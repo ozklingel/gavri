@@ -270,6 +270,27 @@ function Assignments_clearAll(p) {
   return Views_assign({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
 }
 
+// Update assignment fields (score, status, responsibility) — admin only
+function Assignments_update(p) {
+  Auth_requireRole(p, ['admin']);
+  const aid  = (p.assignmentId || '').trim();
+  const exId = (p.exerciseId   || '').trim();
+  if (!aid) throw new Error('חסר מזהה הקצאה.');
+
+  const row = _findRowIndex('Assignments', aid);
+  if (row < 0) throw new Error('ההקצאה לא נמצאה.');
+
+  const sh = _sheet('Assignments');
+  if (p.status !== undefined && p.status !== '')
+    sh.getRange(row, 4).setValue(p.status);
+  if (p.score !== undefined)
+    sh.getRange(row, 5).setValue(p.score);
+  if (p.responsibility !== undefined && p.responsibility !== '')
+    sh.getRange(row, 6).setValue(p.responsibility);
+
+  return Views_exercise({ sid: p.sid, id: exId, info: 'פרטי המשתתף עודכנו בהצלחה.' });
+}
+
 // ═══════════════════════════════════════
 //  Board API — called via google.script.run from assign page
 // ═══════════════════════════════════════

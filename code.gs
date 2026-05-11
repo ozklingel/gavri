@@ -29,6 +29,7 @@ function doGet(e) {
     if (action === 'assign')             return Assignments_assign(p);
     if (action === 'assignTeam')         return Assignments_assignTeamAction(p);
     if (action === 'removeAssignment')   return Assignments_remove(p);
+    if (action === 'updateAssignment')   return Assignments_update(p);
     if (action === 'complete')           return Assignments_complete(p);
     if (action === 'autoAssignAll')      return Assignments_autoAssignAll(p);
     if (action === 'clearAllAssignments')return Assignments_clearAll(p);
