@@ -124,13 +124,6 @@ function _topbar(user, sid) {
     '</div>' +
     '<div class="topbar-nav">';
 
-  nav += _a('page=dashboard&sid=' + sidQ, '⊞ לוח בקרה', 'btn btn-ghost btn-sm');
-  if (user.role === 'admin') {
-    nav += _a('page=exercises&sid=' + sidQ, '🎯 תרגילים',  'btn btn-ghost btn-sm');
-    nav += _a('page=users&sid=' + sidQ,    '👤 משתמשים',  'btn btn-ghost btn-sm');
-    nav += _a('page=timeline&sid=' + sidQ, '📅 ציר זמן',  'btn btn-ghost btn-sm');
-    nav += _a('page=assign&sid=' + sidQ,   '🔀 שיבוץ',    'btn btn-ghost btn-sm');
-  }
   nav += '<span class="topbar-user">👤 ' + _esc(user.name) + ' · ' + _esc(_roleHe(user.role)) + '</span>';
   nav += _a('action=logout', '⏻ יציאה', 'btn btn-ghost btn-sm');
   nav += '</div></nav>';
