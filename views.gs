@@ -95,6 +95,11 @@ function _html(body, title) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function _userLink(userId, userName, sidQ) {
+  return '<a target="_top" href="' + _esc(_url('page=user&id=' + encodeURIComponent(userId) + '&sid=' + sidQ)) +
+    '" style="color:var(--blue);text-decoration:underline"><b>' + _esc(userName) + '</b></a>';
+}
+
 function _roleHe(r) {
   return r === 'admin' ? 'מפקד קורס' : r === 'commander' ? 'מפקד צוות' : r === 'trainee' ? 'חניך' : r;
 }
@@ -583,7 +588,7 @@ function Views_exercise(p) {
         '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
         '<input type="hidden" name="assignmentId" value="' + _esc(a.id) + '">' +
         '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-        '<td><b>' + _esc(u ? u.name : a.user_id) + '</b></td>' +
+        '<td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
         '<td><input type="text" name="responsibility" value="' + _esc(a.responsibility) + '" class="form-input" style="min-width:80px"></td>' +
         '<td><select name="status" class="form-select">' +
         '<option value="pending"' + (a.status === 'pending' ? ' selected' : '') + '>◌ ממתין</option>' +
@@ -611,7 +616,7 @@ function Views_exercise(p) {
       '</tr></thead><tbody>';
     parts.forEach(function(a) {
       const u = Users_get(a.user_id);
-      pHtml += '<tr><td><b>' + _esc(u ? u.name : a.user_id) + '</b></td>' +
+      pHtml += '<tr><td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
         '<td>' + _esc(a.responsibility) + '</td>' +
         '<td>' + _statusBadge(a.status) + '</td>' +
         '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
@@ -735,6 +740,120 @@ const respOptions = [
 }
 
 // ─────────── USERS & TEAMS PAGE ───────────
+// ─────────── USER PROFILE PAGE ───────────
+function Views_user(p) {
+  const user = Auth_current(p);
+  if (!user) return Views_login({ error: 'נדרשת התחברות.' });
+  const sid  = user.id;
+  const sidQ = encodeURIComponent(sid);
+
+  const targetId = p.id || sid;
+  const target   = Users_get(targetId);
+  if (!target) return Views_error('המשתמש לא נמצא.', p);
+
+  const team     = target.team_id ? Teams_get(target.team_id) : null;
+  const teamName = team ? team.name : (target.team_id || '—');
+  const isAdmin  = user.role === 'admin';
+
+  let s = _topbar(user, sid) + '<div class="page">';
+  s += _flash(p);
+
+  // Page header
+  s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+    '<div class="page-title" style="margin:0">👤 ' + _esc(target.name) + '</div>' +
+    '<div style="display:flex;gap:6px">' +
+    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
+  if (isAdmin) {
+    s += _a('page=users&sid=' + sidQ, '← משתמשים', 'btn btn-ghost btn-sm');
+  }
+  s += '</div></div>';
+
+  // ── Profile info card ──
+  s += '<div class="card" style="margin-bottom:14px">' +
+    '<div class="card-header"><span class="card-title">📋 פרטי משתמש</span></div>' +
+    '<div class="card-body">' +
+    '<table class="tbl"><tbody>' +
+    '<tr><td style="width:140px;color:var(--muted);font-family:var(--mono);font-size:12px">מספר אישי</td>' +
+    '<td><span style="font-family:var(--mono);color:var(--green)">' + _esc(target.id) + '</span></td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">שם</td>' +
+    '<td><b>' + _esc(target.name) + '</b></td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">תפקיד</td>' +
+    '<td>' + _badge(_roleHe(target.role), target.role === 'admin' ? 'green' : target.role === 'commander' ? 'blue' : 'muted') + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">צוות</td>' +
+    '<td>' + _esc(teamName) + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">מספר טלפון</td>' +
+    '<td>' + (target.phone ? _esc(target.phone) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">שיוך יחידתי</td>' +
+    '<td>' + (target.unit_affiliation ? _esc(target.unit_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">סוג שירות</td>' +
+    '<td>' + (target.service_type ? _badge(target.service_type, 'muted') : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">שיוך חיילי</td>' +
+    '<td>' + (target.military_affiliation ? _esc(target.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">אפיון יחידתי</td>' +
+    '<td>' + (target.unit_classification ? _esc(target.unit_classification) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">תפקיד מיועד</td>' +
+    '<td>' + (target.target_role ? _esc(target.target_role) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    '</tbody></table>' +
+    '</div></div>';
+
+  // ── Assignments for this user ──
+  const assignments = Assignments_byUser(targetId);
+  s += '<div class="card" style="margin-bottom:14px">' +
+    '<div class="card-header"><span class="card-title">🎯 תרגילים (' + assignments.length + ')</span></div>';
+  if (!assignments.length) {
+    s += '<div class="empty">אין הקצאות</div>';
+  } else {
+    s += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
+      '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
+      '</tr></thead><tbody>';
+    assignments.forEach(function(a) {
+      const ex = Exercises_get(a.exercise_id);
+      const exTitle = ex ? ex.title : a.exercise_id;
+      s += '<tr>' +
+        '<td><a target="_top" href="' + _esc(_url('page=exercise&id=' + encodeURIComponent(a.exercise_id) + '&sid=' + sidQ)) + '" style="color:var(--blue);text-decoration:underline">' +
+        _esc(exTitle) + '</a></td>' +
+        '<td>' + _esc(a.responsibility || '—') + '</td>' +
+        '<td>' + _statusBadge(a.status) + '</td>' +
+        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
+        '</tr>';
+    });
+    s += '</tbody></table></div>';
+  }
+  s += '</div>';
+
+  // ── Admin edit form ──
+  if (isAdmin) {
+    const allTeams = Teams_all();
+    const teamOpts = [['', '— ללא צוות —']].concat(
+      allTeams.map(function(t) { return [t.id, t.id + ' — ' + t.name]; })
+    );
+
+    s += '<div class="collapsible" style="margin-bottom:14px">' +
+      '<button class="collapsible-toggle">✏ עריכת פרופיל <span class="arrow">▾</span></button>' +
+      '<div class="collapsible-content"><div class="card"><div class="card-body">' +
+      _formOpen() +
+      '<input type="hidden" name="action" value="updateProfile">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="targetId" value="' + _esc(target.id) + '">' +
+      '<input type="hidden" name="returnTo" value="user">' +
+      '<div class="form-grid">' +
+      '<div class="form-row"><label class="form-label">תפקיד</label>' +
+        _select('newRole', [['admin','מפקד קורס'],['commander','מפקד צוות'],['trainee','חניך']], target.role) +
+      '</div>' +
+      '<div class="form-row"><label class="form-label">צוות</label>' +
+        _select('newTeamId', teamOpts, target.team_id) +
+      '</div>' +
+      '</div>' +
+      _extraProfileFields(target) +
+      _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
+      '</form>' +
+      '</div></div></div></div>';
+  }
+
+  s += '</div>';
+  return _html(s, target.name + ' — פרופיל');
+}
+
 function Views_users(p) {
   const user = Auth_current(p);
   if (!user || user.role !== 'admin') return Views_error('גישה למפקדי קורס בלבד.', p);
@@ -787,8 +906,10 @@ function _extraProfileFields(u) {
     '<div class="form-row"><label class="form-label">אפיון יחידתי</label>' +
       _input('unit_classification', 'קרבי / תומכי לחימה...', u.unit_classification || '') + '</div>' +
     '</div>' +
-    '<div class="form-row"><label class="form-label">תפקיד מיועד מיועד</label>' +
-      _input('target_role', 'מ"כ / קמ"ן...', u.target_role || '') + '</div>';
+    '<div class="form-row"><label class="form-label">תפקיד מיועד</label>' +
+      _input('target_role', 'מ"כ / קמ"ן...', u.target_role || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">מספר טלפון</label>' +
+      _input('phone', '050-1234567', u.phone || '', 'tel') + '</div>';
 }
 // ── טאב צוותות ──
 function _teamsTab(sid, sidQ) {
@@ -824,7 +945,7 @@ function _teamsTab(sid, sidQ) {
     members.forEach(function(u) {
       memberRows += '<tr>' +
         '<td class="mono">' + _esc(u.id) + '</td>' +
-        '<td><b>' + _esc(u.name) + '</b></td>' +
+        '<td>' + _userLink(u.id, u.name, sidQ) + '</td>' +
         '<td>' + _badge(_roleHe(u.role), u.role === 'commander' ? 'blue' : 'muted') + '</td>' +
         '<td>' +
         _formOpen('form-inline') +
@@ -980,7 +1101,7 @@ function _usersTab(sid, sidQ) {
 
   table += '<div class="card"><div class="card-body" style="padding:0;overflow-x:auto">' +
     '<table class="tbl"><thead><tr>' +
-    '<th>מספר אישי</th><th>שם</th><th>תפקיד</th><th>צוות</th>' +
+    '<th>מספר אישי</th><th>שם</th><th>תפקיד</th><th>צוות</th><th>טלפון</th>' +
     '<th>שיוך יחידתי</th><th>סוג שירות</th><th>שיוך חיילי</th><th>אפיון יחידתי</th><th>תפקיד מיועד</th>' +
     '<th>עריכה</th><th>מחיקה</th>' +
     '</tr></thead><tbody>';
@@ -1004,9 +1125,10 @@ function _usersTab(sid, sidQ) {
 
     table += '<tr>' +
       '<td class="mono">' + _esc(u.id) + '</td>' +
-      '<td><b>' + _esc(u.name) + '</b></td>' +
+      '<td>' + _userLink(u.id, u.name, sidQ) + '</td>' +
       '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : 'muted') + '</td>' +
       '<td>' + _esc(teamName) + '</td>' +
+      '<td>' + (u.phone ? _esc(u.phone) : '<span style="color:var(--muted)">—</span>') + '</td>' +
       '<td>' + (u.unit_affiliation     ? _esc(u.unit_affiliation)     : '<span style="color:var(--muted)">—</span>') + '</td>' +
       '<td>' + (u.service_type         ? _badge(_esc(u.service_type), 'muted') : '<span style="color:var(--muted)">—</span>') + '</td>' +
       '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
@@ -1023,7 +1145,7 @@ function _usersTab(sid, sidQ) {
       '</td></tr>' +
       // Inline edit row
       '<tr id="edit-' + _esc(u.id) + '" style="display:none">' +
-      '<td colspan="11" style="background:var(--bg3);padding:14px">' +
+      '<td colspan="12" style="background:var(--bg3);padding:14px">' +
         editProfileForm +
       '</td></tr>';
   });
