@@ -119,6 +119,13 @@ function _topbar(user, sid) {
     '</div>' +
     '<div class="topbar-nav">';
 
+  nav += _a('page=dashboard&sid=' + sidQ, '⊞ לוח בקרה', 'btn btn-ghost btn-sm');
+  if (user.role === 'admin') {
+    nav += _a('page=exercises&sid=' + sidQ, '🎯 תרגילים',  'btn btn-ghost btn-sm');
+    nav += _a('page=users&sid=' + sidQ,    '👤 משתמשים',  'btn btn-ghost btn-sm');
+    nav += _a('page=timeline&sid=' + sidQ, '📅 ציר זמן',  'btn btn-ghost btn-sm');
+    nav += _a('page=assign&sid=' + sidQ,   '🔀 שיבוץ',    'btn btn-ghost btn-sm');
+  }
   nav += '<span class="topbar-user">👤 ' + _esc(user.name) + ' · ' + _esc(_roleHe(user.role)) + '</span>';
   nav += _a('action=logout', '⏻ יציאה', 'btn btn-ghost btn-sm');
   nav += '</div></nav>';
@@ -608,15 +615,13 @@ function Views_users(p) {
 
   const tabs =
     '<div class="tabs">' +
-    _a('page=users&sid=' + sidQ + '&tab=teams',  '🪖 צוותים',       'tab-link' + (tab === 'teams'  ? ' active' : '')) +
-    _a('page=users&sid=' + sidQ + '&tab=users',  '👤 משתמשים',      'tab-link' + (tab === 'users'  ? ' active' : '')) +
-    _a('page=users&sid=' + sidQ + '&tab=create', '➕ יצירת משתמש', 'tab-link' + (tab === 'create' ? ' active' : '')) +
+    _a('page=users&sid=' + sidQ + '&tab=teams', '🪖 צוותים',  'tab-link' + (tab === 'teams' ? ' active' : '')) +
+    _a('page=users&sid=' + sidQ + '&tab=users', '👤 משתמשים', 'tab-link' + (tab === 'users' ? ' active' : '')) +
     '</div>';
 
   let content = '';
-  if (tab === 'teams')  content = _teamsTab(sid, sidQ);
-  else if (tab === 'users')  content = _usersTab(sid, sidQ);
-  else if (tab === 'create') content = _createUserTab(sid, sidQ);
+  if (tab === 'teams') content = _teamsTab(sid, sidQ);
+  else                 content = _usersTab(sid, sidQ);
 
   const body = _topbar(user, sid) +
     '<div class="page">' +
@@ -793,11 +798,58 @@ function _teamsTab(sid, sidQ) {
 function _usersTab(sid, sidQ) {
   const users = Users_all();
   const teams = Teams_all();
-
   const teamMap = {};
   teams.forEach(function(t) { teamMap[t.id] = t.name; });
 
-  let table = '<div class="card"><div class="card-body" style="padding:0;overflow-x:auto">' +
+  const teamOptsCreate = [['', '— ללא צוות —']].concat(
+    teams.map(function(t) { return [t.id, t.id + ' — ' + t.name]; })
+  );
+
+  const createForm =
+    _formOpen() +
+    '<input type="hidden" name="action" value="createUser">' +
+    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">מספר אישי *</label>' + _input('newUserId', '12321', '', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">שם מלא *</label>'    + _input('newName', 'שם ושם משפחה', '', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">סיסמה *</label>'     + _input('newPassword', 'סיסמה ראשונית', '', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">תפקיד</label>'       + _select('newRole', [['trainee','חניך'],['commander','מפקד צוות'],['admin','מפקד קורס']]) + '</div>' +
+    '<div class="form-row"><label class="form-label">צוות</label>'        + _select('newTeamId', teamOptsCreate) + '</div>' +
+    '</div>' +
+    _extraProfileFields() +
+    '<div style="margin-top:4px">' + _submitBtn('➕ צור משתמש', 'btn btn-primary') + '</div>' +
+    '</form>';
+
+  const importForm =
+    '<input type="hidden" id="xlsxSid"    value="' + _esc(sid) + '">' +
+    '<input type="hidden" id="xlsxAppUrl" value="' + _esc(_appUrl()) + '">' +
+    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px">' +
+    '// פורמט: <b>id</b> · <b>name</b> · <b>password</b> · <b>role</b> (trainee/commander/admin) · team_id (אופציונלי)<br>' +
+    '// שמור מ-Excel כ-CSV UTF-8 (File → Save As → CSV UTF-8)</div>' +
+    '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:10px 12px;' +
+    'font-family:var(--mono);font-size:12px;color:var(--text2);margin-bottom:12px;white-space:pre">id\tname\tpassword\trole\n12321\tישראל ישראלי\t12\ttrainee</div>' +
+    '<label style="display:block;margin-bottom:10px">' +
+    '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);display:block;margin-bottom:6px">בחר קובץ CSV / Excel</span>' +
+    '<input type="file" id="xlsxFile" accept=".csv,.xlsx,.xls,.txt"' +
+    ' style="font-family:var(--mono);font-size:12px;color:var(--text1);background:var(--bg3);' +
+    'border:1px solid var(--border);border-radius:3px;padding:6px;width:100%;cursor:pointer">' +
+    '</label>' +
+    '<div id="xlsxPreview" style="display:none;margin-bottom:10px">' +
+    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">// תצוגה מקדימה</div>' +
+    '<div id="xlsxPreviewTable" style="overflow-x:auto"></div>' +
+    '</div>' +
+    '<div id="xlsxError" style="color:#f87171;font-family:var(--mono);font-size:12px;margin-bottom:8px;display:none"></div>' +
+    '<button type="button" id="xlsxImportBtn" class="btn btn-primary" style="display:none" onclick="doXlsxImport()">📥 ייבא משתמשים</button>';
+
+  let table =
+    '<div class="collapsible" style="margin-bottom:10px">' +
+    '<button class="collapsible-toggle">➕ צור משתמש חדש <span class="arrow">▾</span></button>' +
+    '<div class="collapsible-content"><div class="card"><div class="card-body">' + createForm + '</div></div></div></div>' +
+    '<div class="collapsible" style="margin-bottom:14px">' +
+    '<button class="collapsible-toggle">📥 ייבא משתמשים מקובץ <span class="arrow">▾</span></button>' +
+    '<div class="collapsible-content"><div class="card"><div class="card-body">' + importForm + '</div></div></div></div>';
+
+  table += '<div class="card"><div class="card-body" style="padding:0;overflow-x:auto">' +
     '<table class="tbl"><thead><tr>' +
     '<th>מספר אישי</th><th>שם</th><th>תפקיד</th><th>צוות</th>' +
     '<th>שיוך יחידתי</th><th>סוג שירות</th><th>שיוך חיילי</th><th>אפיון יחידתי</th><th>תפקיד מיועד</th>' +
@@ -999,9 +1051,9 @@ function Views_timeline(p) {
   let s = _topbar(user, sid);
   s += '<div class="page">';
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0">📅 ציר זמן תרגילים</div>' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div>';
+       '<div class="page-title" style="margin:0">📅 ציר זמן תרגילים</div>' +
+       _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+       '</div>';
   
   s += '<div class="card" style="padding:0; overflow:hidden;">';
   
