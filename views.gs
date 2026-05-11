@@ -228,16 +228,52 @@ function Views_exercises(p) {
   }
   s += '</div></div>';
 
-  s += '<div style="flex:1;min-width:260px">';
-  s += '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div><div class="card-body">' +
-    _formOpen() +
-    '<input type="hidden" name="action" value="createExercise">' +
-    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-    '<div class="form-row"><label class="form-label">שם התרגיל</label>' +
-    '<input type="text" name="title" class="form-input" required placeholder="לדוגמה: אימון הקמת קשר"></div>' +
-    _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
-    '</form></div></div>';
-  s += '</div>';
+s += '<div style="flex:1;min-width:260px">';
+s += '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div><div class="card-body">' +
+  _formOpen('exerciseForm') +
+  '<input type="hidden" name="action" value="createExercise">' +
+  '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+
+  '<div class="form-row">' +
+    '<label class="form-label">שם התרגיל</label>' +
+    '<input type="text" name="title" class="form-input" required minlength="2" placeholder="לדוגמה: אימון הקמת קשר">' +
+  '</div>' +
+
+  '<div class="form-row">' +
+    '<label class="form-label">תיאור התרגיל</label>' +
+    '<textarea name="description" class="form-textarea" required rows="4" placeholder="הזן תיאור מלא של התרגיל"></textarea>' +
+  '</div>' +
+
+  '<div class="form-grid">' +
+    '<div class="form-row">' +
+      '<label class="form-label">תאריך התחלה</label>' +
+      '<div class="dp-wrap">' +
+        '<input type="hidden" name="start_date" required>' +
+        '<button type="button" class="dp-trigger">' +
+          '<span class="dp-val"><span class="dp-placeholder">בחר תאריך...</span></span>' +
+          '<span class="dp-icon">📅</span>' +
+        '</button>' +
+        '<div class="dp-popup"></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="form-row">' +
+      '<label class="form-label">תאריך סיום</label>' +
+      '<div class="dp-wrap">' +
+        '<input type="hidden" name="end_date" required>' +
+        '<button type="button" class="dp-trigger">' +
+          '<span class="dp-val"><span class="dp-placeholder">בחר תאריך...</span></span>' +
+          '<span class="dp-icon">📅</span>' +
+        '</button>' +
+        '<div class="dp-popup"></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>' +
+
+  _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
+  '</form></div></div>';
+
+s += '</div>';
 
   s += '</div>';
 
@@ -539,16 +575,49 @@ function Views_exercise(p) {
       indivForm = '<div class="empty">כל המשתמשים כבר הוקצו</div>';
     } else {
 const respOptions = [
-  'קמבצ',
-  'מפ חיר',
-  'מפ חהן',
-  'סמפ',
-  'מפ סיוע מנהלתי',
-  'קצין בטיחות',
-  'מנהל תרגיל',
-  'קצין עורף',
-  'מפ חשן',
-  'מפ מסיעת'
+  'מ"פ חי"ר א\'',
+  'סמ"פ חי"ר א\'',
+  'חונך מ"פ א\'',
+  'מ"פ חי"ר ב\'',
+  'סמ"פ חי"ר ב\'',
+  'חונך מ"פ ב\'',
+  'מ"פ מסייעת',
+  'סמ"פ מסייעת',
+  'חונך מ"פ מסייעת',
+  'מ"פ חה"ן',
+  'סמ"פ חה"ן',
+  'חנוך מ"פ חה"ן',
+  'מ"פ חש"ן',
+  'סמ"פ חש"ן',
+  'חונך מ"פ חש"ן',
+
+  'מנהל התרגיל (מפק"ץ / מח"ט)',
+  'רע"ן ק\' בטיחות (מל"י)',
+  'קמב"ץ מנהל תרגיל (קמ"פ)',
+  'בקר שטח וצלם (ארזים)',
+  'מטיס רחפן תחקור (ארזים)',
+  'מפעיל מגנט (בגירה)',
+  'מנהל לחימה (ארזים)',
+  'מס"ח (מרה"ש - מל"י)',
+  'קל"ח (ארזים)',
+  'ע\' קל"ח (השלמה חיילית לוגיסטיקה)',
+  'קמ"ן (ארזים)',
+  'מדריכת שו"ב (מח\' שו"ב מלפ"ק)',
+
+  'מפקד אחראי גדוד',
+
+  'מג"ד (חניך קמ"ג)',
+  'מפקד מכלול מבצעים (חניך קמ"ג)',
+  'קמב"ץ גדוד (חניך קמ"פ)',
+  'מ\' חפ"ק מג"ד רגלי (מ"מ מגדוד שת"פ)',
+  'קש"א (השלמה חיילית)',
+  'קשר"ג (השלמה חילית)',
+  'קמ"ן (השלמה חיילית)',
+  'קס"ג (השלמה חיילית)',
+  'קמ"ן (השלמה חיילית)',
+  'קשר"ג (השלמה חיילית)',
+  'מ\' מכלול מנהלה (חניך קמ"פ)',
+  'חונך מ"פ חל"ג'
 ];
       const userOptions = available.map(function(u){ return [u.id, u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')']; });
       indivForm =

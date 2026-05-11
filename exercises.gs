@@ -77,29 +77,71 @@ function Exercises_details(exerciseId) {
     .filter(r => String(r[1]) === String(exerciseId))
     .map(r => ({ id: String(r[0]), time: String(r[2]), location: String(r[3]), description: String(r[4]) }));
 }
-
 function Exercises_create(p) {
-  const u      = Auth_requireRole(p, ['admin']);
+  const u = Auth_requireRole(p, ['admin']);
+
+  // ── Validation ──
+  const title       = String(p.title || '').trim();
+  const description = String(p.description || '').trim();
+  const startDate   = String(p.start_date || '').trim();
+  const endDate     = String(p.end_date || '').trim();
+
+  if (!title)
+    throw new Error('חובה להזין שם תרגיל.');
+
+  if (!description)
+    throw new Error('חובה להזין תיאור תרגיל.');
+
+  if (!startDate)
+    throw new Error('חובה לבחור תאריך התחלה.');
+
+  if (!endDate)
+    throw new Error('חובה לבחור תאריך סיום.');
+
+  const startTs = _parseRawDate(startDate);
+  const endTs   = _parseRawDate(endDate);
+
+  if (isNaN(startTs) || isNaN(endTs))
+    throw new Error('תאריכים לא תקינים.');
+
+  if (endTs < startTs)
+    throw new Error('תאריך הסיום חייב להיות אחרי תאריך ההתחלה.');
+
+  // ── Create exercise ──
   const id     = 'E' + new Date().getTime();
   const teamId = (p.teamId || '').trim();
 
-  _append('Exercises', [id, p.title || '', p.description || '', u.id,
-    p.start_date || '', p.end_date || '']);
+  _append('Exercises', [
+    id,
+    title,
+    description,
+    u.id,
+    startDate,
+    endDate
+  ]);
 
   let info = 'התרגיל נוצר בהצלחה (' + id + ').';
 
-  if (teamId) {
-    const result = Assignments_assignTeam(id, teamId, p.sid);
-    const team   = Teams_get(teamId);
-    const tName  = team ? team.name : teamId;
-    if (result.added > 0)   info += ' ' + result.added + ' חיילים מצוות "' + tName + '" נוספו אוטומטית.';
-    if (result.skipped > 0) info += ' (' + result.skipped + ' כבר משתתפים.)';
-    return Views_exercise({ sid: p.sid, id: id, info: info });
-  }
+  // ── Auto assign team ──
+if (teamId) {
+  const result = Assignments_assignTeam(id, teamId, p.sid);
+  const team   = Teams_get(teamId);
+  const tName  = team ? team.name : teamId;
 
-  return Views_dashboard({ sid: p.sid, info: info });
+  if (result.added > 0)
+    info += ' ' + result.added + ' חיילים מצוות "' + tName + '" נוספו אוטומטית.';
+
+  if (result.skipped > 0)
+    info += ' (' + result.skipped + ' כבר משתתפים.)';
 }
 
+// במקום לחזור לדשבורד → הישאר בדף התרגיל החדש
+return Views_exercise({
+  sid: p.sid,
+  id: id,
+  info: info
+});
+}
 function Exercises_edit(p) {
   Auth_requireRole(p, ['admin']);
   const row = _findRowIndex('Exercises', p.id);
