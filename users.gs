@@ -20,6 +20,7 @@ function Users_all() {
 }
 
 function Users_get(id) {
+  // PERF: uses cached _rows — no extra Sheets API call
   return Users_all().find(x => x.id === String(id)) || null;
 }
 
@@ -48,7 +49,6 @@ function Users_create(p) {
   if (!pass)   throw new Error('נא להזין סיסמה.');
   if (['admin','commander','trainee'].indexOf(role) === -1) throw new Error('תפקיד לא חוקי.');
 
-  // Uniqueness check
   if (Users_get(newId)) throw new Error('מספר אישי ' + newId + ' כבר קיים במערכת.');
 
   _append('Users', [
@@ -75,12 +75,15 @@ function Users_delete(p) {
   const row = _findRowIndex('Users', targetId);
   if (row < 0) throw new Error('המשתמש לא נמצא.');
   _sheet('Users').deleteRow(row);
+  _cacheInvalidate('Users');
 
-  // Delete credentials
   const credRow = _findRowIndex('Credentials', targetId);
-  if (credRow > 0) _sheet('Credentials').deleteRow(credRow);
+  if (credRow > 0) {
+    _sheet('Credentials').deleteRow(credRow);
+    _cacheInvalidate('Credentials');
+  }
 
-  // Delete all Assignments belonging to this user (cascade)
+  // Cascade-delete assignments
   const assignSh = _sheet('Assignments');
   const assignData = _rows('Assignments').data;
   for (let i = assignData.length - 1; i >= 0; i--) {
@@ -88,6 +91,7 @@ function Users_delete(p) {
       assignSh.deleteRow(i + 2);
     }
   }
+  _cacheInvalidate('Assignments');
 
   // Remove as commander from any team
   const teamsSh = _sheet('Teams');
@@ -97,6 +101,7 @@ function Users_delete(p) {
       teamsSh.getRange(i + 2, 3).setValue('');
     }
   });
+  _cacheInvalidate('Teams');
 
   return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש נמחק יחד עם כל ההקצאות שלו.' });
 }
@@ -112,6 +117,7 @@ function Users_updateRole(p) {
   const row = _findRowIndex('Users', targetId);
   if (row < 0) throw new Error('המשתמש לא נמצא.');
   _sheet('Users').getRange(row, 3).setValue(newRole);
+  _cacheInvalidate('Users');
 
   return Views_users({ sid: p.sid, tab: 'users', info: 'התפקיד עודכן בהצלחה.' });
 }
@@ -128,42 +134,37 @@ function Teams_get(id) {
   return Teams_all().find(t => t.id === String(id)) || null;
 }
 
-// Create a new team
 function Teams_create(p) {
   Auth_requireRole(p, ['admin']);
   const name = (p.teamName || '').trim();
   if (!name) throw new Error('נא להזין שם צוות.');
-
   const id = 'T' + _nextId('Teams');
   _append('Teams', [id, name, '']);
   return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.' });
 }
 
-// Rename a team
 function Teams_rename(p) {
   Auth_requireRole(p, ['admin']);
   const teamId = (p.teamId   || '').trim();
   const name   = (p.teamName || '').trim();
   if (!teamId) throw new Error('חסר מזהה צוות.');
   if (!name)   throw new Error('נא להזין שם חדש.');
-
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
   _sheet('Teams').getRange(row, 2).setValue(name);
+  _cacheInvalidate('Teams');
   return Views_users({ sid: p.sid, tab: 'teams', info: 'שם הצוות עודכן ל"' + name + '".' });
 }
 
-// Delete a team (removes team_id from all members)
 function Teams_delete(p) {
   Auth_requireRole(p, ['admin']);
   const teamId = (p.teamId || '').trim();
   if (!teamId) throw new Error('חסר מזהה צוות.');
-
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
   _sheet('Teams').deleteRow(row);
+  _cacheInvalidate('Teams');
 
-  // Clear team_id for all members of this team
   const usersSh = _sheet('Users');
   const { data } = _rows('Users');
   data.forEach((r, i) => {
@@ -171,54 +172,49 @@ function Teams_delete(p) {
       usersSh.getRange(i + 2, 4).setValue('');
     }
   });
+  _cacheInvalidate('Users');
 
-  // Also clear commander_id references pointing to this team (already handled above)
   return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות נמחק וחברים הוסרו ממנו.' });
 }
 
-// Set team commander (updates Teams sheet col C)
 function Teams_setCommander(p) {
   Auth_requireRole(p, ['admin']);
   const teamId      = (p.teamId      || '').trim();
   const commanderId = (p.commanderId || '').trim();
   if (!teamId) throw new Error('חסר מזהה צוות.');
-
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
   _sheet('Teams').getRange(row, 3).setValue(commanderId);
+  _cacheInvalidate('Teams');
   return Views_users({ sid: p.sid, tab: 'teams', info: 'מפקד הצוות עודכן.' });
 }
 
-// Add a user to a team (sets user's team_id)
 function Teams_addMember(p) {
   Auth_requireRole(p, ['admin']);
   const teamId = (p.teamId || '').trim();
   const userId = (p.userId || '').trim();
   if (!teamId || !userId) throw new Error('חסרים פרטים.');
-
   if (!Teams_get(teamId)) throw new Error('הצוות לא נמצא.');
-
   const userRow = _findRowIndex('Users', userId);
   if (userRow < 0) throw new Error('המשתמש לא נמצא.');
   _sheet('Users').getRange(userRow, 4).setValue(teamId);
-
+  _cacheInvalidate('Users');
   return Views_users({ sid: p.sid, tab: 'teams', info: 'המשתמש נוסף לצוות.' });
 }
 
-// Remove a user from a team (clears team_id)
 function Teams_removeMember(p) {
   Auth_requireRole(p, ['admin']);
   const userId = (p.userId || '').trim();
   if (!userId) throw new Error('חסר מזהה משתמש.');
-
   const userRow = _findRowIndex('Users', userId);
   if (userRow < 0) throw new Error('המשתמש לא נמצא.');
   _sheet('Users').getRange(userRow, 4).setValue('');
-
+  _cacheInvalidate('Users');
   return Views_users({ sid: p.sid, tab: 'teams', info: 'המשתמש הוסר מהצוות.' });
 }
 
 // Update a user's extended profile fields (admin only)
+// PERF: single setValues() call for all 6 profile columns
 function Users_updateProfile(p) {
   Auth_requireRole(p, ['admin']);
   const targetId = (p.targetId || '').trim();
@@ -226,28 +222,33 @@ function Users_updateProfile(p) {
   const row = _findRowIndex('Users', targetId);
   if (row < 0) throw new Error('המשתמש לא נמצא.');
   const sh = _sheet('Users');
-  // Columns: 1=id,2=name,3=role,4=team_id,5=unit_affiliation,6=service_type,7=military_affiliation,8=unit_classification,9=target_role,10=phone
-  sh.getRange(row, 5).setValue((p.unit_affiliation     || '').trim());
-  sh.getRange(row, 6).setValue((p.service_type         || '').trim());
-  sh.getRange(row, 7).setValue((p.military_affiliation || '').trim());
-  sh.getRange(row, 8).setValue((p.unit_classification  || '').trim());
-  sh.getRange(row, 9).setValue((p.target_role          || '').trim());
-  sh.getRange(row, 10).setValue((p.phone               || '').trim());
-  // Update team if provided via profile edit form
+
+  // Batch-write columns 5-10 (unit_affiliation … phone) in one call
+  sh.getRange(row, 5, 1, 6).setValues([[
+    (p.unit_affiliation     || '').trim(),
+    (p.service_type         || '').trim(),
+    (p.military_affiliation || '').trim(),
+    (p.unit_classification  || '').trim(),
+    (p.target_role          || '').trim(),
+    (p.phone                || '').trim()
+  ]]);
+
+  // Update team if provided
   if (p.newTeamId !== undefined) {
-    const tRow = _findRowIndex('Users', targetId);
-    if (tRow > 0) _sheet('Users').getRange(tRow, 4).setValue((p.newTeamId || '').trim());
+    sh.getRange(row, 4).setValue((p.newTeamId || '').trim());
   }
   // Update role if provided
   if (p.newRole) {
-    const rRow = _findRowIndex('Users', targetId);
-    if (rRow > 0) _sheet('Users').getRange(rRow, 3).setValue(p.newRole.trim());
+    sh.getRange(row, 3).setValue(p.newRole.trim());
   }
+  _cacheInvalidate('Users');
+
   if (p.returnTo === 'user') {
     return Views_user({ sid: p.sid, id: targetId, info: 'פרופיל המשתמש עודכן בהצלחה.' });
   }
   return Views_users({ sid: p.sid, tab: 'users', info: 'פרופיל המשתמש עודכן.' });
 }
+
 // ═══════════════════════════════════════
 //  Users_importBulk — ייבוא משתמשים מאקסל
 //  p.usersJson = JSON array of {id, name, role, password, team_id?}
@@ -272,6 +273,10 @@ function Users_importBulk(p) {
 
   let added = 0, skipped = 0, errors = [];
 
+  // PERF: collect all new rows; batch-append at the end
+  const newUserRows  = [];
+  const newCredRows  = [];
+
   rows.forEach(function(row, i) {
     const id       = String(row.id       || '').trim();
     const name     = String(row.name     || '').trim();
@@ -287,11 +292,14 @@ function Users_importBulk(p) {
 
     if (existing.has(id)) { skipped++; return; }
 
-    usersSh.appendRow([id, name, finalRole, teamId, '', '', '', '', '', '']);
-    credsSh.appendRow([id, password]);
+    newUserRows.push([id, name, finalRole, teamId, '', '', '', '', '', '']);
+    newCredRows.push([id, password]);
     existing.add(id);
     added++;
   });
+
+  if (newUserRows.length) _appendBatch('Users',       newUserRows);
+  if (newCredRows.length) _appendBatch('Credentials', newCredRows);
 
   let info = 'ייבוא הושלם: ' + added + ' משתמשים נוספו.';
   if (skipped) info += ' ' + skipped + ' דולגו (קיימים כבר).';

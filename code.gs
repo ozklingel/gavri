@@ -13,6 +13,9 @@ function doGet(e) {
   const action = p.action || '';
   const page   = p.page   || 'login';
 
+  // ── PERF: clear per-request cache at the start of every request ──
+  _cacheFlush();
+
   try {
     // ── Actions (mutations) — performed via GET, then re-render a page ──
     if (action === 'login')              return Auth_login(p);
@@ -69,32 +72,77 @@ function doPost(e) {
 }
 
 // ─── Tiny helpers ───
+
 function _sheet(name) {
   const sh = SS().getSheetByName(name);
   if (!sh) throw new Error('Sheet not found: ' + name);
   return sh;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PERF: Request-scoped in-memory cache
+//  All _rows() calls are memoized for the duration of a single doGet/doPost
+//  execution. This eliminates repeated Spreadsheet API round-trips.
+// ─────────────────────────────────────────────────────────────────────────────
+var _rowsCache = {};
+
+function _cacheFlush() {
+  _rowsCache = {};
+}
+
 function _rows(name) {
+  if (_rowsCache[name]) return _rowsCache[name];          // ← cache hit
+
   const sh = _sheet(name);
   const last = sh.getLastRow();
-  if (last < 2) return { header: sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0], data: [] };
-  const values = sh.getDataRange().getValues();
-  return { header: values[0], data: values.slice(1) };
+  let result;
+  if (last < 2) {
+    result = {
+      header: sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0],
+      data: []
+    };
+  } else {
+    const values = sh.getDataRange().getValues();
+    result = { header: values[0], data: values.slice(1) };
+  }
+  _rowsCache[name] = result;                              // ← store in cache
+  return result;
 }
-function _append(name, row) { _sheet(name).appendRow(row); }
+
+// Invalidate a single sheet from the cache (call after any write to that sheet)
+function _cacheInvalidate(name) {
+  delete _rowsCache[name];
+}
+
+function _append(name, row) {
+  _sheet(name).appendRow(row);
+  _cacheInvalidate(name);   // keep cache consistent after write
+}
+
+// Batch-append multiple rows at once — far faster than N appendRow() calls
+function _appendBatch(name, rows) {
+  if (!rows || !rows.length) return;
+  const sh   = _sheet(name);
+  const last = sh.getLastRow();
+  sh.getRange(last + 1, 1, rows.length, rows[0].length).setValues(rows);
+  _cacheInvalidate(name);
+}
+
 function _nextId(name) {
   const { data } = _rows(name);
   let max = 0;
   data.forEach(r => { const n = parseInt(r[0], 10); if (!isNaN(n) && n > max) max = n; });
   return max + 1;
 }
+
 function _findRowIndex(name, idValue) {
   const { data } = _rows(name);
   for (let i = 0; i < data.length; i++) {
-    if (String(data[i][0]) === String(idValue)) return i + 2;
+    if (String(data[i][0]) === String(idValue)) return i + 2; // 1-indexed + header
   }
   return -1;
 }
+
 function _esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

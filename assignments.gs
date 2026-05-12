@@ -50,6 +50,7 @@ function Assignments_remove(p) {
   const row = _findRowIndex('Assignments', aid);
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
   _sheet('Assignments').deleteRow(row);
+  _cacheInvalidate('Assignments');
   return Views_exercise({ sid: p.sid, id: exId, info: 'המשתתף הוסר מהתרגיל.' });
 }
 
@@ -65,16 +66,15 @@ function Assignments_complete(p) {
     const trainees = Users_traineesOfCommander(u.id).map(t => t.id);
     if (trainees.indexOf(userId) === -1) throw new Error('לא ניתן לסמן הקצאה מחוץ לצוות שלך.');
   }
-  sh.getRange(row, 4).setValue('completed');
-  if (p.score) sh.getRange(row, 5).setValue(p.score);
+  // PERF: batch-write status + score in one call
+  const score = p.score || '';
+  sh.getRange(row, 4, 1, 2).setValues([['completed', score]]);
+  _cacheInvalidate('Assignments');
   return Views_dashboard({ sid: p.sid, info: 'התרגיל סומן כהושלם.' });
 }
 
 // ═══════════════════════════════════════
-//  AUTO-ASSIGN: מפקד צוות + 2 חניכים לכל תרגיל
-//  - בוחר את מפקד הצוות (commander_id) ואת 2 החניכים הראשונים מהצוות
-//  - מדלג על מי שכבר רשום לתרגיל
-//  - אם אין מפקד או פחות מ-2 חניכים — משבץ מה שקיים
+//  TEAM ASSIGN: מפקד צוות + 2 חניכים לכל תרגיל
 // ═══════════════════════════════════════
 function Assignments_assignTeam(exerciseId, teamId, sid) {
   if (!teamId) return { added: 0, skipped: 0, missing: [] };
@@ -83,17 +83,14 @@ function Assignments_assignTeam(exerciseId, teamId, sid) {
   const members    = Users_byTeam(teamId);
   const existing   = Assignments_byExercise(exerciseId).map(function(a){ return a.user_id; });
 
-  // מפקד הצוות לפי commander_id ב-Teams
   let commander = null;
   if (team && team.commander_id) {
     commander = Users_get(team.commander_id);
   }
-  // אם אין commander_id — נבחר את המפקד הראשון מהצוות
   if (!commander) {
     commander = members.find(function(u){ return u.role === 'commander'; }) || null;
   }
 
-  // 2 חניכים הראשונים בצוות
   const trainees = members.filter(function(u){ return u.role === 'trainee'; }).slice(0, 2);
 
   const toAssign = [];
@@ -103,14 +100,16 @@ function Assignments_assignTeam(exerciseId, teamId, sid) {
   });
 
   let added = 0, skipped = 0;
+  // PERF: collect rows, then batch-append in one Sheets API call
+  const newRows = [];
   toAssign.forEach(function(item){
     if (existing.indexOf(item.user.id) !== -1) { skipped++; return; }
-    const aid = 'A' + new Date().getTime();
-    _append('Assignments', [aid, exerciseId, item.user.id, 'pending', '', item.resp]);
+    const aid = 'A' + new Date().getTime() + '_' + added;
+    newRows.push([aid, exerciseId, item.user.id, 'pending', '', item.resp]);
     added++;
   });
+  if (newRows.length) _appendBatch('Assignments', newRows);
 
-  // הודעות חוסר
   const missing = [];
   if (!commander) missing.push('מפקד צוות');
   if (trainees.length < 2) missing.push('רק ' + trainees.length + ' חניכים זמינים (נדרשים 2)');
@@ -140,14 +139,7 @@ function Assignments_assignTeamAction(p) {
 
 // ═══════════════════════════════════════
 //  AUTO-ASSIGN ALL: שיבוץ אוטומטי לכל התרגילים
-//  לוגיקה נוכחית (פשוטה — רנדומלית):
-//    - לכל תרגיל משבצים מפקד צוות + 2 חניכים
-//    - חניך לא יכול להופיע ביותר מתרגיל אחד (ללא כפילויות)
-//    - מפקדים יכולים לחזור על עצמם בין תרגילים
-//    - תרגילים שכבר יש להם שיבוצים — מדלגים עליהם
-//  ניתן להחליף את הלוגיקה בעתיד.
 // ═══════════════════════════════════════
-// עזר: התאמת ערך שיוך חיילי (military_affiliation) לקטגוריה
 function _matchesCorps(value, corps) {
   if (!value) return false;
   const v = String(value).toLowerCase().trim();
@@ -167,24 +159,14 @@ function Assignments_autoAssignAll(p) {
   const allUsers   = Users_all();
   const allAssigns = Assignments_all();
 
-  // חניכים שכבר משובצים בתרגיל כלשהו — לא נשתמש בהם שוב
+  // Build a Set of trainee IDs already assigned to any exercise
   const usedTrainees = {};
   allAssigns.forEach(function(a){
     const u = allUsers.find(function(x){ return x.id === a.user_id; });
     if (u && u.role === 'trainee') usedTrainees[u.id] = true;
   });
 
-  // בריכות נפרדות לפי שיוך חיילי: חיר ושריון
-  let infantryPool = allUsers.filter(function(u){
-    return u.role === 'trainee' && !usedTrainees[u.id] && _matchesCorps(u.military_affiliation, 'חיר');
-  });
-  let armorPool = allUsers.filter(function(u){
-    return u.role === 'trainee' && !usedTrainees[u.id] && _matchesCorps(u.military_affiliation, 'שריון');
-  });
-
-  // בריכת מפקדים
-  const commanderPool = allUsers.filter(function(u){ return u.role === 'commander'; });
-
+  // Build pools by corps
   function shuffle(arr) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
@@ -194,9 +176,17 @@ function Assignments_autoAssignAll(p) {
     return a;
   }
 
-  infantryPool = shuffle(infantryPool);
-  armorPool    = shuffle(armorPool);
-  const commandersShuffled = shuffle(commanderPool);
+  let infantryPool = shuffle(allUsers.filter(function(u){
+    return u.role === 'trainee' && !usedTrainees[u.id] && _matchesCorps(u.military_affiliation, 'חיר');
+  }));
+  let armorPool = shuffle(allUsers.filter(function(u){
+    return u.role === 'trainee' && !usedTrainees[u.id] && _matchesCorps(u.military_affiliation, 'שריון');
+  }));
+
+  const commanderPool  = shuffle(allUsers.filter(function(u){ return u.role === 'commander'; }));
+
+  // Pre-build a Set of exercise IDs that already have assignments
+  const assignedExIds = new Set(allAssigns.map(function(a){ return a.exercise_id; }));
 
   let totalExercises     = 0;
   let exercisesAssigned  = 0;
@@ -206,21 +196,21 @@ function Assignments_autoAssignAll(p) {
   const insufficient = [];
   const missingCorps = [];
 
+  // PERF: collect ALL new rows, then do ONE batch append at the end
+  const allNewRows = [];
+
   exercises.forEach(function(ex, idx){
     totalExercises++;
-    const existing = allAssigns.filter(function(a){ return a.exercise_id === ex.id; });
-    if (existing.length > 0) {
+    if (assignedExIds.has(ex.id)) {
       skipped.push(ex.title || ex.id);
       return;
     }
 
-    // מפקד (חוזר על עצמו בין תרגילים)
     let commander = null;
-    if (commandersShuffled.length) {
-      commander = commandersShuffled[idx % commandersShuffled.length];
+    if (commanderPool.length) {
+      commander = commanderPool[idx % commanderPool.length];
     }
 
-    // 2 חניכים: אחד חיר, אחד שריון
     const tInf = infantryPool.shift();
     const tArm = armorPool.shift();
 
@@ -238,14 +228,17 @@ function Assignments_autoAssignAll(p) {
       if (m.length) missingCorps.push((ex.title || ex.id) + ' (חסר: ' + m.join(', ') + ')');
     }
 
-    toAdd.forEach(function(item){
-      const aid = 'A' + new Date().getTime();
-      _append('Assignments', [aid, ex.id, item.user.id, 'pending', '', item.resp]);
+    toAdd.forEach(function(item, i){
+      const aid = 'A' + new Date().getTime() + '_' + idx + '_' + i;
+      allNewRows.push([aid, ex.id, item.user.id, 'pending', '', item.resp]);
       if (item.user.role === 'trainee') traineesAssigned++;
       else if (item.user.role === 'commander') commandersAssigned++;
     });
     exercisesAssigned++;
   });
+
+  // PERF: single batch write for ALL new assignments
+  if (allNewRows.length) _appendBatch('Assignments', allNewRows);
 
   let msg = '✅ שיבוץ אוטומטי הושלם: ' + exercisesAssigned + '/' + totalExercises + ' תרגילים שובצו.';
   msg += ' (' + commandersAssigned + ' מפקדים, ' + traineesAssigned + ' חניכים — חיר+שריון).';
@@ -267,10 +260,12 @@ function Assignments_clearAll(p) {
   if (last > 1) {
     sh.deleteRows(2, last - 1);
   }
+  _cacheInvalidate('Assignments');
   return Views_assign({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
 }
 
 // Update assignment fields (score, status, responsibility) — admin only
+// PERF: batch-write all changed cells in one setValues call
 function Assignments_update(p) {
   Auth_requireRole(p, ['admin']);
   const aid  = (p.assignmentId || '').trim();
@@ -281,12 +276,14 @@ function Assignments_update(p) {
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
 
   const sh = _sheet('Assignments');
-  if (p.status !== undefined && p.status !== '')
-    sh.getRange(row, 4).setValue(p.status);
-  if (p.score !== undefined)
-    sh.getRange(row, 5).setValue(p.score);
-  if (p.responsibility !== undefined && p.responsibility !== '')
-    sh.getRange(row, 6).setValue(p.responsibility);
+  // Read current row values so we can write all 3 cols in one call
+  const current = sh.getRange(row, 4, 1, 3).getValues()[0];
+  const newStatus = (p.status !== undefined && p.status !== '') ? p.status : current[0];
+  const newScore  = (p.score  !== undefined)                    ? p.score  : current[1];
+  const newResp   = (p.responsibility !== undefined && p.responsibility !== '') ? p.responsibility : current[2];
+
+  sh.getRange(row, 4, 1, 3).setValues([[newStatus, newScore, newResp]]);
+  _cacheInvalidate('Assignments');
 
   return Views_exercise({ sid: p.sid, id: exId, info: 'פרטי המשתתף עודכנו בהצלחה.' });
 }
@@ -301,7 +298,6 @@ function assignFromBoard(sid, exId, userId, resp) {
   Auth_requireRole(p, ['admin']);
   if (!exId || !userId) throw new Error('חסר מזהה תרגיל או חייל.');
 
-  // Check not already assigned
   var existing = Assignments_byExercise(exId).filter(function(a) { return a.user_id === userId; });
   if (existing.length) throw new Error('החייל כבר משובץ לתרגיל זה.');
 
@@ -318,6 +314,7 @@ function removeAssignmentById(sid, assignId) {
   var row = _findRowIndex('Assignments', assignId);
   if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
   _sheet('Assignments').deleteRow(row);
+  _cacheInvalidate('Assignments');
   return { ok: true };
 }
 
@@ -329,5 +326,6 @@ function moveAssignmentById(sid, assignId, toExId) {
   var row = _findRowIndex('Assignments', assignId);
   if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
   _sheet('Assignments').getRange(row, 2).setValue(toExId);
+  _cacheInvalidate('Assignments');
   return { ok: true };
 }
