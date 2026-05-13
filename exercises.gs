@@ -22,12 +22,9 @@ function _fmtDate(val) {
   return 'יום ' + days[wd] + ', ' + dd + ' ב' + months[mm] + ' ' + yy;
 }
 
-// Format a datetime value → "יום שלישי, 15 באפריל 2025, 08:30"
-function _fmtDateTime(dateVal, timeStr) {
-  const datePart = _fmtDate(dateVal);
-  if (!datePart) return '';
-  if (!timeStr) return datePart;
-  return datePart + ', ' + String(timeStr).trim();
+// Format a date value → "יום שלישי, 15 באפריל 2025"
+function _fmtDateTime(dateVal) {
+  return _fmtDate(dateVal) || '';
 }
 
 // Returns "HH:MM" from a time string or empty
