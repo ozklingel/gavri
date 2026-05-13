@@ -22,6 +22,29 @@ function _fmtDate(val) {
   return 'יום ' + days[wd] + ', ' + dd + ' ב' + months[mm] + ' ' + yy;
 }
 
+// Format a datetime value → "יום שלישי, 15 באפריל 2025, 08:30"
+function _fmtDateTime(dateVal, timeStr) {
+  const datePart = _fmtDate(dateVal);
+  if (!datePart) return '';
+  if (!timeStr) return datePart;
+  return datePart + ', ' + String(timeStr).trim();
+}
+
+// Returns "HH:MM" from a time string or empty
+function _rawTime(val) {
+  if (!val) return '';
+  const s = String(val).trim();
+  // Already HH:MM
+  if (/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5, '0');
+  // Date object from Sheets time column (fraction of day)
+  if (val instanceof Date) {
+    const h = String(val.getHours()).padStart(2,'0');
+    const m = String(val.getMinutes()).padStart(2,'0');
+    return h + ':' + m;
+  }
+  return s;
+}
+
 function _rawDate(val) {
   if (!val) return '';
   const d = (val instanceof Date) ? val : new Date(val);
@@ -46,10 +69,12 @@ function Exercises_all() {
     title:       String(r[1]),
     description: String(r[2]),
     created_by:  String(r[3]),
-    start_date:    _fmtDate(r[4]),
-    end_date:      _fmtDate(r[5]),
+    start_date:    _fmtDateTime(r[4], r[11]),
+    end_date:      _fmtDateTime(r[5], r[12]),
     rawStartDate:  _rawDate(r[4]),
     rawEndDate:    _rawDate(r[5]),
+    rawStartTime:  _rawTime(r[11]),
+    rawEndTime:    _rawTime(r[12]),
     date:          _fmtDate(r[4]),
     rawDate:       _rawDate(r[4]),
     act:                 r[6]  == null ? '' : String(r[6]),
@@ -98,10 +123,14 @@ function Exercises_create(p) {
   const camp              = String(p.camp || '').trim();
   const battalionCommander = String(p.battalion_commander || '').trim();
 
+  const startTime = String(p.start_time || '').trim();
+  const endTime   = String(p.end_time   || '').trim();
+
   _append('Exercises', [
     id, title, description, u.id,
     startDate, endDate,
-    act, exerciseType, partnerBattalion, camp, battalionCommander
+    act, exerciseType, partnerBattalion, camp, battalionCommander,
+    startTime, endTime
   ]);
 
   let info = 'התרגיל נוצר בהצלחה (' + id + ').';
@@ -130,14 +159,16 @@ function Exercises_edit(p) {
     p.title       || '',
     p.description || ''
   ]]);
-  sh.getRange(row, 5, 1, 7).setValues([[
+  sh.getRange(row, 5, 1, 9).setValues([[
     p.start_date          || '',
     p.end_date            || '',
     p.act                 || '',
     p.exercise_type       || '',
     p.partner_battalion   || '',
     p.camp                || '',
-    p.battalion_commander || ''
+    p.battalion_commander || '',
+    p.start_time          || '',
+    p.end_time            || ''
   ]]);
   _cacheInvalidate('Exercises');
   return Views_exercise({ sid: p.sid, id: p.id, info: 'התרגיל עודכן בהצלחה.' });
@@ -211,4 +242,3 @@ function Exercises_delete(p) {
   if (typeof Views_exercises === 'function') return Views_exercises({ sid: p.sid, info: msg });
   return Views_dashboard({ sid: p.sid, info: msg });
 }
-

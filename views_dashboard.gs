@@ -61,14 +61,17 @@ function Views_exercises(p) {
         '<textarea name="description" class="form-input"></textarea>' +
       '</div>' +
 
-      '<div class="form-row">' +
-        '<label class="form-label">תאריך התחלה</label>' +
-        '<input type="text" name="start_date" class="form-input datepicker" required>' +
+      '<div class="form-grid">' +
+        '<div class="form-row"><label class="form-label">תאריך התחלה</label>' +
+        '<input type="text" name="start_date" class="form-input datepicker" required></div>' +
+        '<div class="form-row"><label class="form-label">שעת התחלה</label>' +
+        '<input type="time" name="start_time" class="form-input"></div>' +
       '</div>' +
-
-      '<div class="form-row">' +
-        '<label class="form-label">תאריך סיום</label>' +
-        '<input type="text" name="end_date" class="form-input datepicker" required>' +
+      '<div class="form-grid">' +
+        '<div class="form-row"><label class="form-label">תאריך סיום</label>' +
+        '<input type="text" name="end_date" class="form-input datepicker" required></div>' +
+        '<div class="form-row"><label class="form-label">שעת סיום</label>' +
+        '<input type="time" name="end_time" class="form-input"></div>' +
       '</div>' +
 
       '<div class="form-row">' +

@@ -34,6 +34,8 @@ s += _confirmDelete(
     '<b>' + _esc(ex.start_date || '—') + '</b></div>' +
     '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">סיום</span><br>' +
     '<b>' + _esc(ex.end_date || '—') + '</b></div>' +
+    (ex.rawStartTime ? '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">שעת התחלה</span><br><b>' + _esc(ex.rawStartTime) + '</b></div>' : '') +
+    (ex.rawEndTime   ? '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">שעת סיום</span><br><b>' + _esc(ex.rawEndTime) + '</b></div>' : '') +
     '<div style="flex:1"><span style="color:var(--muted);font-family:var(--mono);font-size:11px">תיאור</span><br>' +
     _esc(ex.description || '—') + '</div>' +
     '</div>' +
@@ -170,6 +172,10 @@ s += _confirmDelete(
       '<div class="form-grid">' +
       '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', ex.rawStartDate) + '</div>' +
       '<div class="form-row"><label class="form-label">תאריך סיום</label>' + _dateInput('end_date', ex.rawEndDate) + '</div>' +
+      '</div>' +
+      '<div class="form-grid">' +
+      '<div class="form-row"><label class="form-label">שעת התחלה</label><input type="time" name="start_time" value="' + _esc(ex.rawStartTime || '') + '" class="form-input"></div>' +
+      '<div class="form-row"><label class="form-label">שעת סיום</label><input type="time" name="end_time" value="' + _esc(ex.rawEndTime || '') + '" class="form-input"></div>' +
       '</div>' +
       '<div class="form-grid">' +
       '<div class="form-row"><label class="form-label">אקט</label>' + _input('act', 'אקט', ex.act) + '</div>' +
@@ -409,4 +415,3 @@ function Views_user(p) {
   s += '</div>';
   return _html(s, target.name + ' — פרופיל');
 }
-
