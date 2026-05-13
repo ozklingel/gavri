@@ -18,7 +18,10 @@ function Views_exercise(p) {
 
   if (user.role === 'admin') {
     s += _a('action=duplicateExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, '⎘ שכפל', 'btn btn-ghost btn-sm');
-    s += _confirmDelete('action=deleteExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, 'מחיקת תרגיל "' + ex.title + '" תסיר גם את כל ההקצאות וציר הזמן שלו. להמשיך?');
+s += _confirmDelete(
+  'action=deleteExercise&id=' + encodeURIComponent(ex.id) + '&from=exercise&sid=' + sidQ,
+  'מחיקת תרגיל "' + ex.title + '" תסיר גם את כל ההקצאות וציר הזמן שלו. להמשיך?'
+);
   }
   s += '</div></div>';
 

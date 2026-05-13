@@ -172,6 +172,7 @@ function Exercises_addDetail(p) {
   _append('ExerciseDetails', [did, exId, p.time || '', p.location || '', p.detailDescription || '']);
   return Views_exercise({ sid: p.sid, id: exId, info: 'רישום ציר הזמן נוסף בהצלחה.' });
 }
+// (החלף את הפונקציה Exercises_delete בקובץ exercises.gs בגרסה הזו)
 
 function Exercises_delete(p) {
   Auth_requireRole(p, ['admin']);
@@ -199,5 +200,15 @@ function Exercises_delete(p) {
   _sheet('Exercises').deleteRow(row);
   _cacheInvalidate('Exercises');
 
-  return Views_dashboard({ sid: p.sid, info: 'התרגיל נמחק יחד עם כל ההקצאות ורשומות ציר הזמן.' });
+  const msg = 'התרגיל נמחק יחד עם כל ההקצאות ורשומות ציר הזמן.';
+  const from = (p.from || '').trim();
+
+  // השאר את המשתמש באותו עמוד שממנו הגיעה המחיקה
+  if (from === 'dashboard')  return Views_dashboard({ sid: p.sid, info: msg });
+  if (from === 'exercise')   return Views_exercises ? Views_exercises({ sid: p.sid, info: msg })
+                                                    : Views_dashboard({ sid: p.sid, info: msg });
+  // ברירת מחדל: עמוד ניהול התרגילים
+  if (typeof Views_exercises === 'function') return Views_exercises({ sid: p.sid, info: msg });
+  return Views_dashboard({ sid: p.sid, info: msg });
 }
+
