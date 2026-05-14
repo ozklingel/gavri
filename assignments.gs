@@ -151,7 +151,6 @@ function _matchesCorps(value, corps) {
   }
   return false;
 }
-
 function Assignments_autoAssignAll(p) {
   Auth_requireRole(p, ['admin']);
 
@@ -159,99 +158,183 @@ function Assignments_autoAssignAll(p) {
   const allUsers   = Users_all();
   const allAssigns = Assignments_all();
 
-  // Build a Set of trainee IDs already assigned to any exercise
-  const usedTrainees = {};
-  allAssigns.forEach(function(a){
-    const u = allUsers.find(function(x){ return x.id === a.user_id; });
-    if (u && u.role === 'trainee') usedTrainees[u.id] = true;
-  });
+  // -----------------------------
+  // נרמול חילות
+  // -----------------------------
+  function normalize(v) {
+    return String(v || '')
+      .replace(/״/g, '')
+      .trim();
+  }
 
-  // Build pools by corps
+  function corps(u) {
+    return normalize(u.military_affiliation);
+  }
+
+  const CORPS = {
+    INF: 'חיר',
+    ARM: 'שריון',
+    ENG: 'חהן',
+    SUP: 'מסייעת',
+    ADM: 'מנהלי'
+  };
+
+  // -----------------------------
+  // תרגילים שכבר שובצו
+  // -----------------------------
+  const assigned = new Set(allAssigns.map(a => a.exercise_id));
+
+  // -----------------------------
+  // עדיפות חניכים
+  // -----------------------------
+  function priority(u) {
+    let s = 0;
+    if (u.service_type === 'מילואים') s += 100;
+    if (u.target_role === 'מתמרן') s += 50;
+    return s;
+  }
+
+  let trainees = allUsers.filter(u => u.role === 'trainee');
+  trainees.sort((a, b) => priority(b) - priority(a));
+
+  // -----------------------------
+  // חלוקה לפי חילות
+  // -----------------------------
+  let infantry = trainees.filter(u => corps(u) === CORPS.INF);
+  let armor    = trainees.filter(u => corps(u) === CORPS.ARM);
+  let eng      = trainees.filter(u => corps(u) === CORPS.ENG);
+  let support  = trainees.filter(u => corps(u) === CORPS.SUP);
+  let admin    = trainees.filter(u => corps(u) === CORPS.ADM);
+
+  let commanders = allUsers.filter(u => u.role === 'commander');
+
   function shuffle(arr) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+      [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
   }
 
-  let infantryPool = shuffle(allUsers.filter(function(u){
-    return u.role === 'trainee' && !usedTrainees[u.id] && _matchesCorps(u.military_affiliation, 'חיר');
-  }));
-  let armorPool = shuffle(allUsers.filter(function(u){
-    return u.role === 'trainee' && !usedTrainees[u.id] && _matchesCorps(u.military_affiliation, 'שריון');
-  }));
+  commanders = shuffle(commanders);
 
-  const commanderPool  = shuffle(allUsers.filter(function(u){ return u.role === 'commander'; }));
+  function pick(pool, cond) {
+    const i = pool.findIndex(cond);
+    if (i === -1) return null;
+    return pool.splice(i, 1)[0];
+  }
 
-  // Pre-build a Set of exercise IDs that already have assignments
-  const assignedExIds = new Set(allAssigns.map(function(a){ return a.exercise_id; }));
+  const allRows = [];
 
-  let totalExercises     = 0;
-  let exercisesAssigned  = 0;
-  let traineesAssigned   = 0;
-  let commandersAssigned = 0;
-  const skipped      = [];
-  const insufficient = [];
-  const missingCorps = [];
+  let stats = {
+    ex: 0,
+    skipped: 0,
+    trainees: 0,
+    commanders: 0
+  };
 
-  // PERF: collect ALL new rows, then do ONE batch append at the end
-  const allNewRows = [];
+  // -----------------------------
+  // לולאת שיבוץ
+  // -----------------------------
+  exercises.forEach((ex, idx) => {
 
-  exercises.forEach(function(ex, idx){
-    totalExercises++;
-    if (assignedExIds.has(ex.id)) {
-      skipped.push(ex.title || ex.id);
+    if (assigned.has(ex.id)) {
+      stats.skipped++;
       return;
     }
 
-    let commander = null;
-    if (commanderPool.length) {
-      commander = commanderPool[idx % commanderPool.length];
-    }
+    // -----------------------------
+    // בחירת צוות מוביל לפי חי״ר
+    // -----------------------------
+    const teamCount = {};
 
-    const tInf = infantryPool.shift();
-    const tArm = armorPool.shift();
-
-    const toAdd = [];
-    if (commander) toAdd.push({ user: commander, resp: 'מפקד צוות' });
-    if (tInf)      toAdd.push({ user: tInf,      resp: 'חניך חיר' });
-    if (tArm)      toAdd.push({ user: tArm,      resp: 'חניך שריון' });
-
-    if (toAdd.length === 0) return;
-    if (!commander || !tInf || !tArm) {
-      insufficient.push(ex.title || ex.id);
-      const m = [];
-      if (!tInf) m.push('חיר');
-      if (!tArm) m.push('שריון');
-      if (m.length) missingCorps.push((ex.title || ex.id) + ' (חסר: ' + m.join(', ') + ')');
-    }
-
-    toAdd.forEach(function(item, i){
-      const aid = 'A' + new Date().getTime() + '_' + idx + '_' + i;
-      allNewRows.push([aid, ex.id, item.user.id, 'pending', '', item.resp]);
-      if (item.user.role === 'trainee') traineesAssigned++;
-      else if (item.user.role === 'commander') commandersAssigned++;
+    infantry.forEach(u => {
+      teamCount[u.team_id] = (teamCount[u.team_id] || 0) + 1;
     });
-    exercisesAssigned++;
+
+    let preferredTeam = Object.keys(teamCount)
+      .sort((a, b) => teamCount[b] - teamCount[a])[0];
+
+    // -----------------------------
+    // פונקציות צוות
+    // -----------------------------
+    function pickTeam(pool) {
+      let i = pool.findIndex(u => u.team_id === preferredTeam);
+      if (i !== -1) return pool.splice(i, 1)[0];
+      return null;
+    }
+
+    function pickAny(pool) {
+      return pick(pool, () => true);
+    }
+
+    const row = [];
+
+    // מפקד
+    const commander = commanders[idx % Math.max(commanders.length, 1)];
+    if (commander) row.push({ u: commander, r: 'מפקד צוות' });
+
+    // מסייעת (עדיפות צוות)
+    let sup = pickTeam(support) || pickAny(support);
+    if (sup) row.push({ u: sup, r: 'מסייעת' });
+
+    // שריון
+    let arm = pickTeam(armor) || pickAny(armor);
+    if (arm) row.push({ u: arm, r: 'שריון' });
+
+    // חי״ר (עד 2, מאותו צוות קודם)
+    for (let i = 0; i < 2; i++) {
+      let inf = pickTeam(infantry) || pickAny(infantry);
+      if (!inf) break;
+      row.push({ u: inf, r: 'חי״ר' });
+    }
+
+    // חה״ן
+    let e = pickTeam(eng) || pickAny(eng);
+    if (e) row.push({ u: e, r: 'חה״ן' });
+
+    // מנהלי
+    let ad = pickTeam(admin) || pickAny(admin);
+    if (ad) row.push({ u: ad, r: 'מנהלי' });
+
+    // -----------------------------
+    // כתיבה
+    // -----------------------------
+    row.forEach((x, i) => {
+      const id = 'A' + Date.now() + '_' + idx + '_' + i;
+
+      allRows.push([
+        id,
+        ex.id,
+        x.u.id,
+        'pending',
+        '',
+        x.r
+      ]);
+
+      stats.trainees++;
+      if (x.u.role === 'commander') stats.commanders++;
+    });
+
+    if (row.length) stats.ex++;
   });
 
-  // PERF: single batch write for ALL new assignments
-  if (allNewRows.length) _appendBatch('Assignments', allNewRows);
-
-  let msg = '✅ שיבוץ אוטומטי הושלם: ' + exercisesAssigned + '/' + totalExercises + ' תרגילים שובצו.';
-  msg += ' (' + commandersAssigned + ' מפקדים, ' + traineesAssigned + ' חניכים — חיר+שריון).';
-  if (skipped.length) msg += ' דולגו ' + skipped.length + ' תרגילים עם שיבוצים קיימים.';
-  if (insufficient.length) msg += ' ⚠ ' + insufficient.length + ' תרגילים שובצו חלקית.';
-  if (missingCorps.length) msg += ' פירוט חוסרים: ' + missingCorps.join('; ') + '.';
-  if (infantryPool.length === 0 && armorPool.length === 0 && exercises.length > exercisesAssigned + skipped.length) {
-    msg += ' אין יותר חניכים פנויים.';
+  if (allRows.length) {
+    _appendBatch('Assignments', allRows);
   }
 
-  return Views_assign({ sid: p.sid, info: msg });
+  return Views_assign({
+    sid: p.sid,
+    info:
+      '✅ שיבוץ הושלם: ' +
+      stats.ex + '/' + exercises.length +
+      ' תרגילים שובצו. ' +
+      '(' + stats.commanders + ' מפקדים, ' +
+      stats.trainees + ' חניכים). ' +
+      'דולגו: ' + stats.skipped
+  });
 }
-
 // פעולה: ניקוי כל השיבוצים (לפני הרצה מחדש של שיבוץ אוטומטי)
 function Assignments_clearAll(p) {
   Auth_requireRole(p, ['admin']);
