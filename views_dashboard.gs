@@ -152,8 +152,7 @@ function _adminDashboard(sid) {
 
   // ── תפריט פעולות ראשי במרכז המסך ──
   s += '<div style="display:flex;justify-content:center;margin:40px 0">';
-  s += '<div style="display:grid;grid-template-columns:repeat(2,minmax(200px,260px));gap:18px;width:100%;max-width:600px">';
-
+s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;width:100%;max-width:600px">';
   const navBtn = function(query, icon, label) {
     return '<a target="_top" href="' + _esc(_url(query)) + '" ' +
       'style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +

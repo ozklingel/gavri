@@ -89,10 +89,10 @@ function _flash(p) {
 
 function _html(body, title) {
   const tpl = HtmlService.createTemplateFromFile('index');
-  tpl.pageTitle = title || 'סדרת שטח — מערכת תרגילים';
+  tpl.pageTitle = title || 'סדרת השטח — מערכת תרגילים';
   tpl.body = body;
   return tpl.evaluate()
-    .setTitle(title || 'סדרת שטח — מערכת תרגילים')
+    .setTitle(title || 'סדרת השטח — מערכת תרגילים')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
@@ -121,7 +121,7 @@ function _topbar(user, sid) {
   let nav = '<nav class="topbar">' +
     '<div class="topbar-brand">' +
     '<span class="star">★</span>' +
-    '<div><span>סדרת שטח</span><span class="sub">TRAINING CMD SYS // CLASSIFIED</span></div>' +
+    '<div><span>סדרת השטח</span><span class="sub">TRAINING CMD SYS // CLASSIFIED</span></div>' +
     '</div>' +
     '<div class="topbar-nav">';
 
@@ -165,7 +165,7 @@ function Views_login(p) {
     '<div class="login-box">' +
     '<div class="login-head">' +
     '<div class="login-star">★</div>' +
-    '<div class="login-title">סדרת שטח</div>' +
+    '<div class="login-title">סדרת השטח</div>' +
     '<div class="login-sub">// AUTHORIZED PERSONNEL ONLY //</div>' +
     '</div>' +
     '<div class="login-body">' +

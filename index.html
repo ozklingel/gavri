@@ -33,28 +33,44 @@
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 14px;
+  min-height: 100vh;
 
-    html, body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--body);
-      font-size: 14px;
-      min-height: 100vh;
-    }
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  position: relative;
+}
+
+* {
+  box-sizing: border-box;
+  max-width: 100%;
+}
 
     /* ── TOPBAR ── */
     .topbar {
-      background: var(--bg2);
-      border-bottom: 2px solid var(--border2);
-      padding: 0 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 52px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
+  background: var(--bg2);
+  border-bottom: 2px solid var(--border2);
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
     .topbar-brand {
       font-family: var(--mono);
       color: var(--green);
@@ -398,10 +414,60 @@
 
     /* ── RESPONSIVE ── */
     @media (max-width: 640px) {
-      .grid-2, .grid-3 { grid-template-columns: 1fr; }
-      .form-grid { grid-template-columns: 1fr; }
-      .page { padding: 10px 12px; }
-    }
+
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    padding: 10px 12px;
+    overflow-x: hidden;
+  }
+
+  .topbar {
+    padding: 0 8px;
+  }
+
+  .topbar-nav {
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+
+  .tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .tbl {
+    display: block;
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .form-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .assigned-chip {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .card,
+  .card-body,
+  .card-header,
+  .ex-row,
+  .section-header {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
 
     /* ── SCANLINE effect on topbar ── */
     .topbar::after {
