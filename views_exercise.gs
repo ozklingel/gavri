@@ -1,10 +1,32 @@
 // views_exercise.gs — exercise detail page + user profile
+
+function _canViewExercise(user, exId) {
+  if (user.role === 'admin') return true;
+  if (user.role === 'trainee') {
+    return Assignments_byUser(user.id).some(function(a) {
+      return String(a.exercise_id) === String(exId);
+    });
+  }
+  if (user.role === 'commander') {
+    const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
+    return Assignments_byExercise(exId).some(function(a) {
+      return traineeIds.indexOf(a.user_id) !== -1;
+    });
+  }
+  return false;
+}
+
 function Views_exercise(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
-  const ex  = Exercises_get(p.id);
+  const exId = String((p && (p.id || p.exerciseId)) || '').trim();
+  if (!exId) return Views_error('חסר מזהה תרגיל.', p);
+  const ex  = Exercises_get(exId);
   if (!ex) return Views_error('התרגיל לא נמצא.', p);
+  if (!_canViewExercise(user, exId)) {
+    return Views_error('אין הרשאה לצפות בתרגיל זה.', p);
+  }
   const sidQ = encodeURIComponent(sid);
 
   let s = _topbar(user, sid) + '<div class="page">';

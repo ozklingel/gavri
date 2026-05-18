@@ -789,6 +789,19 @@ body {
   var MapimSpa = (function() {
     var SID_KEY = 'mapim_sid';
     var loading = false;
+    var reqId = 0;
+
+    function parseSpaParams(el) {
+      var raw = el.getAttribute('data-spa-params');
+      if (!raw) return {};
+      try { return JSON.parse(raw); } catch (e1) {
+        try {
+          var t = document.createElement('textarea');
+          t.innerHTML = raw;
+          return JSON.parse(t.value);
+        } catch (e2) { return {}; }
+      }
+    }
 
     function getSid() {
       try { return sessionStorage.getItem(SID_KEY) || ''; } catch (e) { return ''; }
@@ -855,22 +868,34 @@ body {
     }
 
     function navigate(page, params) {
-      if (loading) return;
+      var myReq = ++reqId;
       loading = true;
       MapimLoader.show(MapimLoader.labelFor('page=' + (page || '')));
       google.script.run
-        .withSuccessHandler(applyResult)
-        .withFailureHandler(fail)
+        .withSuccessHandler(function(result) {
+          if (myReq !== reqId) return;
+          applyResult(result);
+        })
+        .withFailureHandler(function(err) {
+          if (myReq !== reqId) return;
+          fail(err);
+        })
         .apiRenderPage(getSid(), page, JSON.stringify(params || {}));
     }
 
     function runAction(action, params) {
-      if (loading) return;
+      var myReq = ++reqId;
       loading = true;
       MapimLoader.show(MapimLoader.labelFor('action=' + (action || '')));
       google.script.run
-        .withSuccessHandler(applyResult)
-        .withFailureHandler(fail)
+        .withSuccessHandler(function(result) {
+          if (myReq !== reqId) return;
+          applyResult(result);
+        })
+        .withFailureHandler(function(err) {
+          if (myReq !== reqId) return;
+          fail(err);
+        })
         .apiRunAction(getSid(), action, JSON.stringify(params || {}));
     }
 
@@ -901,19 +926,13 @@ body {
       var el = e.target.closest('[data-spa-page]');
       if (el) {
         e.preventDefault();
-        MapimLoader.show(MapimLoader.labelFor('page=' + el.getAttribute('data-spa-page')));
-        var params = {};
-        try { params = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x) {}
-        navigate(el.getAttribute('data-spa-page'), params);
+        navigate(el.getAttribute('data-spa-page'), parseSpaParams(el));
         return;
       }
       el = e.target.closest('[data-spa-action]');
       if (el && !el.dataset.confirm) {
         e.preventDefault();
-        MapimLoader.show(MapimLoader.labelFor('action=' + el.getAttribute('data-spa-action')));
-        var p2 = {};
-        try { p2 = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x2) {}
-        runAction(el.getAttribute('data-spa-action'), p2);
+        runAction(el.getAttribute('data-spa-action'), parseSpaParams(el));
         return;
       }
       if (e.target.closest('.spa-form button[type="submit"], .spa-form input[type="submit"]')) {
