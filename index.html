@@ -756,6 +756,11 @@ body {
     function runScripts(container) {
       if (!container) return;
       container.querySelectorAll('script').forEach(function(old) {
+        var t = (old.getAttribute('type') || '').trim().toLowerCase();
+        // Keep data islands (e.g. assign board JSON) — do not execute as JS
+        if (t && t !== 'text/javascript' && t !== 'application/javascript' && t !== 'module') {
+          return;
+        }
         var s = document.createElement('script');
         if (old.src) {
           s.src = old.src;
