@@ -727,6 +727,64 @@ body {
 
 <div id="app-content"><?!= body ?></div>
 <script>
+  // ══ Page loader (shared by SPA + assign board) ══
+  var MapimLoader = (function() {
+    var loader = document.getElementById('page-loader');
+    var ltxt = document.getElementById('loader-text');
+    var msgTimer = null;
+    var safetyTimer = null;
+    var MSGS = ['// LOADING...', '// FETCHING DATA...', '// RENDERING...', '// ALMOST THERE...'];
+    var LABELS = {
+      'action=login': '// AUTHENTICATING...',
+      'action=logout': '// SIGNING OUT...',
+      'action=delete': '// DELETING...',
+      'action=create': '// CREATING...',
+      'action=edit': '// SAVING...',
+      'action=assign': '// ASSIGNING...',
+      'action=remove': '// REMOVING...',
+      'action=complete': '// UPDATING...',
+      'action=autoAssignAll': '// AUTO-ASSIGNING...',
+      'action=clearAllAssignments': '// CLEARING...',
+      'action=importUsers': '// IMPORTING...',
+      'page=dashboard': '// LOADING DASHBOARD...',
+      'page=exercise': '// LOADING EXERCISE...',
+      'page=timeline': '// LOADING TIMELINE...',
+      'page=assign': '// LOADING BOARD...',
+      'page=user': '// LOADING PROFILE...',
+      'page=users': '// LOADING USERS...',
+      'page=exercises': '// LOADING EXERCISES...'
+    };
+    function labelFor(key) {
+      if (!key) return MSGS[0];
+      for (var k in LABELS) { if (key.indexOf(k) > -1) return LABELS[k]; }
+      return MSGS[0];
+    }
+    function show(msg) {
+      if (!loader) return;
+      clearInterval(msgTimer);
+      clearTimeout(safetyTimer);
+      loader.classList.add('visible');
+      var text = msg || MSGS[0];
+      if (ltxt) ltxt.textContent = text;
+      var i = 0;
+      msgTimer = setInterval(function() {
+        if (!ltxt) return;
+        i = (i + 1) % MSGS.length;
+        ltxt.textContent = MSGS[i];
+      }, 900);
+      safetyTimer = setTimeout(hide, 20000);
+    }
+    function hide() {
+      if (!loader) return;
+      clearInterval(msgTimer);
+      clearTimeout(safetyTimer);
+      loader.classList.remove('visible');
+    }
+    return { show: show, hide: hide, labelFor: labelFor, MSGS: MSGS };
+  })();
+  window.MapimSpaShowLoader = function(msg) { MapimLoader.show(msg); };
+  window.MapimSpaHideLoader = function() { MapimLoader.hide(); };
+
   // ══ SPA router — fixed URL, no full page reloads ══
   var MapimSpa = (function() {
     var SID_KEY = 'mapim_sid';
@@ -740,17 +798,6 @@ body {
         if (sid) sessionStorage.setItem(SID_KEY, sid);
         else sessionStorage.removeItem(SID_KEY);
       } catch (e) {}
-    }
-
-    function showLoader(msg) {
-      var loader = document.getElementById('page-loader');
-      var ltxt = document.getElementById('loader-text');
-      if (loader) loader.classList.add('visible');
-      if (ltxt && msg) ltxt.textContent = msg;
-    }
-    function hideLoader() {
-      var loader = document.getElementById('page-loader');
-      if (loader) loader.classList.remove('visible');
     }
 
     function runScripts(container) {
@@ -797,12 +844,12 @@ body {
         afterRender();
       }
       if (result.title) document.title = result.title;
-      hideLoader();
+      MapimLoader.hide();
       loading = false;
     }
 
     function fail(err) {
-      hideLoader();
+      MapimLoader.hide();
       loading = false;
       alert(err && err.message ? err.message : String(err));
     }
@@ -810,6 +857,7 @@ body {
     function navigate(page, params) {
       if (loading) return;
       loading = true;
+      MapimLoader.show(MapimLoader.labelFor('page=' + (page || '')));
       google.script.run
         .withSuccessHandler(applyResult)
         .withFailureHandler(fail)
@@ -819,6 +867,7 @@ body {
     function runAction(action, params) {
       if (loading) return;
       loading = true;
+      MapimLoader.show(MapimLoader.labelFor('action=' + (action || '')));
       google.script.run
         .withSuccessHandler(applyResult)
         .withFailureHandler(fail)
@@ -833,14 +882,26 @@ body {
     }
 
     function boot() {
+      MapimLoader.show('// LOADING...');
       var sid = getSid();
       navigate(sid ? 'dashboard' : 'login', {});
     }
 
+    function isLocalUiClick(el) {
+      return el.closest('.collapsible-toggle') ||
+        el.closest('.dp-tab') ||
+        el.closest('.dp-wrap') ||
+        el.closest('.dp-popup') ||
+        el.closest('#page-loader');
+    }
+
     document.addEventListener('click', function(e) {
+      if (isLocalUiClick(e.target)) return;
+
       var el = e.target.closest('[data-spa-page]');
       if (el) {
         e.preventDefault();
+        MapimLoader.show(MapimLoader.labelFor('page=' + el.getAttribute('data-spa-page')));
         var params = {};
         try { params = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x) {}
         navigate(el.getAttribute('data-spa-page'), params);
@@ -849,9 +910,17 @@ body {
       el = e.target.closest('[data-spa-action]');
       if (el && !el.dataset.confirm) {
         e.preventDefault();
+        MapimLoader.show(MapimLoader.labelFor('action=' + el.getAttribute('data-spa-action')));
         var p2 = {};
         try { p2 = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x2) {}
         runAction(el.getAttribute('data-spa-action'), p2);
+        return;
+      }
+      if (e.target.closest('.spa-form button[type="submit"], .spa-form input[type="submit"]')) {
+        MapimLoader.show('// SAVING...');
+      }
+      if (e.target.id === 'xlsxImportBtn' || e.target.closest('#xlsxImportBtn')) {
+        MapimLoader.show('// IMPORTING...');
       }
     }, true);
 
@@ -867,7 +936,10 @@ body {
       runAction(action, data);
     }, true);
 
-    return { navigate: navigate, runAction: runAction, getSid: getSid, setSid: setSid, boot: boot, applyResult: applyResult };
+    return {
+      navigate: navigate, runAction: runAction, getSid: getSid, setSid: setSid,
+      boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
+    };
   })();
 
   // Inline edit-panel toggle for user rows
@@ -889,6 +961,7 @@ body {
     el.textContent = '⏳...';
     el.style.pointerEvents = 'none';
     if (el.dataset.spaAction) {
+      MapimLoader.show(MapimLoader.labelFor('action=' + el.dataset.spaAction));
       var p = {};
       try { p = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x) {}
       MapimSpa.runAction(el.dataset.spaAction, p);
@@ -1080,50 +1153,7 @@ body {
   // Also run immediately in case DOMContentLoaded already fired
   if (document.readyState !== 'loading') initDatePickers();
 
-  // ══ Page Loader ══
-  (function(){
-    var loader=document.getElementById('page-loader');
-    var ltxt=document.getElementById('loader-text');
-    var shown=false,msgTimer=null,safetyTimer=null;
-    var MSGS=['// LOADING...','// FETCHING DATA...','// RENDERING...','// ALMOST THERE...'];
-    var LABELS={'action=login':'// AUTHENTICATING...','action=logout':'// SIGNING OUT...',
-      'action=delete':'// DELETING...','action=create':'// CREATING...',
-      'action=edit':'// SAVING...','action=assign':'// ASSIGNING...',
-      'action=remove':'// REMOVING...','action=complete':'// UPDATING...',
-      'action=autoAssign':'// AUTO-ASSIGNING...','action=clearAll':'// CLEARING...',
-      'action=import':'// IMPORTING...','page=dashboard':'// LOADING DASHBOARD...',
-      'page=exercise':'// LOADING EXERCISE...','page=timeline':'// LOADING TIMELINE...',
-      'page=assign':'// LOADING BOARD...','page=user':'// LOADING PROFILE...','page=users':'// LOADING USERS...',
-      'page=exercises':'// LOADING EXERCISES...'};
-    function getMsg(u){if(!u)return MSGS[0];for(var k in LABELS){if(u.indexOf(k)>-1)return LABELS[k];}return MSGS[0];}
-    function show(msg){
-      if(shown)return;shown=true;
-      ltxt.textContent=msg||MSGS[0];
-      loader.classList.add('visible');
-      var i=0;
-      msgTimer=setInterval(function(){i=(i+1)%MSGS.length;ltxt.textContent=MSGS[i];},900);
-      clearTimeout(safetyTimer);
-      safetyTimer=setTimeout(hide,14000);
-    }
-    function hide(){shown=false;clearInterval(msgTimer);loader.classList.remove('visible');}
-    window.MapimSpaShowLoader = function(msg) { show(msg || MSGS[0]); };
-    var _origNavigate = MapimSpa.navigate;
-    var _origRunAction = MapimSpa.runAction;
-    MapimSpa.navigate = function(page, params) {
-      show('// LOADING ' + (page || '').toUpperCase() + '...');
-      _origNavigate(page, params);
-    };
-    MapimSpa.runAction = function(action, params) {
-      show(getMsg('action=' + action));
-      _origRunAction(action, params);
-    };
-    var _origApply = MapimSpa.applyResult;
-    MapimSpa.applyResult = function(r) {
-      hide();
-      _origApply(r);
-    };
-    window.addEventListener('pageshow', hide);
-  })();
+  window.addEventListener('pageshow', function() { MapimLoader.hide(); });
 
   // ══ Hebrew-safe CSV importer ══
   (function(){
@@ -1261,6 +1291,7 @@ body {
       if (!rows || !rows.length) return;
       btn.textContent = '⏳ מייבא...';
       btn.disabled    = true;
+      MapimLoader.show('// IMPORTING...');
       var payload = rows.map(function(r){
         return {id:r.id||'',name:r.name||'',password:r.password||'',
                 role:r.role||'trainee',team_id:r.team_id||''};

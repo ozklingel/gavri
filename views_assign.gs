@@ -257,11 +257,20 @@ function _assignBoardJs() {
   }
 
   // ── API calls via google.script.run ──
+  function hidePageLoader() {
+    if (window.MapimSpaHideLoader) window.MapimSpaHideLoader();
+  }
+  function showPageLoader(msg) {
+    if (window.MapimSpaShowLoader) window.MapimSpaShowLoader(msg || '// ASSIGNING...');
+  }
+
   function addAssignment(exId, userId, resp, zone) {
     setStatus('⏳ משבץ...', '#fbbf24');
+    showPageLoader('// ASSIGNING...');
 
     google.script.run
       .withSuccessHandler(function(result) {
+        hidePageLoader();
         if (result && result.id) {
           if (!data.exMap[exId]) data.exMap[exId] = [];
 
@@ -282,6 +291,7 @@ function _assignBoardJs() {
         }
       })
       .withFailureHandler(function(err) {
+        hidePageLoader();
         setStatus('✗ ' + err.message, '#f87171');
       })
       .assignFromBoard(sid, exId, userId, resp);
@@ -289,9 +299,11 @@ function _assignBoardJs() {
 
   function removeAssignment(assignId, chip, fromExId) {
     setStatus('⏳ מסיר...', '#fbbf24');
+    showPageLoader('// REMOVING...');
 
     google.script.run
       .withSuccessHandler(function() {
+        hidePageLoader();
         var userId = '';
 
         if (data.exMap[fromExId]) {
@@ -319,6 +331,7 @@ function _assignBoardJs() {
         setStatus('✓ הוסר בהצלחה', '#4ade80');
       })
       .withFailureHandler(function(err) {
+        hidePageLoader();
         setStatus('✗ ' + err.message, '#f87171');
       })
       .removeAssignmentById(sid, assignId);
@@ -326,9 +339,11 @@ function _assignBoardJs() {
 
   function moveAssignment(assignId, toExId, userId, resp, zone, fromExId) {
     setStatus('⏳ מעביר...', '#fbbf24');
+    showPageLoader('// MOVING...');
 
     google.script.run
       .withSuccessHandler(function() {
+        hidePageLoader();
         if (data.exMap[fromExId]) {
           var a = data.exMap[fromExId].find(function(x) {
             return x.id === assignId;
@@ -355,6 +370,7 @@ function _assignBoardJs() {
         setStatus('✓ הועבר בהצלחה', '#4ade80');
       })
       .withFailureHandler(function(err) {
+        hidePageLoader();
         setStatus('✗ ' + err.message, '#f87171');
       })
       .moveAssignmentById(sid, assignId, toExId);
