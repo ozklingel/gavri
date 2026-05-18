@@ -105,22 +105,6 @@ function Views_exercises(p) {
 
   s += '</div></div>';
 
-  // ───── JS + Flatpickr ─────
-  s += `
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  flatpickr(".datepicker", {
-    dateFormat: "Y-m-d",
-    allowInput: true,
-    disableMobile: true
-  });
-});
-</script>
-`;
-
   const body =
     _topbar(user, sid) +
     '<div class="page">' + _flash(p) +
@@ -131,7 +115,7 @@ document.addEventListener("DOMContentLoaded", function () {
     s +
     '</div>';
 
-  return _html(body, 'ניהול תרגילים');
+  return _wrapPage(body, 'ניהול תרגילים');
 }
 // ── Admin Dashboard ──
 function _adminDashboard(sid) {
@@ -153,22 +137,10 @@ function _adminDashboard(sid) {
   // ── תפריט פעולות ראשי במרכז המסך ──
   s += '<div style="display:flex;justify-content:center;margin:40px 0">';
 s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;width:100%;max-width:600px">';
-  const navBtn = function(query, icon, label) {
-    return '<a target="_top" href="' + _esc(_url(query)) + '" ' +
-      'style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-      'gap:10px;padding:32px 16px;background:var(--bg3);border:1px solid var(--border2);' +
-      'border-radius:10px;color:var(--text);text-decoration:none;font-family:var(--mono);' +
-      'font-size:15px;font-weight:bold;transition:all .15s" ' +
-      'onmouseover="this.style.borderColor=\'var(--green)\';this.style.background=\'var(--bg4)\';this.style.color=\'var(--green)\'" ' +
-      'onmouseout="this.style.borderColor=\'var(--border2)\';this.style.background=\'var(--bg3)\';this.style.color=\'var(--text)\'">' +
-      '<span style="font-size:38px">' + icon + '</span>' +
-      '<span>' + label + '</span></a>';
-  };
-
-  s += navBtn('page=exercises&sid=' + sidQ, '🎯', 'תרגילים');
-  s += navBtn('page=users&sid='     + sidQ, '👤', 'משתמשים');
-  s += navBtn('page=timeline&sid='  + sidQ, '📅', 'ציר זמן');
-  s += navBtn('page=assign&sid='    + sidQ, '🔀', 'שיבוץ');
+  s += _spaNavCard('exercises', {}, '🎯', 'תרגילים');
+  s += _spaNavCard('users', {}, '👤', 'משתמשים');
+  s += _spaNavCard('timeline', {}, '📅', 'ציר זמן');
+  s += _spaNavCard('assign', {}, '🔀', 'שיבוץ');
 
   s += '</div></div>';
   s += '</div>';

@@ -328,15 +328,7 @@ function Views_timeline(p) {
     const isPast =
       item.endMs < nowMs;
 
-    s += '<a href="' +
-
-         _url(
-           'page=exercise&id=' +
-           item.ex.id +
-           '&sid=' + sidQ
-         ) +
-
-         '" style="' +
+    s += '<a ' + _spaBarLink('exercise', { id: item.ex.id }) + ' style="' +
 
          'position:absolute;' +
          'top:' + topPx + 'px;' +
@@ -442,5 +434,5 @@ function Views_timeline(p) {
 
   s += '</div>';
 
-  return _html(s, 'ציר זמן');
+  return _wrapPage(s, 'ציר זמן');
 }

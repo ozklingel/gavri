@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
-  <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= pageTitle ?></title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Heebo:wght@300;400;600;700;900&display=swap');
 
@@ -724,8 +725,146 @@ body {
   <div class="loader-text" id="loader-text">// LOADING...</div>
 </div>
 
-<?!= body ?>
+<div id="app-content"><?!= body ?></div>
 <script>
+  // ══ SPA router — fixed URL, no full page reloads ══
+  var MapimSpa = (function() {
+    var SID_KEY = 'mapim_sid';
+    var loading = false;
+
+    function getSid() {
+      try { return sessionStorage.getItem(SID_KEY) || ''; } catch (e) { return ''; }
+    }
+    function setSid(sid) {
+      try {
+        if (sid) sessionStorage.setItem(SID_KEY, sid);
+        else sessionStorage.removeItem(SID_KEY);
+      } catch (e) {}
+    }
+
+    function showLoader(msg) {
+      var loader = document.getElementById('page-loader');
+      var ltxt = document.getElementById('loader-text');
+      if (loader) loader.classList.add('visible');
+      if (ltxt && msg) ltxt.textContent = msg;
+    }
+    function hideLoader() {
+      var loader = document.getElementById('page-loader');
+      if (loader) loader.classList.remove('visible');
+    }
+
+    function runScripts(container) {
+      if (!container) return;
+      container.querySelectorAll('script').forEach(function(old) {
+        var s = document.createElement('script');
+        if (old.src) {
+          s.src = old.src;
+          s.async = false;
+        } else {
+          s.textContent = old.textContent;
+        }
+        old.parentNode.replaceChild(s, old);
+      });
+    }
+
+    function initFlatpickr() {
+      if (typeof flatpickr === 'undefined') return;
+      document.querySelectorAll('.datepicker').forEach(function(el) {
+        if (el._flatpickr) return;
+        flatpickr(el, { dateFormat: 'Y-m-d', allowInput: true, disableMobile: true });
+      });
+    }
+
+    function afterRender() {
+      if (typeof initCollapsibles === 'function') initCollapsibles();
+      if (typeof initDatePickers === 'function') initDatePickers();
+      initFlatpickr();
+    }
+
+    function applyResult(result) {
+      if (!result) return;
+      if (result.clearSid) setSid('');
+      if (result.sid) setSid(result.sid);
+      var app = document.getElementById('app-content');
+      if (app && result.body != null) {
+        app.innerHTML = result.body;
+        runScripts(app);
+        afterRender();
+      }
+      if (result.title) document.title = result.title;
+      hideLoader();
+      loading = false;
+    }
+
+    function fail(err) {
+      hideLoader();
+      loading = false;
+      alert(err && err.message ? err.message : String(err));
+    }
+
+    function navigate(page, params) {
+      if (loading) return;
+      loading = true;
+      google.script.run
+        .withSuccessHandler(applyResult)
+        .withFailureHandler(fail)
+        .apiRenderPage(getSid(), page, JSON.stringify(params || {}));
+    }
+
+    function runAction(action, params) {
+      if (loading) return;
+      loading = true;
+      google.script.run
+        .withSuccessHandler(applyResult)
+        .withFailureHandler(fail)
+        .apiRunAction(getSid(), action, JSON.stringify(params || {}));
+    }
+
+    function formToObject(form) {
+      var data = {};
+      var fd = new FormData(form);
+      fd.forEach(function(v, k) { data[k] = v; });
+      return data;
+    }
+
+    function boot() {
+      var sid = getSid();
+      navigate(sid ? 'dashboard' : 'login', {});
+    }
+
+    document.addEventListener('click', function(e) {
+      var el = e.target.closest('[data-spa-page]');
+      if (el) {
+        e.preventDefault();
+        var params = {};
+        try { params = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x) {}
+        navigate(el.getAttribute('data-spa-page'), params);
+        return;
+      }
+      el = e.target.closest('[data-spa-action]');
+      if (el && !el.dataset.confirm) {
+        e.preventDefault();
+        var p2 = {};
+        try { p2 = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x2) {}
+        runAction(el.getAttribute('data-spa-action'), p2);
+      }
+    }, true);
+
+    document.addEventListener('submit', function(e) {
+      var form = e.target;
+      if (!form || !form.classList || !form.classList.contains('spa-form')) return;
+      e.preventDefault();
+      var data = formToObject(form);
+      var action = data.action;
+      delete data.action;
+      delete data.sid;
+      if (!action) return;
+      runAction(action, data);
+    }, true);
+
+    return { navigate: navigate, runAction: runAction, getSid: getSid, setSid: setSid, boot: boot, applyResult: applyResult };
+  })();
+
   // Inline edit-panel toggle for user rows
   function toggleEditPanel(btn) {
     const targetId = btn.dataset.target;
@@ -742,20 +881,29 @@ body {
   function confirmDelete(el) {
     const msg = el.dataset.confirm || 'בטוח שרוצים למחוק?';
     if (!confirm(msg)) return false;
-    // Show brief loading state
     el.textContent = '⏳...';
     el.style.pointerEvents = 'none';
+    if (el.dataset.spaAction) {
+      var p = {};
+      try { p = JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (x) {}
+      MapimSpa.runAction(el.dataset.spaAction, p);
+      return false;
+    }
     return true;
   }
 
-  // Collapsible toggle (for .collapsible-toggle buttons)
-  document.querySelectorAll('.collapsible-toggle').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const content = this.nextElementSibling;
-      const isOpen = content.classList.toggle('open');
-      this.classList.toggle('coll-open', isOpen);
+  function initCollapsibles() {
+    document.querySelectorAll('.collapsible-toggle').forEach(function(btn) {
+      if (btn._collInit) return;
+      btn._collInit = true;
+      btn.addEventListener('click', function() {
+        const content = this.nextElementSibling;
+        const isOpen = content.classList.toggle('open');
+        this.classList.toggle('coll-open', isOpen);
+      });
     });
-  });
+  }
+  initCollapsibles();
 
   // Mini-tab switcher — uses data-target, no onclick quoting issues
   document.addEventListener('click', function(e) {
@@ -953,21 +1101,23 @@ body {
       safetyTimer=setTimeout(hide,14000);
     }
     function hide(){shown=false;clearInterval(msgTimer);loader.classList.remove('visible');}
-    document.addEventListener('click',function(e){
-      var el=e.target;
-      while(el&&el.tagName!=='A')el=el.parentElement;
-      if(!el)return;
-      var href=el.getAttribute('href')||'';
-      if(!href||href==='#'||href.startsWith('javascript:'))return;
-      if(el.closest&&el.closest('.assign-chip'))return;
-      if(el.dataset&&el.dataset.confirm)return;
-      show(getMsg(href));
-    },true);
-    document.addEventListener('submit',function(e){
-      var inp=e.target.querySelector('input[name="action"]');
-      show(getMsg(inp?'action='+inp.value:''));
-    },true);
-    window.addEventListener('pageshow',hide);
+    window.MapimSpaShowLoader = function(msg) { show(msg || MSGS[0]); };
+    var _origNavigate = MapimSpa.navigate;
+    var _origRunAction = MapimSpa.runAction;
+    MapimSpa.navigate = function(page, params) {
+      show('// LOADING ' + (page || '').toUpperCase() + '...');
+      _origNavigate(page, params);
+    };
+    MapimSpa.runAction = function(action, params) {
+      show(getMsg('action=' + action));
+      _origRunAction(action, params);
+    };
+    var _origApply = MapimSpa.applyResult;
+    MapimSpa.applyResult = function(r) {
+      hide();
+      _origApply(r);
+    };
+    window.addEventListener('pageshow', hide);
   })();
 
   // ══ Hebrew-safe CSV importer ══
@@ -1101,25 +1251,24 @@ body {
     }
 
     window.doXlsxImport = function() {
-      var btn    = document.getElementById('xlsxImportBtn');
-      var sid    = document.getElementById('xlsxSid')    && document.getElementById('xlsxSid').value;
-      var appUrl = document.getElementById('xlsxAppUrl') && document.getElementById('xlsxAppUrl').value;
-      var rows   = btn && btn._rows;
-      if (!rows || !rows.length || !sid || !appUrl) return;
+      var btn  = document.getElementById('xlsxImportBtn');
+      var rows = btn && btn._rows;
+      if (!rows || !rows.length) return;
       btn.textContent = '⏳ מייבא...';
       btn.disabled    = true;
       var payload = rows.map(function(r){
         return {id:r.id||'',name:r.name||'',password:r.password||'',
                 role:r.role||'trainee',team_id:r.team_id||''};
       });
-      window.top.location.href = appUrl + '?action=importUsers&sid=' +
-        encodeURIComponent(sid) + '&usersJson=' + encodeURIComponent(JSON.stringify(payload));
+      MapimSpa.runAction('importUsers', { usersJson: JSON.stringify(payload) });
     };
 
     document.addEventListener('change', function(e){
       if (e.target && e.target.id === 'xlsxFile') onFileChange(e.target);
     });
   })();
+
+  MapimSpa.boot();
 
 </script>
 </body>

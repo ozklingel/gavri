@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════
-//  Code.gs — Entry point & router
-//  GET-only architecture (works inside Apps Script iframe sandbox)
+//  Code.gs — Entry point (SPA shell, fixed URL)
 // ═══════════════════════════════════════
 
 const SS_ID = ''; // leave empty if bound to spreadsheet via container
@@ -9,62 +8,8 @@ function SS() {
 }
 
 function doGet(e) {
-  const p = (e && e.parameter) ? e.parameter : {};
-  const action = p.action || '';
-  const page   = p.page   || 'login';
-
-  // ── PERF: clear per-request cache at the start of every request ──
   _cacheFlush();
-
-  try {
-    // ── Actions (mutations) — performed via GET, then re-render a page ──
-    if (action === 'login')              return Auth_login(p);
-    if (action === 'logout')             return Auth_logout(p);
-
-    // Exercises
-    if (action === 'createExercise')     return Exercises_create(p);
-    if (action === 'editExercise')       return Exercises_edit(p);
-    if (action === 'duplicateExercise')  return Exercises_duplicate(p);
-    if (action === 'deleteExercise')     return Exercises_delete(p);
-    if (action === 'addDetail')          return Exercises_addDetail(p);
-
-    // Assignments
-    if (action === 'assign')             return Assignments_assign(p);
-    if (action === 'assignTeam')         return Assignments_assignTeamAction(p);
-    if (action === 'removeAssignment')   return Assignments_remove(p);
-    if (action === 'updateAssignment')   return Assignments_update(p);
-    if (action === 'complete')           return Assignments_complete(p);
-    if (action === 'autoAssignAll')      return Assignments_autoAssignAll(p);
-    if (action === 'clearAllAssignments')return Assignments_clearAll(p);
-
-    // Users
-    if (action === 'createUser')         return Users_create(p);
-    if (action === 'importUsers')        return Users_importBulk(p);
-    if (action === 'deleteUser')         return Users_delete(p);
-    if (action === 'updateRole')         return Users_updateRole(p);
-    if (action === 'updateProfile')      return Users_updateProfile(p);
-
-    // Teams
-    if (action === 'createTeam')         return Teams_create(p);
-    if (action === 'renameTeam')         return Teams_rename(p);
-    if (action === 'deleteTeam')         return Teams_delete(p);
-    if (action === 'setCommander')       return Teams_setCommander(p);
-    if (action === 'addMember')          return Teams_addMember(p);
-    if (action === 'removeMember')       return Teams_removeMember(p);
-
-    // ── Pages (read-only renders) ──
-    if (page === 'login')     return Views_login(p);
-    if (page === 'dashboard') return Views_dashboard(p);
-    if (page === 'exercise')  return Views_exercise(p);
-    if (page === 'exercises') return Views_exercises(p);
-    if (page === 'users')     return Views_users(p);
-    if (page === 'timeline')  return Views_timeline(p);
-    if (page === 'user')      return Views_user(p);
-    if (page === 'assign')    return Views_assign(p);
-    return Views_login(p);
-  } catch (err) {
-    return Views_error(err && err.message ? err.message : String(err), p);
-  }
+  return _htmlShell();
 }
 
 function doPost(e) {

@@ -51,12 +51,10 @@ function Views_assign(p) {
     '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:14px">' +
-    '<a target="_top" href="' + _esc(_url('action=autoAssignAll&sid=' + sidQ)) + '" ' +
-    'class="btn btn-primary" ' +
-    'onclick="return confirm(this.dataset.msg)" data-msg="לבצע שיבוץ אוטומטי? תרגילים שכבר משובצים לא יושפעו.">⚡ שיבוץ אוטומטי</a>' +
-    '<a target="_top" href="' + _esc(_url('action=clearAllAssignments&sid=' + sidQ)) + '" ' +
-    'class="btn btn-sm" style="background:#7f1d1d;color:var(--danger);border:1px solid #b91c1c" ' +
-    'onclick="return confirm(this.dataset.msg)" data-msg="לאפס את כל השיבוצים? פעולה בלתי הפיכה.">🗑 איפוס שיבוצים</a>' +
+    _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
+      'לבצע שיבוץ אוטומטי? תרגילים שכבר משובצים לא יושפעו.', 'btn btn-primary') +
+    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס שיבוצים',
+      'לאפס את כל השיבוצים? פעולה בלתי הפיכה.', 'btn btn-danger btn-sm') +
     '</div>' +
 
     // Data island
@@ -71,7 +69,7 @@ function Views_assign(p) {
 
     '<script>' + _assignBoardJs() + '</script>';
 
-  return _html(body, 'לוח שיבוץ');
+  return _wrapPage(body, 'לוח שיבוץ');
 }
 function _assignBoardJs() {
   return `

@@ -1,8 +1,7 @@
 // ═══════════════════════════════════════
 //  auth.gs — login / logout / session
-//  Session is carried in the URL via &sid=USERID (no PropertiesService,
-//  because PropertiesService is per-script-user, not per-end-user, so
-//  it cannot be used as a real session store on a web app).
+//  Session is carried client-side (sessionStorage) via sid passed to
+//  google.script.run APIs (no PropertiesService for end-user sessions).
 // ═══════════════════════════════════════
 
 function Auth_login(p) {
@@ -21,12 +20,15 @@ function Auth_login(p) {
   const user = Users_get(userId);
   if (!user) return Views_login({ error: 'המשתמש אינו רשום במערכת.' });
 
-  // Build dashboard with sid in query
-  return Views_dashboard({ sid: userId });
+  const page = Views_dashboard({ sid: userId });
+  page.sid = userId;
+  return page;
 }
 
 function Auth_logout(p) {
-  return Views_login({ info: 'התנתקת בהצלחה.' });
+  const page = Views_login({ info: 'התנתקת בהצלחה.' });
+  page.clearSid = true;
+  return page;
 }
 
 // Resolve current user from sid query param

@@ -7,36 +7,81 @@
 function _appUrl() {
   return ScriptApp.getService().getUrl() || '';
 }
-function _url(query) {
-  return _appUrl() + (query ? '?' + query : '');
+
+// ── SPA query parsing (legacy page= / action= strings) ──
+
+function _spaParseQuery(query) {
+  const params = {};
+  let page = null;
+  let action = null;
+  (query || '').split('&').forEach(function(part) {
+    if (!part) return;
+    const eq = part.indexOf('=');
+    const k = eq === -1 ? part : part.substring(0, eq);
+    const v = eq === -1 ? '' : decodeURIComponent(part.substring(eq + 1).replace(/\+/g, ' '));
+    if (k === 'page') page = v;
+    else if (k === 'action') action = v;
+    else if (k === 'sid') { /* session from client */ }
+    else params[k] = v;
+  });
+  return { page: page, action: action, params: params };
+}
+
+function _spaParamsAttr(params) {
+  const json = JSON.stringify(params || {});
+  return ' data-spa-params="' + json.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"';
+}
+
+function _spaNavCard(page, params, icon, label) {
+  return '<a href="#" data-spa-page="' + _esc(page) + '"' + _spaParamsAttr(params) +
+    ' style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+    'gap:10px;padding:32px 16px;background:var(--bg3);border:1px solid var(--border2);' +
+    'border-radius:10px;color:var(--text);text-decoration:none;font-family:var(--mono);' +
+    'font-size:15px;font-weight:bold;transition:all .15s" ' +
+    'onmouseover="this.style.borderColor=\'var(--green)\';this.style.background=\'var(--bg4)\';this.style.color=\'var(--green)\'" ' +
+    'onmouseout="this.style.borderColor=\'var(--border2)\';this.style.background=\'var(--bg3)\';this.style.color=\'var(--text)\'">' +
+    '<span style="font-size:38px">' + icon + '</span>' +
+    '<span>' + label + '</span></a>';
+}
+
+function _spaBarLink(page, params) {
+  return 'href="#" data-spa-page="' + _esc(page) + '"' + _spaParamsAttr(params);
 }
 
 // ── Core building blocks ──
 
 function _a(query, label, cls) {
   cls = cls || 'btn btn-secondary btn-sm';
-  return '<a target="_top" href="' + _esc(_url(query)) + '" class="' + cls + '">' + label + '</a>';
+  const parsed = _spaParseQuery(query);
+  if (parsed.page) {
+    return '<a href="#" class="' + cls + '" data-spa-page="' + _esc(parsed.page) + '"' +
+      _spaParamsAttr(parsed.params) + '>' + label + '</a>';
+  }
+  if (parsed.action) {
+    return '<a href="#" class="' + cls + '" data-spa-action="' + _esc(parsed.action) + '"' +
+      _spaParamsAttr(parsed.params) + '>' + label + '</a>';
+  }
+  return '<a href="#" class="' + cls + '">' + label + '</a>';
 }
 
-// Render a confirm-before-delete link button
 function _confirmDelete(query, msg) {
-  return '<a target="_top" href="' + _esc(_url(query)) + '" ' +
-    'class="btn btn-danger btn-sm" ' +
-    'data-confirm="' + _esc(msg) + '" ' +
-    'onclick="return confirmDelete(this)">🗑 מחק</a>';
+  const parsed = _spaParseQuery(query);
+  return '<a href="#" class="btn btn-danger btn-sm" data-spa-action="' + _esc(parsed.action) + '"' +
+    _spaParamsAttr(parsed.params) +
+    ' data-confirm="' + _esc(msg) + '" onclick="return confirmDelete(this)">🗑 מחק</a>';
 }
 
-// Render a generic confirm-before-action link button
 function _confirmAction(query, label, msg, cls) {
   cls = cls || 'btn btn-secondary';
-  return '<a target="_top" href="' + _esc(_url(query)) + '" ' +
-    'class="' + cls + '" ' +
-    'data-confirm="' + _esc(msg) + '" ' +
-    'onclick="return confirmDelete(this)">' + label + '</a>';
+  const parsed = _spaParseQuery(query);
+  return '<a href="#" class="' + cls + '" data-spa-action="' + _esc(parsed.action) + '"' +
+    _spaParamsAttr(parsed.params) +
+    ' data-confirm="' + _esc(msg) + '" onclick="return confirmDelete(this)">' + label + '</a>';
 }
 
 function _formOpen(extraClass) {
-  return '<form action="' + _esc(_appUrl()) + '" method="get" target="_top"' + (extraClass ? ' class="' + extraClass + '"' : '') + '>';
+  const cls = 'spa-form' + (extraClass ? ' ' + extraClass : '');
+  return '<form class="' + cls + '" onsubmit="return false">';
 }
 
 function _submitBtn(label, cls) {
@@ -87,18 +132,44 @@ function _flash(p) {
   return s;
 }
 
-function _html(body, title) {
+function _wrapPage(body, title) {
+  return {
+    body: body,
+    title: title || 'סדרת השטח — מערכת תרגילים',
+    sid: null,
+    clearSid: false
+  };
+}
+
+function _htmlShell() {
   const tpl = HtmlService.createTemplateFromFile('index');
-  tpl.pageTitle = title || 'סדרת השטח — מערכת תרגילים';
-  tpl.body = body;
+  tpl.pageTitle = 'סדרת השטח — מערכת תרגילים';
+  tpl.body = '';
   return tpl.evaluate()
-    .setTitle(title || 'סדרת השטח — מערכת תרגילים')
+    .setTitle('סדרת השטח — מערכת תרגילים')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function _userLink(userId, userName, sidQ) {
-  return '<a target="_top" href="' + _esc(_url('page=user&id=' + encodeURIComponent(userId) + '&sid=' + sidQ)) +
-    '" style="color:var(--blue);text-decoration:underline"><b>' + _esc(userName) + '</b></a>';
+  return '<a href="#" data-spa-page="user"' + _spaParamsAttr({ id: userId }) +
+    ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(userName) + '</b></a>';
+}
+
+function _extraProfileFields(target) {
+  return '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">שיוך יחידתי</label>' +
+    _input('unit_affiliation', '', target.unit_affiliation || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">סוג שירות</label>' +
+    _input('service_type', '', target.service_type || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">שיוך חיילי</label>' +
+    _input('military_affiliation', '', target.military_affiliation || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">אפיון יחידתי</label>' +
+    _input('unit_classification', '', target.unit_classification || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">תפקיד מיועד</label>' +
+    _input('target_role', '', target.target_role || '') + '</div>' +
+    '<div class="form-row"><label class="form-label">טלפון</label>' +
+    _input('phone', '', target.phone || '', 'tel') + '</div>' +
+    '</div>';
 }
 
 function _roleHe(r) {
@@ -145,7 +216,7 @@ function Views_error(msg, p) {
     '<div class="login-body">' +
     '<p style="color:#fca5a5;margin-bottom:16px">' + _esc(msg) + '</p>' +
     back + '</div></div></div>';
-  return _html(body, 'שגיאה');
+  return _wrapPage(body, 'שגיאה');
 }
 
 // ─────────── LOGIN ───────────
@@ -179,7 +250,7 @@ function Views_login(p) {
     '<div class="demo-item"><div class="demo-role">חניך</div><div class="demo-cred">3332<br>3332</div></div>' +
     '</div>' +
     '</div></div></div>';
-  return _html(body, 'התחברות');
+  return _wrapPage(body, 'התחברות');
 }
 
 // ─────────── DASHBOARD ───────────
@@ -195,7 +266,7 @@ function Views_dashboard(p) {
 
   const body = _topbar(user, sid) +
     '<div class="page">' + _flash(p) + content + '</div>';
-  return _html(body, 'לוח בקרה');
+  return _wrapPage(body, 'לוח בקרה');
 }
 
 // ─────────── EXERCISES MANAGEMENT ───────────

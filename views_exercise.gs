@@ -108,7 +108,7 @@ s += _confirmDelete(
     parts.forEach(function(a) {
       const u = Users_get(a.user_id);
       pHtml += '<tr>' +
-        '<form action="' + _esc(_appUrl()) + '" method="get" target="_top">' +
+        '<form class="spa-form" onsubmit="return false">' +
         '<input type="hidden" name="action" value="updateAssignment">' +
         '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
         '<input type="hidden" name="assignmentId" value="' + _esc(a.id) + '">' +
@@ -298,7 +298,7 @@ const respOptions = [
   }
 
   s += '</div>'; // end page
-  return _html(s, ex.title);
+  return _wrapPage(s, ex.title);
 }
 
 // ─────────── USERS & TEAMS PAGE ───────────
@@ -372,7 +372,7 @@ function Views_user(p) {
       const ex = Exercises_get(a.exercise_id);
       const exTitle = ex ? ex.title : a.exercise_id;
       s += '<tr>' +
-        '<td><a target="_top" href="' + _esc(_url('page=exercise&id=' + encodeURIComponent(a.exercise_id) + '&sid=' + sidQ)) + '" style="color:var(--blue);text-decoration:underline">' +
+        '<td><a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: a.exercise_id }) + ' style="color:var(--blue);text-decoration:underline">' +
         _esc(exTitle) + '</a></td>' +
         '<td>' + _esc(a.responsibility || '—') + '</td>' +
         '<td>' + _statusBadge(a.status) + '</td>' +
@@ -413,5 +413,5 @@ function Views_user(p) {
   }
 
   s += '</div>';
-  return _html(s, target.name + ' — פרופיל');
+  return _wrapPage(s, target.name + ' — פרופיל');
 }
