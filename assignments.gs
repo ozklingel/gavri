@@ -150,8 +150,7 @@ function _matchesCorps(value, corps) {
     return v.indexOf('שריון') !== -1 || v === 'armor' || v === 'armour';
   }
   return false;
-}
-function Assignments_autoAssignAll(p) {
+}function Assignments_autoAssignAll(p) {
   Auth_requireRole(p, ['admin']);
 
   const exercises  = Exercises_all();
