@@ -150,20 +150,70 @@ function _matchesCorps(value, corps) {
     return v.indexOf('חשן') !== -1 || v === 'armor' || v === 'armour';
   }
   return false;
-}function Assignments_autoAssignAll(p) {
+}
+
+function _exerciseTimeRange(ex) {
+  const DAY_MS  = 86400000;
+  const HOUR_MS = 3600000;
+
+  let startMs = _parseRawDate(ex.rawStartDate);
+  let endMs   = _parseRawDate(ex.rawEndDate || ex.rawStartDate);
+  if (isNaN(startMs)) return null;
+  if (isNaN(endMs)) endMs = startMs + DAY_MS;
+
+  if (ex.rawStartTime) {
+    const parts = ex.rawStartTime.split(':').map(Number);
+    startMs += parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
+  }
+  if (ex.rawEndTime) {
+    const parts = ex.rawEndTime.split(':').map(Number);
+    endMs = _parseRawDate(ex.rawEndDate || ex.rawStartDate) +
+      parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
+  }
+  if (endMs <= startMs) endMs = startMs + DAY_MS;
+  return { startMs: startMs, endMs: endMs };
+}
+
+function _timesOverlap(r1, r2) {
+  if (!r1 || !r2) return false;
+  return r1.startMs < r2.endMs && r2.startMs < r1.endMs;
+}
+
+function _buildUserExerciseMap(assigns) {
+  const map = {};
+  assigns.forEach(function(a) {
+    if (!map[a.user_id]) map[a.user_id] = [];
+    if (map[a.user_id].indexOf(a.exercise_id) === -1) {
+      map[a.user_id].push(a.exercise_id);
+    }
+  });
+  return map;
+}
+
+function _userTimeConflict(userId, targetExId, exRanges, userExMap) {
+  const targetRange = exRanges[targetExId];
+  const exIds = userExMap[userId] || [];
+  for (let i = 0; i < exIds.length; i++) {
+    if (exIds[i] === targetExId) return true;
+    if (_timesOverlap(targetRange, exRanges[exIds[i]])) return true;
+  }
+  return false;
+}
+
+function _addUserToExerciseMap(userExMap, userId, exId) {
+  if (!userExMap[userId]) userExMap[userId] = [];
+  if (userExMap[userId].indexOf(exId) === -1) userExMap[userId].push(exId);
+}
+
+function Assignments_autoAssignAll(p) {
   Auth_requireRole(p, ['admin']);
 
   const exercises  = Exercises_all();
   const allUsers   = Users_all();
   const allAssigns = Assignments_all();
 
-  // -----------------------------
-  // נרמול חילות
-  // -----------------------------
   function normalize(v) {
-    return String(v || '')
-      .replace(/״/g, '')
-      .trim();
+    return String(v || '').replace(/״/g, '').trim();
   }
 
   function corps(u) {
@@ -178,14 +228,15 @@ function _matchesCorps(value, corps) {
     ADM: 'מנהלי'
   };
 
-  // -----------------------------
-  // תרגילים שכבר שובצו
-  // -----------------------------
-  const assigned = new Set(allAssigns.map(a => a.exercise_id));
+  const SLOTS = [
+    { kind: 'commander', resp: 'מפקד צוות', count: 1 },
+    { kind: 'corps', corpsKey: CORPS.SUP, resp: 'מסייעת', count: 1 },
+    { kind: 'corps', corpsKey: CORPS.ARM, resp: 'חשן', count: 1 },
+    { kind: 'corps', corpsKey: CORPS.INF, resp: 'חי״ר', count: 2 },
+    { kind: 'corps', corpsKey: CORPS.ENG, resp: 'חה״ן', count: 1 },
+    { kind: 'corps', corpsKey: CORPS.ADM, resp: 'מנהלי', count: 1 }
+  ];
 
-  // -----------------------------
-  // עדיפות חניכים
-  // -----------------------------
   function priority(u) {
     let s = 0;
     if (u.service_type === 'מילואים') s += 100;
@@ -193,146 +244,174 @@ function _matchesCorps(value, corps) {
     return s;
   }
 
-  let trainees = allUsers.filter(u => u.role === 'trainee');
-  trainees.sort((a, b) => priority(b) - priority(a));
-
-  // -----------------------------
-  // חלוקה לפי חילות
-  // -----------------------------
-  let infantry = trainees.filter(u => corps(u) === CORPS.INF);
-  let armor    = trainees.filter(u => corps(u) === CORPS.ARM);
-  let eng      = trainees.filter(u => corps(u) === CORPS.ENG);
-  let support  = trainees.filter(u => corps(u) === CORPS.SUP);
-  let admin    = trainees.filter(u => corps(u) === CORPS.ADM);
-
-  let commanders = allUsers.filter(u => u.role === 'commander');
-
   function shuffle(arr) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
+      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
     }
     return a;
   }
 
-  commanders = shuffle(commanders);
+  const exRanges = {};
+  exercises.forEach(function(ex) {
+    exRanges[ex.id] = _exerciseTimeRange(ex);
+  });
 
-  function pick(pool, cond) {
-    const i = pool.findIndex(cond);
-    if (i === -1) return null;
-    return pool.splice(i, 1)[0];
+  const userExMap = _buildUserExerciseMap(allAssigns);
+
+  const trainees = allUsers
+    .filter(function(u) { return u.role === 'trainee'; })
+    .sort(function(a, b) { return priority(b) - priority(a); });
+
+  const corpsPools = {
+    [CORPS.INF]: trainees.filter(function(u) { return corps(u) === CORPS.INF; }),
+    [CORPS.ARM]: trainees.filter(function(u) { return corps(u) === CORPS.ARM; }),
+    [CORPS.ENG]: trainees.filter(function(u) { return corps(u) === CORPS.ENG; }),
+    [CORPS.SUP]: trainees.filter(function(u) { return corps(u) === CORPS.SUP; }),
+    [CORPS.ADM]: trainees.filter(function(u) { return corps(u) === CORPS.ADM; })
+  };
+
+  const commanders = shuffle(allUsers.filter(function(u) { return u.role === 'commander'; }));
+
+  const sortedExercises = exercises.slice().sort(function(a, b) {
+    const ra = exRanges[a.id];
+    const rb = exRanges[b.id];
+    if (ra && rb) return ra.startMs - rb.startMs;
+    if (ra) return -1;
+    if (rb) return 1;
+    return a.id.localeCompare(b.id);
+  });
+
+  function respCount(exId, resp, pendingRows) {
+    let n = allAssigns.filter(function(a) {
+      return a.exercise_id === exId && a.responsibility === resp;
+    }).length;
+    pendingRows.forEach(function(r) {
+      if (r[1] === exId && r[5] === resp) n++;
+    });
+    return n;
+  }
+
+  function onExercise(exId, pendingRows) {
+    const ids = {};
+    allAssigns.forEach(function(a) {
+      if (a.exercise_id === exId) ids[a.user_id] = true;
+    });
+    pendingRows.forEach(function(r) {
+      if (r[1] === exId) ids[r[2]] = true;
+    });
+    return ids;
+  }
+
+  function pickTrainee(pool, exId, preferredTeam, onEx) {
+    function ok(u) {
+      if (onEx[u.id]) return false;
+      if (_userTimeConflict(u.id, exId, exRanges, userExMap)) return false;
+      return true;
+    }
+    if (preferredTeam) {
+      for (let i = 0; i < pool.length; i++) {
+        if (pool[i].team_id === preferredTeam && ok(pool[i])) return pool[i];
+      }
+    }
+    for (let i = 0; i < pool.length; i++) {
+      if (ok(pool[i])) return pool[i];
+    }
+    return null;
+  }
+
+  function pickCommander(exId, exIdx, onEx) {
+    if (!commanders.length) return null;
+    for (let j = 0; j < commanders.length; j++) {
+      const c = commanders[(exIdx + j) % commanders.length];
+      if (onEx[c.id]) continue;
+      if (_userTimeConflict(c.id, exId, exRanges, userExMap)) continue;
+      return c;
+    }
+    return null;
+  }
+
+  function preferredTeamForEx(exId, onEx) {
+    const teamCount = {};
+    corpsPools[CORPS.INF].forEach(function(u) {
+      if (onEx[u.id]) return;
+      if (_userTimeConflict(u.id, exId, exRanges, userExMap)) return;
+      if (!u.team_id) return;
+      teamCount[u.team_id] = (teamCount[u.team_id] || 0) + 1;
+    });
+    const keys = Object.keys(teamCount).sort(function(a, b) {
+      return teamCount[b] - teamCount[a];
+    });
+    return keys[0] || '';
   }
 
   const allRows = [];
-
-  let stats = {
-    ex: 0,
-    skipped: 0,
-    trainees: 0,
-    commanders: 0
+  const stats = {
+    added: 0,
+    full: 0,
+    partial: 0,
+    empty: 0,
+    slotsMissing: 0
   };
 
-  // -----------------------------
-  // לולאת שיבוץ
-  // -----------------------------
-  exercises.forEach((ex, idx) => {
+  sortedExercises.forEach(function(ex, exIdx) {
+    const preferredTeam = preferredTeamForEx(ex.id, onExercise(ex.id, allRows));
 
-    if (assigned.has(ex.id)) {
-      stats.skipped++;
-      return;
-    }
+    SLOTS.forEach(function(slot) {
+      const need = slot.count - respCount(ex.id, slot.resp, allRows);
+      for (let n = 0; n < need; n++) {
+        const onEx = onExercise(ex.id, allRows);
+        let user = null;
 
-    // -----------------------------
-    // בחירת צוות מוביל לפי חי״ר
-    // -----------------------------
-    const teamCount = {};
+        if (slot.kind === 'commander') {
+          user = pickCommander(ex.id, exIdx, onEx);
+        } else {
+          const pool = corpsPools[slot.corpsKey] || [];
+          user = pickTrainee(pool, ex.id, preferredTeam, onEx);
+        }
 
-    infantry.forEach(u => {
-      teamCount[u.team_id] = (teamCount[u.team_id] || 0) + 1;
+        if (!user) {
+          stats.slotsMissing++;
+          continue;
+        }
+
+        const row = [
+          'A' + Date.now() + '_' + exIdx + '_' + stats.added,
+          ex.id,
+          user.id,
+          'pending',
+          '',
+          slot.resp
+        ];
+        allRows.push(row);
+        _addUserToExerciseMap(userExMap, user.id, ex.id);
+        stats.added++;
+      }
     });
 
-    let preferredTeam = Object.keys(teamCount)
-      .sort((a, b) => teamCount[b] - teamCount[a])[0];
+    const filled = SLOTS.reduce(function(sum, slot) {
+      return sum + Math.min(slot.count, respCount(ex.id, slot.resp, allRows));
+    }, 0);
+    const total = SLOTS.reduce(function(sum, slot) { return sum + slot.count; }, 0);
 
-    // -----------------------------
-    // פונקציות צוות
-    // -----------------------------
-    function pickTeam(pool) {
-      let i = pool.findIndex(u => u.team_id === preferredTeam);
-      if (i !== -1) return pool.splice(i, 1)[0];
-      return null;
-    }
-
-    function pickAny(pool) {
-      return pick(pool, () => true);
-    }
-
-    const row = [];
-
-    // מפקד
-    const commander = commanders[idx % Math.max(commanders.length, 1)];
-    if (commander) row.push({ u: commander, r: 'מפקד צוות' });
-
-    // מסייעת (עדיפות צוות)
-    let sup = pickTeam(support) || pickAny(support);
-    if (sup) row.push({ u: sup, r: 'מסייעת' });
-
-    // חשן
-    let arm = pickTeam(armor) || pickAny(armor);
-    if (arm) row.push({ u: arm, r: 'חשן' });
-
-    // חי״ר (עד 2, מאותו צוות קודם)
-    for (let i = 0; i < 2; i++) {
-      let inf = pickTeam(infantry) || pickAny(infantry);
-      if (!inf) break;
-      row.push({ u: inf, r: 'חי״ר' });
-    }
-
-    // חה״ן
-    let e = pickTeam(eng) || pickAny(eng);
-    if (e) row.push({ u: e, r: 'חה״ן' });
-
-    // מנהלי
-    let ad = pickTeam(admin) || pickAny(admin);
-    if (ad) row.push({ u: ad, r: 'מנהלי' });
-
-    // -----------------------------
-    // כתיבה
-    // -----------------------------
-    row.forEach((x, i) => {
-      const id = 'A' + Date.now() + '_' + idx + '_' + i;
-
-      allRows.push([
-        id,
-        ex.id,
-        x.u.id,
-        'pending',
-        '',
-        x.r
-      ]);
-
-      stats.trainees++;
-      if (x.u.role === 'commander') stats.commanders++;
-    });
-
-    if (row.length) stats.ex++;
+    if (filled === 0) stats.empty++;
+    else if (filled >= total) stats.full++;
+    else stats.partial++;
   });
 
-  if (allRows.length) {
-    _appendBatch('Assignments', allRows);
+  if (allRows.length) _appendBatch('Assignments', allRows);
+
+  let info = '✅ שיבוץ הושלם: ' + stats.added + ' הקצאות חדשות. ' +
+    stats.full + ' תרגילים מלאים';
+  if (stats.partial) info += ', ' + stats.partial + ' חלקיים';
+  if (stats.empty) info += ', ' + stats.empty + ' ללא שיבוץ';
+  if (stats.slotsMissing) {
+    info += '. חסרים ' + stats.slotsMissing + ' משתתפים (חפיפה בזמן או מחסור בכוח אדם)';
   }
+  info += '. משתתפים יכולים להופיע בכמה תרגילים — למעט תרגילים חופפים בזמן.';
 
-  return Views_assign({
-    sid: p.sid,
-    info:
-      '✅ שיבוץ הושלם: ' +
-      stats.ex + '/' + exercises.length +
-      ' תרגילים שובצו. ' +
-      '(' + stats.commanders + ' מפקדים, ' +
-      stats.trainees + ' חניכים). ' +
-      'דולגו: ' + stats.skipped
-  });
+  return Views_assign({ sid: p.sid, info: info });
 }
 // פעולה: ניקוי כל השיבוצים (לפני הרצה מחדש של שיבוץ אוטומטי)
 function Assignments_clearAll(p) {

@@ -52,7 +52,7 @@ function Views_assign(p) {
     '</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:14px">' +
     _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
-      'לבצע שיבוץ אוטומטי? תרגילים שכבר משובצים לא יושפעו.', 'btn btn-primary') +
+      'לבצע שיבוץ אוטומטי? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
     _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס שיבוצים',
       'לאפס את כל השיבוצים? פעולה בלתי הפיכה.', 'btn btn-danger btn-sm') +
     '</div>' +
