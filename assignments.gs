@@ -146,8 +146,8 @@ function _matchesCorps(value, corps) {
   if (corps === 'חיר') {
     return v.indexOf('חיר') !== -1 || v.indexOf('רגל') !== -1 || v === 'infantry';
   }
-  if (corps === 'שריון') {
-    return v.indexOf('שריון') !== -1 || v === 'armor' || v === 'armour';
+  if (corps === 'חשן') {
+    return v.indexOf('חשן') !== -1 || v === 'armor' || v === 'armour';
   }
   return false;
 }function Assignments_autoAssignAll(p) {
@@ -172,7 +172,7 @@ function _matchesCorps(value, corps) {
 
   const CORPS = {
     INF: 'חיר',
-    ARM: 'שריון',
+    ARM: 'חשן',
     ENG: 'חהן',
     SUP: 'מסייעת',
     ADM: 'מנהלי'
@@ -278,9 +278,9 @@ function _matchesCorps(value, corps) {
     let sup = pickTeam(support) || pickAny(support);
     if (sup) row.push({ u: sup, r: 'מסייעת' });
 
-    // שריון
+    // חשן
     let arm = pickTeam(armor) || pickAny(armor);
-    if (arm) row.push({ u: arm, r: 'שריון' });
+    if (arm) row.push({ u: arm, r: 'חשן' });
 
     // חי״ר (עד 2, מאותו צוות קודם)
     for (let i = 0; i < 2; i++) {
