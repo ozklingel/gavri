@@ -134,13 +134,115 @@ function Teams_get(id) {
   return Teams_all().find(t => t.id === String(id)) || null;
 }
 
+function _nextTeamId() {
+  const { data } = _rows('Teams');
+  let max = 0;
+  data.forEach(function(r) {
+    const id = String(r[0] || '');
+    const m = id.match(/^T(\d+)$/i);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+    else {
+      const n = parseInt(id, 10);
+      if (!isNaN(n)) max = Math.max(max, n);
+    }
+  });
+  return 'T' + (max + 1);
+}
+
+function _nextTeamIds(count) {
+  const { data } = _rows('Teams');
+  let max = 0;
+  data.forEach(function(r) {
+    const id = String(r[0] || '');
+    const m = id.match(/^T(\d+)$/i);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+    else {
+      const n = parseInt(id, 10);
+      if (!isNaN(n)) max = Math.max(max, n);
+    }
+  });
+  const ids = [];
+  for (let i = 0; i < count; i++) ids.push('T' + (max + 1 + i));
+  return ids;
+}
+
 function Teams_create(p) {
   Auth_requireRole(p, ['admin']);
   const name = (p.teamName || '').trim();
   if (!name) throw new Error('נא להזין שם צוות.');
-  const id = 'T' + _nextId('Teams');
+  const id = _nextTeamId();
   _append('Teams', [id, name, '']);
   return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.' });
+}
+
+// Auto-split unassigned trainees into teams of 10 (+ 1–2 commanders each)
+function Teams_autoSplit(p) {
+  Auth_requireRole(p, ['admin']);
+  const TRAINEES_PER_TEAM = 10;
+  const cmdPerTeam = Math.min(2, Math.max(1, parseInt(p.commandersPerTeam, 10) || 1));
+  const prefix = (p.teamNamePrefix || 'צוות').trim() || 'צוות';
+
+  const trainees = Users_all()
+    .filter(function(u) { return u.role === 'trainee' && !u.team_id; })
+    .sort(function(a, b) { return a.id.localeCompare(b.id); });
+  const commanders = Users_all()
+    .filter(function(u) { return u.role === 'commander' && !u.team_id; })
+    .sort(function(a, b) { return a.id.localeCompare(b.id); });
+
+  if (!trainees.length) throw new Error('אין חניכים ללא צוות לחלוקה.');
+
+  const numTeams = Math.ceil(trainees.length / TRAINEES_PER_TEAM);
+  const commandersNeeded = numTeams * cmdPerTeam;
+  const teamIds = _nextTeamIds(numTeams);
+  const teamRows = [];
+  const plans = [];
+  let cmdIdx = 0;
+
+  for (let i = 0; i < numTeams; i++) {
+    const chunk = trainees.slice(i * TRAINEES_PER_TEAM, (i + 1) * TRAINEES_PER_TEAM);
+    const cmds = [];
+    for (let c = 0; c < cmdPerTeam && cmdIdx < commanders.length; c++) {
+      cmds.push(commanders[cmdIdx++]);
+    }
+    const id = teamIds[i];
+    const name = prefix + ' ' + (i + 1);
+    teamRows.push([id, name, cmds[0] ? cmds[0].id : '']);
+    plans.push({ id: id, trainees: chunk, commanders: cmds });
+  }
+
+  _appendBatch('Teams', teamRows);
+
+  const userRows = {};
+  _rows('Users').data.forEach(function(r, i) {
+    userRows[String(r[0])] = i + 2;
+  });
+  const usersSh = _sheet('Users');
+
+  plans.forEach(function(plan) {
+    plan.trainees.forEach(function(u) {
+      const row = userRows[u.id];
+      if (row) usersSh.getRange(row, 4).setValue(plan.id);
+    });
+    plan.commanders.forEach(function(u) {
+      const row = userRows[u.id];
+      if (row) usersSh.getRange(row, 4).setValue(plan.id);
+    });
+  });
+
+  _cacheInvalidate('Teams');
+  _cacheInvalidate('Users');
+
+  let info = 'נוצרו ' + numTeams + ' צוותים — ' + trainees.length + ' חניכים חולקו (עד ' +
+    TRAINEES_PER_TEAM + ' לצוות, ' + cmdPerTeam + ' מפקדים לצוות).';
+  const missingCmds = commandersNeeded - cmdIdx;
+  if (missingCmds > 0) {
+    info += ' חסרים ' + missingCmds + ' מפקדי צוות פנויים — חלק מהצוותים ללא מפקד מלא.';
+  }
+  const leftover = trainees.length % TRAINEES_PER_TEAM;
+  if (leftover > 0) {
+    info += ' הצוות האחרון כולל ' + leftover + ' חניכים.';
+  }
+  return Views_users({ sid: p.sid, tab: 'teams', info: info });
 }
 
 function Teams_rename(p) {

@@ -148,6 +148,28 @@ function _teamsTab(sid) {
     _submitBtn('צור צוות', 'btn btn-primary btn-full') +
     '</form></div></div>';
 
+  const unassignedTrainees = unassigned.filter(function(u) { return u.role === 'trainee'; });
+  const freeCommanders = Users_all().filter(function(u) {
+    return u.role === 'commander' && !u.team_id;
+  });
+  const previewTeams = unassignedTrainees.length
+    ? Math.ceil(unassignedTrainees.length / 10)
+    : 0;
+
+  s += '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">⚡ חלוקה אוטומטית לצוותים</div></div><div class="card-body">' +
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">' +
+    'חניכים ללא צוות: <b>' + unassignedTrainees.length + '</b> · מפקדי צוות פנויים: <b>' + freeCommanders.length + '</b>' +
+    (previewTeams ? ' · ייווצרו כ-<b>' + previewTeams + '</b> צוותים' : '') +
+    '</p>' +
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">כל צוות: עד 10 חניכים + 1–2 מפקדי צוות (לפי בחירה).</p>' +
+    _formOpen() +
+    '<input type="hidden" name="action" value="autoSplitTeams">' +
+    '<div class="form-row"><label class="form-label">קידומת שם</label>' + _input('teamNamePrefix', 'צוות', 'צוות', 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">מפקדים לצוות</label>' +
+    _select('commandersPerTeam', [['1','1 מפקד'],['2','2 מפקדים']], '1') + '</div>' +
+    _submitBtn('חלק אוטומטית', 'btn btn-primary btn-full') +
+    '</form></div></div>';
+
   s += '</div>';
   return s;
 }

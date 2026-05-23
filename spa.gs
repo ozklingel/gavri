@@ -94,6 +94,7 @@ function _spaDispatchAction(action, p) {
     case 'updateRole':         return Users_updateRole(p);
     case 'updateProfile':      return Users_updateProfile(p);
     case 'createTeam':         return Teams_create(p);
+    case 'autoSplitTeams':     return Teams_autoSplit(p);
     case 'renameTeam':         return Teams_rename(p);
     case 'deleteTeam':         return Teams_delete(p);
     case 'setCommander':       return Teams_setCommander(p);
