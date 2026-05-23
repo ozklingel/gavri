@@ -903,6 +903,17 @@ body {
       var data = {};
       var fd = new FormData(form);
       fd.forEach(function(v, k) { data[k] = v; });
+      // Include inputs linked via form="..." (participant row save)
+      if (form.id) {
+        document.querySelectorAll('[form="' + form.id + '"]').forEach(function(el) {
+          if (!el.name || el.disabled) return;
+          if (el.type === 'checkbox' || el.type === 'radio') {
+            if (el.checked) data[el.name] = el.value;
+            return;
+          }
+          data[el.name] = el.value;
+        });
+      }
       return data;
     }
 
@@ -935,7 +946,7 @@ body {
         runAction(el.getAttribute('data-spa-action'), parseSpaParams(el));
         return;
       }
-      if (e.target.closest('.spa-form button[type="submit"], .spa-form input[type="submit"]')) {
+      if (e.target.closest('.spa-form button[type="submit"], .spa-form input[type="submit"], button[type="submit"][form]')) {
         MapimLoader.show('// SAVING...');
       }
       if (e.target.id === 'xlsxImportBtn' || e.target.closest('#xlsxImportBtn')) {
@@ -960,6 +971,28 @@ body {
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();
+
+  // Save participant row — reads data-* on <tr> and fields in the row (no form inside table)
+  function spaSaveAssignmentRow(btn) {
+    if (!btn || !window.MapimSpa) return;
+    var row = btn.closest('tr');
+    if (!row) return;
+    var assignmentId = row.getAttribute('data-assignment-id') || '';
+    var exerciseId = row.getAttribute('data-exercise-id') || '';
+    var pick = function(name) {
+      var el = row.querySelector('[name="' + name + '"]');
+      return el ? String(el.value || '').trim() : '';
+    };
+    if (!assignmentId) { alert('חסר מזהה הקצאה'); return; }
+    MapimSpa.runAction('updateAssignment', {
+      assignmentId: assignmentId,
+      exerciseId: exerciseId,
+      status: pick('status'),
+      score: pick('score'),
+      responsibility: pick('responsibility')
+    });
+  }
+  window.spaSaveAssignmentRow = spaSaveAssignmentRow;
 
   // Inline edit-panel toggle for user rows
   function toggleEditPanel(btn) {

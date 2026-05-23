@@ -358,13 +358,14 @@ function Assignments_update(p) {
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
 
   const sh = _sheet('Assignments');
-  // Read current row values so we can write all 3 cols in one call
-  const current = sh.getRange(row, 4, 1, 3).getValues()[0];
-  const newStatus = (p.status !== undefined && p.status !== '') ? p.status : current[0];
-  const newScore  = (p.score  !== undefined)                    ? p.score  : current[1];
-  const newResp   = (p.responsibility !== undefined && p.responsibility !== '') ? p.responsibility : current[2];
+  // Columns D=status, E=score, F=responsibility (explicit cells — avoids getRange ambiguity)
+  const newStatus = String(p.status != null ? p.status : '').trim();
+  const newScore  = String(p.score  != null ? p.score  : '').trim();
+  const newResp   = String(p.responsibility != null ? p.responsibility : '').trim();
 
-  sh.getRange(row, 4, 1, 3).setValues([[newStatus, newScore, newResp]]);
+  sh.getRange(row, 4).setValue(newStatus || 'pending');
+  sh.getRange(row, 5).setValue(newScore);
+  sh.getRange(row, 6).setValue(newResp);
   _cacheInvalidate('Assignments');
 
   return Views_exercise({ sid: p.sid, id: exId, info: 'פרטי המשתתף עודכנו בהצלחה.' });

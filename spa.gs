@@ -10,6 +10,24 @@ function apiRenderPage(sid, page, paramsJson) {
   }
 }
 
+// Direct update for participant row save (explicit params — reliable in HtmlService iframe)
+function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, responsibility) {
+  _cacheFlush();
+  const p = {
+    sid: String(sid || '').trim(),
+    assignmentId: String(assignmentId || '').trim(),
+    exerciseId: String(exerciseId || '').trim(),
+    status: status == null ? '' : String(status),
+    score: score == null ? '' : String(score),
+    responsibility: responsibility == null ? '' : String(responsibility)
+  };
+  try {
+    return _spaEnsureWrap(Assignments_update(p));
+  } catch (err) {
+    return _spaEnsureWrap(Views_error(err && err.message ? err.message : String(err), p));
+  }
+}
+
 function apiRunAction(sid, action, paramsJson) {
   _cacheFlush();
   const p = _spaMergeParams(sid, paramsJson);

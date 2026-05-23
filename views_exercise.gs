@@ -129,12 +129,7 @@ s += _confirmDelete(
       '</tr></thead><tbody>';
     parts.forEach(function(a) {
       const u = Users_get(a.user_id);
-      pHtml += '<tr>' +
-        '<form class="spa-form" onsubmit="return false">' +
-        '<input type="hidden" name="action" value="updateAssignment">' +
-        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-        '<input type="hidden" name="assignmentId" value="' + _esc(a.id) + '">' +
-        '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+      pHtml += '<tr data-assignment-id="' + _esc(a.id) + '" data-exercise-id="' + _esc(ex.id) + '">' +
         '<td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
         '<td><input type="text" name="responsibility" value="' + _esc(a.responsibility) + '" class="form-input" style="min-width:80px"></td>' +
         '<td><select name="status" class="form-select">' +
@@ -144,11 +139,9 @@ s += _confirmDelete(
         '</select></td>' +
         '<td><input type="text" name="score" value="' + _esc(a.score) + '" class="form-input" style="width:60px" placeholder="—"></td>' +
         '<td style="display:flex;gap:4px">' +
-        '<button type="submit" class="btn btn-primary btn-sm">💾</button>' +
-        '</form>' +
+        '<button type="button" class="btn btn-primary btn-sm" onclick="spaSaveAssignmentRow(this)">💾</button>' +
         _formOpen('form-inline') +
         '<input type="hidden" name="action" value="removeAssignment">' +
-        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
         '<input type="hidden" name="assignmentId" value="' + _esc(a.id) + '">' +
         '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
         _submitBtn('✕', 'btn btn-danger btn-sm btn-icon') +

@@ -81,7 +81,7 @@ function _confirmAction(query, label, msg, cls) {
 
 function _formOpen(extraClass) {
   const cls = 'spa-form' + (extraClass ? ' ' + extraClass : '');
-  return '<form class="' + cls + '" onsubmit="return false">';
+  return '<form class="' + cls + '">';
 }
 
 function _submitBtn(label, cls) {
