@@ -19,7 +19,13 @@ function Views_assign(p) {
     return { id: e.id, title: e.title, start: e.start_date || '', end: e.end_date || '' };
   });
   const userMap = {};
-  allUsers.forEach(function(u) { userMap[u.id] = { name: u.name, role: u.role }; });
+  allUsers.forEach(function(u) {
+    userMap[u.id] = {
+      name: u.name,
+      role: u.role,
+      corps: String(u.military_affiliation || '').replace(/״/g, '').trim()
+    };
+  });
 
   const exMap = {}; // exercise_id → [assignments]
   assigns.forEach(function(a) {
@@ -35,7 +41,14 @@ function Views_assign(p) {
     exercises: exData,
     userMap:   userMap,
     exMap:     exMap,
-    unassigned: unassigned.map(function(u) { return { id: u.id, name: u.name, role: u.role }; })
+    unassigned: unassigned.map(function(u) { return { id: u.id, name: u.name, role: u.role }; }),
+    corpsList: [
+      { key: 'חיר', label: 'חי״ר' },
+      { key: 'חשן', label: 'חשן' },
+      { key: 'חהן', label: 'חה״ן' },
+      { key: 'מסייעת', label: 'מסייעת' },
+      { key: 'מנהלי', label: 'מנהלי' }
+    ]
   });
 
   const body = _topbar(user, sid) +
@@ -65,6 +78,12 @@ function Views_assign(p) {
     '<div id="assignBoard" style="display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:16px">' +
     // Unassigned column rendered by JS
     '</div>' +
+
+    '<div id="assignLeastSection" style="margin-top:8px;border-top:1px solid var(--border);padding-top:16px">' +
+    '<div class="card-title" style="margin-bottom:10px;font-size:13px">📊 חניך מועדף לשיבוץ — הכי פחות משובץ לכל חיל</div>' +
+    '<div id="assignLeastPanel" style="display:flex;gap:10px;flex-wrap:wrap"></div>' +
+    '<p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:8px 0 0">מתעדכן אוטומטית לפי מספר התרגילים הנוכחי · אחד לכל חיל</p>' +
+    '</div>' +
     '</div>' +
 
     '<script>' + _assignBoardJs() + '</script>';
@@ -78,6 +97,7 @@ function _assignBoardJs() {
   var sid   = document.getElementById('assignSid').value;
   var board = document.getElementById('assignBoard');
   var status = document.getElementById('assignStatus');
+  var leastPanel = document.getElementById('assignLeastPanel');
 
   var ROLE_LABELS = { admin: 'מפקד קורס', commander: 'מפקד צוות', trainee: 'חניך' };
   var ROLE_COLORS = { admin: '#4ade80', commander: '#60a5fa', trainee: '#94a3b8' };
@@ -85,6 +105,70 @@ function _assignBoardJs() {
   function setStatus(msg, color) {
     status.textContent = msg;
     status.style.color = color || 'var(--muted)';
+  }
+
+  function countAssignments(userId) {
+    var n = 0;
+    for (var exId in data.exMap) {
+      if (!data.exMap.hasOwnProperty(exId)) continue;
+      (data.exMap[exId] || []).forEach(function(a) {
+        if (a.userId === userId) n++;
+      });
+    }
+    return n;
+  }
+
+  function renderLeastAssigned() {
+    if (!leastPanel) return;
+    leastPanel.innerHTML = '';
+
+    (data.corpsList || []).forEach(function(c) {
+      var candidates = [];
+      for (var uid in data.userMap) {
+        if (!data.userMap.hasOwnProperty(uid)) continue;
+        var u = data.userMap[uid];
+        if (u.role !== 'trainee') continue;
+        if ((u.corps || '') !== c.key) continue;
+        candidates.push({ id: uid, name: u.name, count: countAssignments(uid) });
+      }
+
+      candidates.sort(function(a, b) {
+        if (a.count !== b.count) return a.count - b.count;
+        return a.name.localeCompare(b.name, 'he');
+      });
+
+      var card = document.createElement('div');
+      card.style.cssText = [
+        'min-width:150px;flex:1;max-width:200px',
+        'background:var(--bg2);border:1px solid var(--border);border-radius:6px',
+        'padding:10px 12px'
+      ].join(';');
+
+      var lbl = document.createElement('div');
+      lbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px';
+      lbl.textContent = c.label;
+
+      var body = document.createElement('div');
+      if (!candidates.length) {
+        body.style.cssText = 'font-size:12px;color:var(--muted)';
+        body.textContent = '— אין חניכים';
+      } else {
+        var pick = candidates[0];
+        body.style.cssText = 'font-family:var(--mono);font-size:12px;color:var(--text1)';
+        var nameEl = document.createElement('b');
+        nameEl.textContent = pick.name;
+        body.appendChild(nameEl);
+        body.appendChild(document.createElement('br'));
+        var sub = document.createElement('span');
+        sub.style.cssText = 'font-size:10px;color:var(--muted)';
+        sub.textContent = pick.id + ' · ' + pick.count + ' תרגילים';
+        body.appendChild(sub);
+      }
+
+      card.appendChild(lbl);
+      card.appendChild(body);
+      leastPanel.appendChild(card);
+    });
   }
 
   // ── Build a draggable chip ──
@@ -254,6 +338,8 @@ function _assignBoardJs() {
         makeColumn(ex.id, ex.title, subtitle, chips)
       );
     });
+
+    renderLeastAssigned();
   }
 
   // ── API calls via google.script.run ──
