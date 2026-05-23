@@ -27,6 +27,28 @@ function _fmtDateTime(dateVal) {
   return _fmtDate(dateVal) || '';
 }
 
+// Format date + time → "יום שלישי, 15 באפריל 2025 · 08:00"
+function _fmtDateTimeFull(dateVal, timeVal) {
+  const datePart = dateVal ? _fmtDate(dateVal) : '';
+  const timePart = timeVal != null && timeVal !== '' ? _rawTime(timeVal) : '';
+  if (datePart && timePart) return datePart + ' · ' + timePart;
+  return datePart || timePart || '';
+}
+
+// Format ExerciseDetails time cell (Date, datetime string, or HH:MM)
+function _fmtDetailTime(val) {
+  if (val == null || val === '') return '—';
+  if (val instanceof Date) return _fmtDateTimeFull(val, val);
+  const s = String(val).trim();
+  if (!s) return '—';
+  const d = new Date(s);
+  if (!isNaN(d.getTime()) && (/[-/T]/.test(s) || s.length > 10)) {
+    return _fmtDateTimeFull(d, d);
+  }
+  const tp = _rawTime(s);
+  return tp || s;
+}
+
 // Returns "HH:MM" from a time string or empty
 function _rawTime(val) {
   if (!val) return '';
@@ -90,7 +112,12 @@ function Exercises_get(id) {
 function Exercises_details(exerciseId) {
   return _rows('ExerciseDetails').data
     .filter(r => String(r[1]) === String(exerciseId))
-    .map(r => ({ id: String(r[0]), time: String(r[2]), location: String(r[3]), description: String(r[4]) }));
+    .map(r => ({
+      id: String(r[0]),
+      time: _fmtDetailTime(r[2]),
+      location: String(r[3] || ''),
+      description: String(r[4] || '')
+    }));
 }
 
 function Exercises_create(p) {

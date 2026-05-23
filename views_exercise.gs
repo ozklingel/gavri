@@ -90,7 +90,7 @@ s += _confirmDelete(
   if (!details.length) {
     tlHtml += '<div class="empty">אין רישומים</div>';
   } else {
-    tlHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr><th>שעה</th><th>מיקום</th><th>תיאור</th></tr></thead><tbody>';
+    tlHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr><th>תאריך ושעה</th><th>מיקום</th><th>תיאור</th></tr></thead><tbody>';
     details.forEach(function(d) {
       tlHtml += '<tr><td class="mono">' + _esc(d.time) + '</td><td>' + _esc(d.location) + '</td><td>' + _esc(d.description) + '</td></tr>';
     });
