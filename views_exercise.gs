@@ -137,7 +137,8 @@ s += _confirmDelete(
         '<option value="in_progress"' + (a.status === 'in_progress' ? ' selected' : '') + '>⟳ בביצוע</option>' +
         '<option value="completed"' + (a.status === 'completed' ? ' selected' : '') + '>✓ הושלם</option>' +
         '</select></td>' +
-        '<td><input type="text" name="score" value="' + _esc(a.score) + '" class="form-input" style="width:60px" placeholder="—"></td>' +
+        '<td style="white-space:nowrap"><input type="text" name="score" value="' + _esc(a.score) + '" class="form-input" style="width:60px" placeholder="—"> ' +
+        _feedbackBtn(a.id, ex.id, !!a.feedback) + '</td>' +
         '<td style="display:flex;gap:4px">' +
         '<button type="button" class="btn btn-primary btn-sm" onclick="spaSaveAssignmentRow(this)">💾</button>' +
         _formOpen('form-inline') +
@@ -150,17 +151,23 @@ s += _confirmDelete(
     });
     pHtml += '</tbody></table></div>';
   } else {
-    // Non-admin: read-only table
+    // Non-admin: read-only table (+ משוב for commander)
+    const showFeedback = user.role === 'commander';
     pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
       '<th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
+      (showFeedback ? '<th>משוב</th>' : '') +
       '</tr></thead><tbody>';
     parts.forEach(function(a) {
       const u = Users_get(a.user_id);
+      const canFb = showFeedback && Assignments_canEditFeedback(user, a);
       pHtml += '<tr><td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
         '<td>' + _esc(a.responsibility) + '</td>' +
         '<td>' + _statusBadge(a.status) + '</td>' +
-        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
-        '</tr>';
+        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>';
+      if (showFeedback) {
+        pHtml += '<td>' + (canFb ? _feedbackBtn(a.id, ex.id, !!a.feedback) : '—') + '</td>';
+      }
+      pHtml += '</tr>';
     });
     pHtml += '</tbody></table></div>';
   }

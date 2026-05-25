@@ -68,6 +68,7 @@ function _spaDispatchPage(page, p) {
     case 'timeline':  return Views_timeline(p);
     case 'user':      return Views_user(p);
     case 'assign':    return Views_assign(p);
+    case 'feedback':  return Views_feedback(p);
     default:          return Views_login(p);
   }
 }
@@ -100,6 +101,7 @@ function _spaDispatchAction(action, p) {
     case 'setCommander':       return Teams_setCommander(p);
     case 'addMember':          return Teams_addMember(p);
     case 'removeMember':       return Teams_removeMember(p);
+    case 'saveFeedback':       return Assignments_saveFeedback(p);
     default:
       throw new Error('פעולה לא מוכרת: ' + action);
   }

@@ -89,6 +89,24 @@ function _submitBtn(label, cls) {
   return '<button type="submit" class="' + cls + '">► ' + label + '</button>';
 }
 
+function _feedbackBtn(assignmentId, exerciseId, hasFeedback, cls) {
+  cls = cls || 'btn btn-ghost btn-sm';
+  const label = hasFeedback ? 'משוב ✓' : 'משוב';
+  return _a(
+    'page=feedback&assignmentId=' + encodeURIComponent(assignmentId) +
+    '&id=' + encodeURIComponent(exerciseId),
+    label,
+    cls
+  );
+}
+
+function _textarea(name, placeholder, value, extra) {
+  value = value || '';
+  extra = extra || '';
+  return '<textarea name="' + name + '" class="form-input" placeholder="' + _esc(placeholder || '') + '" ' +
+    extra + '>' + _esc(value) + '</textarea>';
+}
+
 function _input(name, placeholder, value, type, extra) {
   type = type || 'text';
   value = value || '';

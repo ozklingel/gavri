@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════
 //  assignments.gs — assign, team-assign, remove, complete
 //  Sheet "Assignments" columns:
-//    A: id | B: exercise_id | C: user_id | D: status | E: score | F: responsibility
+//    A: id | B: exercise_id | C: user_id | D: status | E: score | F: responsibility | G: feedback
 // ═══════════════════════════════════════
 
 function Assignments_all() {
@@ -11,8 +11,23 @@ function Assignments_all() {
     user_id:        String(r[2]),
     status:         String(r[3] || 'pending'),
     score:          r[4] == null ? '' : String(r[4]),
-    responsibility: r[5] == null ? '' : String(r[5])
+    responsibility: r[5] == null ? '' : String(r[5]),
+    feedback:       r[6] == null ? '' : String(r[6])
   }));
+}
+
+function Assignments_get(id) {
+  return Assignments_all().find(function(a) { return a.id === String(id); }) || null;
+}
+
+function Assignments_canEditFeedback(user, assignment) {
+  if (!user || !assignment) return false;
+  if (user.role === 'admin') return true;
+  if (user.role === 'commander') {
+    const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
+    return traineeIds.indexOf(assignment.user_id) !== -1;
+  }
+  return false;
 }
 
 function Assignments_byUser(userId) {
@@ -507,6 +522,31 @@ function Assignments_update(p) {
   _cacheInvalidate('Assignments');
 
   return Views_exercise({ sid: p.sid, id: exId, info: 'פרטי המשתתף עודכנו בהצלחה.' });
+}
+
+// Save free-text feedback on trainee performance in an exercise
+function Assignments_saveFeedback(p) {
+  const user = Auth_requireRole(p, ['admin', 'commander']);
+  const aid  = (p.assignmentId || '').trim();
+  const exId = (p.exerciseId || p.id || '').trim();
+  if (!aid) throw new Error('חסר מזהה הקצאה.');
+
+  const assignment = Assignments_get(aid);
+  if (!assignment) throw new Error('ההקצאה לא נמצאה.');
+  if (!Assignments_canEditFeedback(user, assignment)) {
+    throw new Error('אין הרשאה לערוך משוב להקצאה זו.');
+  }
+
+  const row = _findRowIndex('Assignments', aid);
+  if (row < 0) throw new Error('ההקצאה לא נמצאה.');
+  _sheet('Assignments').getRange(row, 7).setValue(String(p.feedback != null ? p.feedback : '').trim());
+  _cacheInvalidate('Assignments');
+
+  return Views_exercise({
+    sid: p.sid,
+    id: exId || assignment.exercise_id,
+    info: 'המשוב נשמר בהצלחה.'
+  });
 }
 
 // ═══════════════════════════════════════
