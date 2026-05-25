@@ -128,13 +128,6 @@ function _dashboardCorpsAssignedCounts() {
   const userById = {};
   users.forEach(function(u) { userById[u.id] = u; });
 
-  const seen = {};
-  assigns.forEach(function(a) {
-    const u = userById[a.user_id];
-    if (!u || u.role !== 'trainee') return;
-    seen[a.user_id] = _normalizeAffiliation(u.military_affiliation);
-  });
-
   const order = [
     { key: 'חיר', label: 'חי״ר' },
     { key: 'חשן', label: 'חשן' },
@@ -146,8 +139,10 @@ function _dashboardCorpsAssignedCounts() {
   order.forEach(function(c) { counts[c.key] = 0; });
   let other = 0;
 
-  Object.keys(seen).forEach(function(uid) {
-    const aff = seen[uid];
+  assigns.forEach(function(a) {
+    const u = userById[a.user_id];
+    if (!u || u.role !== 'trainee') return;
+    const aff = _normalizeAffiliation(u.military_affiliation);
     if (counts.hasOwnProperty(aff)) counts[aff]++;
     else other++;
   });
@@ -163,7 +158,7 @@ function _adminDashboard(sid) {
   s += '<h1 class="page-title">לוח בקרה מפקד</h1>';
 
   s += '<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px">' +
-    'חניכים שהוקצו כמשתתפים לפחות תרגיל אחד — לפי שיוך חיילי</p>';
+    'סך ההקצאות — לפי שיוך חיילי</p>';
   s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:24px">';
   corpsStats.order.forEach(function(c) {
     s += '<div class="stat-box"><div class="stat-num">' + corpsStats.counts[c.key] +
