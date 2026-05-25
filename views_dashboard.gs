@@ -118,21 +118,62 @@ function Views_exercises(p) {
   return _wrapPage(body, 'ניהול תרגילים');
 }
 // ── Admin Dashboard ──
+function _normalizeAffiliation(v) {
+  return String(v || '').replace(/״/g, '').trim();
+}
+
+function _dashboardCorpsAssignedCounts() {
+  const assigns = Assignments_all();
+  const users = Users_all();
+  const userById = {};
+  users.forEach(function(u) { userById[u.id] = u; });
+
+  const seen = {};
+  assigns.forEach(function(a) {
+    const u = userById[a.user_id];
+    if (!u || u.role !== 'trainee') return;
+    seen[a.user_id] = _normalizeAffiliation(u.military_affiliation);
+  });
+
+  const order = [
+    { key: 'חיר', label: 'חי״ר' },
+    { key: 'חשן', label: 'חשן' },
+    { key: 'חהן', label: 'חה״ן' },
+    { key: 'מסייעת', label: 'מסייעת' },
+    { key: 'מנהלי', label: 'מנהלי' }
+  ];
+  const counts = {};
+  order.forEach(function(c) { counts[c.key] = 0; });
+  let other = 0;
+
+  Object.keys(seen).forEach(function(uid) {
+    const aff = seen[uid];
+    if (counts.hasOwnProperty(aff)) counts[aff]++;
+    else other++;
+  });
+
+  return { order: order, counts: counts, other: other };
+}
+
 function _adminDashboard(sid) {
-  const exs = Exercises_all();
   const sidQ = encodeURIComponent(sid);
-  const assigns = Assignments_all ? Assignments_all() : [];
-  const completed = assigns.filter(a => a.status === 'completed').length;
+  const corpsStats = _dashboardCorpsAssignedCounts();
 
   let s = '<div class="page">';
   s += '<h1 class="page-title">לוח בקרה מפקד</h1>';
 
-  // שורת סטטיסטיקה
-  s += '<div class="grid-3" style="margin-bottom: 24px;">' +
-    '<div class="stat-box"><div class="stat-num">' + exs.length + '</div><div class="stat-label">תרגילים פעילים</div></div>' +
-    '<div class="stat-box"><div class="stat-num">' + completed + '</div><div class="stat-label">שיבוצים שהושלמו</div></div>' +
-    '<div class="stat-box"><div class="stat-num" style="color:var(--green)">ON</div><div class="stat-label">סטטוס מערכת</div></div>' +
-    '</div>';
+  s += '<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px">' +
+    'חניכים שהוקצו כמשתתפים לפחות תרגיל אחד — לפי שיוך חיילי</p>';
+  s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:24px">';
+  corpsStats.order.forEach(function(c) {
+    s += '<div class="stat-box"><div class="stat-num">' + corpsStats.counts[c.key] +
+      '</div><div class="stat-label">' + c.label + '</div></div>';
+  });
+  if (corpsStats.other > 0) {
+    s += '<div class="stat-box"><div class="stat-num">' + corpsStats.other +
+      '</div><div class="stat-label">אחר / ללא שיוך</div></div>';
+  }
+  s += '</div>';
 
   // ── תפריט פעולות ראשי במרכז המסך ──
   s += '<div style="display:flex;justify-content:center;margin:40px 0">';
