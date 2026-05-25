@@ -304,21 +304,80 @@ function Assignments_autoAssignAll(p) {
     return ids;
   }
 
+  function isMiluaim(u) {
+    return normalize(u.service_type) === 'מילואים';
+  }
+
+  function isSadir(u) {
+    return normalize(u.service_type) === 'סדיר';
+  }
+
+  function assignCount(userId, pendingRows) {
+    let n = allAssigns.filter(function(a) { return a.user_id === userId; }).length;
+    pendingRows.forEach(function(r) {
+      if (r[2] === userId) n++;
+    });
+    return n;
+  }
+
+  function traineePickScore(u, preferredTeam) {
+    let s = 0;
+    if (preferredTeam && u.team_id === preferredTeam) s += 1000;
+    if (u.target_role === 'מתמרן') s += 50;
+    if (isMiluaim(u)) s += 10;
+    return s;
+  }
+
+  function pickBestTrainee(candidates, preferredTeam) {
+    if (!candidates.length) return null;
+    candidates.sort(function(a, b) {
+      const ca = assignCount(a.id, allRows);
+      const cb = assignCount(b.id, allRows);
+      if (ca !== cb) return ca - cb;
+      const sa = traineePickScore(a, preferredTeam);
+      const sb = traineePickScore(b, preferredTeam);
+      if (sa !== sb) return sb - sa;
+      return a.id.localeCompare(b.id);
+    });
+    return candidates[0];
+  }
+
   function pickTrainee(pool, exId, preferredTeam, onEx) {
     function ok(u) {
       if (onEx[u.id]) return false;
       if (_userTimeConflict(u.id, exId, exRanges, userExMap)) return false;
       return true;
     }
+
+    const eligible = pool.filter(ok);
+    if (!eligible.length) return null;
+
+    const eligibleMiluaim = eligible.filter(isMiluaim);
+    let candidates = eligible.slice();
+
+    // סדיר רק אם אין מילואים זמין ששובץ פחות ממנו
+    if (eligibleMiluaim.length) {
+      candidates = candidates.filter(function(u) {
+        if (!isSadir(u)) return true;
+        const sadirCount = assignCount(u.id, allRows);
+        for (let i = 0; i < eligibleMiluaim.length; i++) {
+          if (assignCount(eligibleMiluaim[i].id, allRows) < sadirCount) return false;
+        }
+        return true;
+      });
+    }
+
+    if (!candidates.length) return null;
+
     if (preferredTeam) {
-      for (let i = 0; i < pool.length; i++) {
-        if (pool[i].team_id === preferredTeam && ok(pool[i])) return pool[i];
-      }
+      const teamCandidates = candidates.filter(function(u) {
+        return u.team_id === preferredTeam;
+      });
+      const teamPick = pickBestTrainee(teamCandidates, preferredTeam);
+      if (teamPick) return teamPick;
     }
-    for (let i = 0; i < pool.length; i++) {
-      if (ok(pool[i])) return pool[i];
-    }
-    return null;
+
+    return pickBestTrainee(candidates, preferredTeam);
   }
 
   function pickCommander(exId, exIdx, onEx) {
