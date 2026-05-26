@@ -99,6 +99,159 @@ body {
       border-radius: var(--radius);
       margin-left: 10px;
     }
+    .topbar-start {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+    .topbar-menu-btn {
+      flex-shrink: 0;
+      font-size: 18px;
+      line-height: 1;
+      padding: 6px 10px;
+      min-width: 44px;
+      min-height: 44px;
+    }
+    a.topbar-brand {
+      text-decoration: none;
+      color: inherit;
+      min-width: 0;
+    }
+    a.topbar-brand:hover { color: var(--green); }
+
+    /* ── APP DRAWER (mobile + desktop) ── */
+    .app-drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    .app-drawer-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .app-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(300px, 88vw);
+      max-width: 100%;
+      height: 100%;
+      height: 100dvh;
+      background: var(--bg2);
+      border-left: 2px solid var(--border2);
+      z-index: 201;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.28s ease;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    .app-drawer.open {
+      transform: translateX(0);
+    }
+    body.drawer-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+    .app-drawer-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .app-drawer-brand {
+      font-family: var(--mono);
+      color: var(--green);
+      font-size: 15px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .app-drawer-brand .star { font-size: 18px; flex-shrink: 0; }
+    .app-drawer-brand .sub {
+      color: var(--muted);
+      font-size: 10px;
+      display: block;
+      line-height: 1.2;
+      font-weight: normal;
+    }
+    .app-drawer-close {
+      flex-shrink: 0;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text1);
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+    .app-drawer-close:hover { border-color: var(--green); color: var(--green); }
+    .app-drawer-user {
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 12px 14px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      line-height: 1.5;
+      flex-shrink: 0;
+    }
+    .app-drawer-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .app-drawer-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text1);
+      text-decoration: none;
+      font-family: var(--mono);
+      font-size: 14px;
+      min-height: 48px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .app-drawer-link:hover,
+    .app-drawer-link:focus {
+      border-color: var(--green);
+      background: var(--bg4);
+      color: var(--green);
+      outline: none;
+    }
+    .app-drawer-link-icon {
+      font-size: 20px;
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .app-drawer-foot {
+      padding: 12px 14px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
 
     /* ── BUTTONS ── */
     .btn {
@@ -432,6 +585,10 @@ body {
 
   .topbar {
     padding: 0 8px;
+  }
+
+  .topbar-brand .sub {
+    display: none;
   }
 
   .topbar-nav {
@@ -845,7 +1002,62 @@ body {
       if (typeof initCollapsibles === 'function') initCollapsibles();
       if (typeof initDatePickers === 'function') initDatePickers();
       initFlatpickr();
+      initAppDrawer();
     }
+
+    function initAppDrawer() {
+      var drawer = document.getElementById('appDrawer');
+      var overlay = document.getElementById('appDrawerOverlay');
+      var openBtn = document.getElementById('appDrawerOpen');
+      var closeBtn = document.getElementById('appDrawerClose');
+      if (!drawer || !overlay) return;
+
+      function openDrawer() {
+        drawer.classList.add('open');
+        drawer.setAttribute('aria-hidden', 'false');
+        overlay.hidden = false;
+        requestAnimationFrame(function() {
+          overlay.classList.add('open');
+        });
+        document.body.classList.add('drawer-open');
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+        overlay.classList.remove('open');
+        document.body.classList.remove('drawer-open');
+        setTimeout(function() {
+          if (!drawer.classList.contains('open')) overlay.hidden = true;
+        }, 280);
+      }
+
+      if (openBtn) {
+        openBtn.onclick = function(e) {
+          e.preventDefault();
+          openDrawer();
+        };
+      }
+      if (closeBtn) {
+        closeBtn.onclick = function(e) {
+          e.preventDefault();
+          closeDrawer();
+        };
+      }
+      overlay.onclick = closeDrawer;
+
+      drawer.querySelectorAll('.app-drawer-link, .app-drawer-foot a').forEach(function(el) {
+        el.addEventListener('click', function() {
+          closeDrawer();
+        });
+      });
+
+      window.MapimDrawer = { open: openDrawer, close: closeDrawer };
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && window.MapimDrawer) MapimDrawer.close();
+    });
 
     function applyResult(result) {
       if (!result) return;

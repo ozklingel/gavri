@@ -235,20 +235,57 @@ function _statusBadge(s) {
   return _badge('◌ ממתין', 'yellow');
 }
 
+function _drawerNavItems(user) {
+  const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
+  if (user.role === 'admin') {
+    items.push(
+      { page: 'exercises', label: 'תרגילים', icon: '🎯' },
+      { page: 'users', label: 'משתמשים וצוותים', icon: '👤', params: { tab: 'users' } },
+      { page: 'timeline', label: 'ציר זמן', icon: '📅' },
+      { page: 'assign', label: 'לוח שיבוץ', icon: '🔀' }
+    );
+  } else if (user.role === 'commander') {
+    items.push({ page: 'timeline', label: 'ציר זמן', icon: '📅' });
+  }
+  return items;
+}
+
+function _appDrawer(user, sid) {
+  let nav = '';
+  _drawerNavItems(user).forEach(function(item) {
+    const params = item.params || {};
+    nav += '<a href="#" class="app-drawer-link" data-spa-page="' + _esc(item.page) + '"' +
+      _spaParamsAttr(params) + '>' +
+      '<span class="app-drawer-link-icon">' + item.icon + '</span>' +
+      '<span>' + _esc(item.label) + '</span></a>';
+  });
+
+  return '<div class="app-drawer-overlay" id="appDrawerOverlay" hidden></div>' +
+    '<aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="תפריט ראשי">' +
+    '<div class="app-drawer-head">' +
+    '<div class="app-drawer-brand"><span class="star">★</span><div>' +
+    '<span>סדרת השטח</span>' +
+    '<span class="sub">TRAINING CMD SYS // CLASSIFIED</span></div></div>' +
+    '<button type="button" class="app-drawer-close" id="appDrawerClose" aria-label="סגור">✕</button>' +
+    '</div>' +
+    '<div class="app-drawer-user">👤 <b>' + _esc(user.name) + '</b><br>' +
+    '<span style="color:var(--muted)">' + _esc(_roleHe(user.role)) + '</span></div>' +
+    '<nav class="app-drawer-nav">' + nav + '</nav>' +
+    '<div class="app-drawer-foot">' +
+    _a('action=logout', '⏻ יציאה', 'btn btn-danger btn-full') +
+    '</div></aside>';
+}
+
 function _topbar(user, sid) {
   if (!user) return '';
-  const sidQ = encodeURIComponent(sid);
-  let nav = '<nav class="topbar">' +
-    '<div class="topbar-brand">' +
+  return _appDrawer(user, sid) +
+    '<nav class="topbar">' +
+    '<div class="topbar-start">' +
+    '<button type="button" class="btn btn-ghost btn-sm topbar-menu-btn" id="appDrawerOpen" aria-label="פתח תפריט">☰</button>' +
+    '<a href="#" class="topbar-brand" data-spa-page="dashboard"' + _spaParamsAttr({}) + '>' +
     '<span class="star">★</span>' +
-    '<div><span>סדרת השטח</span><span class="sub">TRAINING CMD SYS // CLASSIFIED</span></div>' +
-    '</div>' +
-    '<div class="topbar-nav">';
-
-  nav += '<span class="topbar-user">👤 ' + _esc(user.name) + ' · ' + _esc(_roleHe(user.role)) + '</span>';
-  nav += _a('action=logout', '⏻ יציאה', 'btn btn-ghost btn-sm');
-  nav += '</div></nav>';
-  return nav;
+    '<div><span>סדרת השטח</span><span class="sub">TRAINING CMD</span></div>' +
+    '</a></div></nav>';
 }
 
 // ─────────── ERROR ───────────
