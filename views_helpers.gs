@@ -173,6 +173,11 @@ function _userLink(userId, userName, sidQ) {
     ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(userName) + '</b></a>';
 }
 
+function _exerciseLink(exerciseId, title) {
+  return '<a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: exerciseId }) +
+    ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(title) + '</b></a>';
+}
+
 function _extraProfileFields(target) {
   return '<div class="form-grid">' +
     '<div class="form-row"><label class="form-label">שיוך יחידתי</label>' +

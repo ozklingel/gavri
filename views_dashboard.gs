@@ -219,7 +219,7 @@ function _commanderDashboard(user, sid) {
       assigns.forEach(function(a) {
         const ex = Exercises_get(a.exercise_id);
         inner += '<tr>' +
-          '<td>' + _esc(ex ? ex.title : a.exercise_id) + '</td>' +
+          '<td>' + (ex ? _exerciseLink(ex.id, ex.title) : _esc(a.exercise_id)) + '</td>' +
           '<td>' + _esc(a.responsibility) + '</td>' +
           '<td>' + _statusBadge(a.status) + '</td>' +
           '<td class="actions">';
