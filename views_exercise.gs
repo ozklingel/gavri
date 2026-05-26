@@ -123,7 +123,6 @@ s += _confirmDelete(
   if (!parts.length) {
     pHtml += '<div class="empty">אין משתתפים</div>';
   } else if (user.role === 'admin') {
-    // Admin: inline-editable rows — each row is its own form
     pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
       '<th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>פעולות</th>' +
       '</tr></thead><tbody>';
@@ -131,7 +130,8 @@ s += _confirmDelete(
       const u = Users_get(a.user_id);
       pHtml += '<tr data-assignment-id="' + _esc(a.id) + '" data-exercise-id="' + _esc(ex.id) + '">' +
         '<td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
-        '<td><input type="text" name="responsibility" value="' + _esc(a.responsibility) + '" class="form-input" style="min-width:80px"></td>' +
+        '<td><input type="text" name="responsibility" list="respList" placeholder="בחר או הקלד..." value="' +
+        _esc(a.responsibility) + '" class="form-input" style="min-width:140px"></td>' +
         '<td><select name="status" class="form-select">' +
         '<option value="pending"' + (a.status === 'pending' ? ' selected' : '') + '>◌ ממתין</option>' +
         '<option value="in_progress"' + (a.status === 'in_progress' ? ' selected' : '') + '>⟳ בביצוע</option>' +
@@ -177,6 +177,7 @@ s += _confirmDelete(
 
   // ── Admin-only panels ──
   if (user.role === 'admin') {
+    s += _respDatalistHtml('respList');
 
     // Edit exercise + Assign soldier — side by side
     s += '<div class="grid-2" style="margin-bottom:14px">';
@@ -232,7 +233,6 @@ s += _confirmDelete(
         '<div class="form-row"><label class="form-label">חייל</label>' + _select('userId', userOptions) + '</div>' +
         '<div class="form-row"><label class="form-label">תפקיד</label>' +
         '<input name="responsibility" list="respList" placeholder="בחר או הקלד..." class="form-input" required>' +
-        _respDatalistHtml('respList') +
         '</div>' +
         _submitBtn('➤ הקצה חייל', 'btn btn-primary') +
         '</form>';
