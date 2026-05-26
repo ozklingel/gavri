@@ -245,6 +245,67 @@ function _commanderDashboard(user, sid) {
   return s;
 }
 
+// ── Tutor Dashboard ──
+function _tutorDashboard(user, sid) {
+  const myAssigns = Assignments_byTutor(user.id);
+  const exMap = {};
+
+  myAssigns.forEach(function(a) {
+    const u = Users_get(a.user_id);
+    if (!u || u.role !== 'trainee') return;
+    if (!exMap[a.exercise_id]) exMap[a.exercise_id] = [];
+    exMap[a.exercise_id].push({ assign: a, trainee: u });
+  });
+
+  const exIds = Object.keys(exMap);
+  let s = '<div class="page-title">⊞ לוח בקרה — חונך</div>';
+
+  if (!exIds.length) {
+    return s + '<div class="card"><div class="empty">אין תרגילים עם חניכים משויכים אליך</div></div>';
+  }
+
+  exIds.sort(function(a, b) {
+    const ea = Exercises_get(a);
+    const eb = Exercises_get(b);
+    const da = ea && ea.start_date ? ea.start_date : a;
+    const db = eb && eb.start_date ? eb.start_date : b;
+    return String(da).localeCompare(String(db));
+  });
+
+  s += '<p style="font-size:12px;color:var(--muted);margin-bottom:14px">' +
+    'תרגילים שבהם משובצים חניכים שהוקצו לך כחונך — ניתן לתת ציון ומשוב לחניכים שלך בלבד.</p>';
+
+  exIds.forEach(function(exId) {
+    const ex = Exercises_get(exId);
+    const title = ex ? ex.title : exId;
+    const rows = exMap[exId];
+
+    s += '<div class="card" style="margin-bottom:12px">' +
+      '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+      '<span class="card-title">🎯 ' + _exerciseLink(exId, title) + '</span>' +
+      '<a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: exId }) +
+      ' class="btn btn-secondary btn-sm">↗ פתיחה</a>' +
+      '</div><div class="card-body" style="padding:0">' +
+      '<table class="tbl"><thead><tr><th>חניך</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>משוב</th></tr></thead><tbody>';
+
+    rows.forEach(function(row) {
+      const a = row.assign;
+      const t = row.trainee;
+      s += '<tr>' +
+        '<td><b>' + _esc(t.name) + '</b></td>' +
+        '<td>' + _esc(a.responsibility || '—') + '</td>' +
+        '<td>' + _statusBadge(a.status) + '</td>' +
+        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
+        '<td>' + _feedbackBtn(a.id, exId, !!a.feedback) + '</td>' +
+        '</tr>';
+    });
+
+    s += '</tbody></table></div></div>';
+  });
+
+  return s;
+}
+
 // ── Trainee Dashboard ──
 function _traineeDashboard(user, sid) {
   const sidQ = encodeURIComponent(sid);

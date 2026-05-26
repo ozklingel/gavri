@@ -41,7 +41,7 @@ function _usersTab(sid) {
       s += '<tr>' +
         '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td>' + _userLink(u.id, u.name, '') + '</td>' +
-        '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : 'muted') + '</td>' +
+        '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : u.role === 'tutor' ? 'yellow' : 'muted') + '</td>' +
         '<td>' + _esc(team ? team.name : '—') + '</td>' +
         '<td class="actions" style="white-space:nowrap">' +
         _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?') +
@@ -60,7 +60,7 @@ function _usersTab(sid) {
     '<div class="form-row"><label class="form-label">סיסמה</label>' + _input('newPassword', '', '', 'password', 'required') + '</div>' +
     '<div class="form-grid">' +
     '<div class="form-row"><label class="form-label">תפקיד</label>' +
-    _select('newRole', [['trainee','חניך'],['commander','מפקד צוות'],['admin','מפקד קורס']], 'trainee') + '</div>' +
+    _select('newRole', [['trainee','חניך'],['commander','מפקד צוות'],['tutor','חונך'],['admin','מפקד קורס']], 'trainee') + '</div>' +
     '<div class="form-row"><label class="form-label">צוות</label>' + _select('newTeamId', teamOpts, '') + '</div>' +
     '</div>' +
     _submitBtn('צור משתמש', 'btn btn-primary btn-full') +

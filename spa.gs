@@ -11,7 +11,7 @@ function apiRenderPage(sid, page, paramsJson) {
 }
 
 // Direct update for participant row save (explicit params — reliable in HtmlService iframe)
-function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, responsibility) {
+function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, responsibility, tutor) {
   _cacheFlush();
   const p = {
     sid: String(sid || '').trim(),
@@ -19,7 +19,8 @@ function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, respo
     exerciseId: String(exerciseId || '').trim(),
     status: status == null ? '' : String(status),
     score: score == null ? '' : String(score),
-    responsibility: responsibility == null ? '' : String(responsibility)
+    responsibility: responsibility == null ? '' : String(responsibility),
+    tutor: tutor == null ? '' : String(tutor)
   };
   try {
     return _spaEnsureWrap(Assignments_update(p));

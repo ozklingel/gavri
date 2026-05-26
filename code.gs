@@ -122,6 +122,7 @@ function setupSheets() {
   ensure('Assignments',      ['id','exercise_id','user_id','status','score','responsibility','feedback']);
   ensureColumn('Assignments', 'responsibility');
   ensureColumn('Assignments', 'feedback');
+  ensureColumn('Assignments', 'tutor');
   ensureColumn('Users', 'unit_affiliation');
   ensureColumn('Users', 'service_type');
   ensureColumn('Users', 'military_affiliation');
@@ -150,7 +151,7 @@ function resetTrainingTables() {
     Teams: ['id','name','commander_id'],
     Exercises: ['id','title','description','created_by','start_date','end_date','act','exercise_type','partner_battalion','camp','battalion_commander'],
     ExerciseDetails: ['id','exercise_id','time','location','description'],
-    Assignments: ['id','exercise_id','user_id','status','score','responsibility','feedback']
+    Assignments: ['id','exercise_id','user_id','status','score','responsibility','feedback','tutor']
   };
 
   Object.keys(schemas).forEach(name => {

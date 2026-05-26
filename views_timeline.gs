@@ -38,6 +38,17 @@ function Views_timeline(p) {
       )
     );
 
+  } else if (user.role === 'tutor') {
+
+    const tutoredExIds = {};
+    (Assignments_byTutor ? Assignments_byTutor(user.id) : []).forEach(function(a) {
+      tutoredExIds[a.exercise_id] = true;
+    });
+
+    exercises = exercises.filter(function(ex) {
+      return !!tutoredExIds[ex.id];
+    });
+
   } else if (user.role === 'trainee') {
 
     const myAssigns =

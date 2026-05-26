@@ -47,7 +47,7 @@ function Users_create(p) {
   if (!newId)  throw new Error('נא להזין מספר אישי.');
   if (!name)   throw new Error('נא להזין שם מלא.');
   if (!pass)   throw new Error('נא להזין סיסמה.');
-  if (['admin','commander','trainee'].indexOf(role) === -1) throw new Error('תפקיד לא חוקי.');
+  if (['admin','commander','trainee','tutor'].indexOf(role) === -1) throw new Error('תפקיד לא חוקי.');
 
   if (Users_get(newId)) throw new Error('מספר אישי ' + newId + ' כבר קיים במערכת.');
 
@@ -112,7 +112,7 @@ function Users_updateRole(p) {
   const targetId = (p.targetId || '').trim();
   const newRole  = (p.newRole  || '').trim();
   if (!targetId) throw new Error('חסר מזהה משתמש.');
-  if (['admin','commander','trainee'].indexOf(newRole) === -1) throw new Error('תפקיד לא חוקי.');
+  if (['admin','commander','trainee','tutor'].indexOf(newRole) === -1) throw new Error('תפקיד לא חוקי.');
 
   const row = _findRowIndex('Users', targetId);
   if (row < 0) throw new Error('המשתמש לא נמצא.');
@@ -389,7 +389,7 @@ function Users_importBulk(p) {
     if (!id || !name) { errors.push('שורה ' + (i+1) + ': חסר id או שם'); return; }
     if (!password)    { errors.push('שורה ' + (i+1) + ': חסרה סיסמה ל-' + id); return; }
 
-    const validRoles = ['admin','commander','trainee'];
+    const validRoles = ['admin','commander','trainee','tutor'];
     const finalRole  = validRoles.includes(role) ? role : 'trainee';
 
     if (existing.has(id)) { skipped++; return; }

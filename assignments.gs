@@ -1,8 +1,19 @@
 // ═══════════════════════════════════════
 //  assignments.gs — assign, team-assign, remove, complete
 //  Sheet "Assignments" columns:
-//    A: id | B: exercise_id | C: user_id | D: status | E: score | F: responsibility | G: feedback
+//    A: id | B: exercise_id | C: user_id | D: status | E: score | F: responsibility | G: feedback | H: tutor
 // ═══════════════════════════════════════
+
+function _assignmentRow(id, exId, userId, status, score, resp, feedback, tutor) {
+  return [
+    id, exId, userId,
+    status || 'pending',
+    score || '',
+    resp || '',
+    feedback || '',
+    tutor || ''
+  ];
+}
 
 function Assignments_all() {
   return _rows('Assignments').data.map(r => ({
@@ -12,12 +23,20 @@ function Assignments_all() {
     status:         String(r[3] || 'pending'),
     score:          r[4] == null ? '' : String(r[4]),
     responsibility: r[5] == null ? '' : String(r[5]),
-    feedback:       r[6] == null ? '' : String(r[6])
+    feedback:       r[6] == null ? '' : String(r[6]),
+    tutor:          r[7] == null ? '' : String(r[7])
   }));
 }
 
 function Assignments_get(id) {
   return Assignments_all().find(function(a) { return a.id === String(id); }) || null;
+}
+
+function Assignments_isTuteeOf(user, assignment) {
+  if (!user || !assignment || user.role !== 'tutor') return false;
+  if (String(assignment.tutor) !== String(user.id)) return false;
+  const u = Users_get(assignment.user_id);
+  return !!(u && u.role === 'trainee');
 }
 
 function Assignments_canEditFeedback(user, assignment) {
@@ -27,7 +46,21 @@ function Assignments_canEditFeedback(user, assignment) {
     const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
     return traineeIds.indexOf(assignment.user_id) !== -1;
   }
+  if (user.role === 'tutor') return Assignments_isTuteeOf(user, assignment);
   return false;
+}
+
+function Assignments_canEditScore(user, assignment) {
+  if (!user || !assignment) return false;
+  if (user.role === 'admin') return true;
+  if (user.role === 'tutor') return Assignments_isTuteeOf(user, assignment);
+  return false;
+}
+
+function Assignments_byTutor(tutorId) {
+  return Assignments_all().filter(function(a) {
+    return String(a.tutor) === String(tutorId);
+  });
 }
 
 function Assignments_byUser(userId) {
@@ -51,7 +84,7 @@ function Assignments_assign(p) {
   if (exists) return Views_exercise({ sid: p.sid, id: exId, info: 'החייל כבר משתתף בתרגיל.' });
 
   const id = 'A' + new Date().getTime();
-  _append('Assignments', [id, exId, userId, 'pending', '', resp]);
+  _append('Assignments', _assignmentRow(id, exId, userId, 'pending', '', resp, '', ''));
   return Views_exercise({ sid: p.sid, id: exId, info: 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.' });
 }
 
@@ -120,7 +153,7 @@ function Assignments_assignTeam(exerciseId, teamId, sid) {
   toAssign.forEach(function(item){
     if (existing.indexOf(item.user.id) !== -1) { skipped++; return; }
     const aid = 'A' + new Date().getTime() + '_' + added;
-    newRows.push([aid, exerciseId, item.user.id, 'pending', '', item.resp]);
+    newRows.push(_assignmentRow(aid, exerciseId, item.user.id, 'pending', '', item.resp, '', ''));
     added++;
   });
   if (newRows.length) _appendBatch('Assignments', newRows);
@@ -499,14 +532,10 @@ function Assignments_autoAssignAll(p) {
           continue;
         }
 
-        const row = [
+        const row = _assignmentRow(
           'A' + Date.now() + '_' + exIdx + '_' + stats.added,
-          ex.id,
-          user.id,
-          'pending',
-          '',
-          slot.resp
-        ];
+          ex.id, user.id, 'pending', '', slot.resp, '', ''
+        );
         allRows.push(row);
         _addUserToExerciseMap(userExMap, user.id, ex.id);
         stats.added++;
@@ -526,14 +555,10 @@ function Assignments_autoAssignAll(p) {
           continue;
         }
 
-        const row = [
+        const row = _assignmentRow(
           'A' + Date.now() + '_' + exIdx + '_c' + stats.added,
-          ex.id,
-          user.id,
-          'pending',
-          '',
-          cmdSlot.resp
-        ];
+          ex.id, user.id, 'pending', '', cmdSlot.resp, '', ''
+        );
         allRows.push(row);
         _addUserToExerciseMap(userExMap, user.id, ex.id);
         stats.added++;
@@ -575,26 +600,41 @@ function Assignments_clearAll(p) {
   return Views_assign({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
 }
 
-// Update assignment fields (score, status, responsibility) — admin only
-// PERF: batch-write all changed cells in one setValues call
+// Update assignment fields — admin: all; tutor: score only for assigned tutee
 function Assignments_update(p) {
-  Auth_requireRole(p, ['admin']);
+  const u = Auth_require(p);
   const aid  = (p.assignmentId || '').trim();
   const exId = (p.exerciseId   || '').trim();
   if (!aid) throw new Error('חסר מזהה הקצאה.');
+
+  const assignment = Assignments_get(aid);
+  if (!assignment) throw new Error('ההקצאה לא נמצאה.');
 
   const row = _findRowIndex('Assignments', aid);
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
 
   const sh = _sheet('Assignments');
-  // Columns D=status, E=score, F=responsibility (explicit cells — avoids getRange ambiguity)
+
+  if (u.role === 'tutor') {
+    if (!Assignments_canEditScore(u, assignment)) {
+      throw new Error('אין הרשאה לעדכן ציון להקצאה זו.');
+    }
+    sh.getRange(row, 5).setValue(String(p.score != null ? p.score : '').trim());
+    _cacheInvalidate('Assignments');
+    return Views_exercise({ sid: p.sid, id: exId || assignment.exercise_id, info: 'הציון נשמר.' });
+  }
+
+  if (u.role !== 'admin') throw new Error('אין הרשאה לפעולה זו.');
+
   const newStatus = String(p.status != null ? p.status : '').trim();
   const newScore  = String(p.score  != null ? p.score  : '').trim();
   const newResp   = String(p.responsibility != null ? p.responsibility : '').trim();
+  const newTutor  = String(p.tutor != null ? p.tutor : '').trim();
 
   sh.getRange(row, 4).setValue(newStatus || 'pending');
   sh.getRange(row, 5).setValue(newScore);
   sh.getRange(row, 6).setValue(newResp);
+  sh.getRange(row, 8).setValue(newTutor);
   _cacheInvalidate('Assignments');
 
   return Views_exercise({ sid: p.sid, id: exId, info: 'פרטי המשתתף עודכנו בהצלחה.' });
@@ -602,7 +642,7 @@ function Assignments_update(p) {
 
 // Save free-text feedback on trainee performance in an exercise
 function Assignments_saveFeedback(p) {
-  const user = Auth_requireRole(p, ['admin', 'commander']);
+  const user = Auth_requireRole(p, ['admin', 'commander', 'tutor']);
   const aid  = (p.assignmentId || '').trim();
   const exId = (p.exerciseId || p.id || '').trim();
   if (!aid) throw new Error('חסר מזהה הקצאה.');
@@ -639,7 +679,7 @@ function assignFromBoard(sid, exId, userId, resp) {
   if (existing.length) throw new Error('החייל כבר משובץ לתרגיל זה.');
 
   var id = 'A' + new Date().getTime();
-  _append('Assignments', [id, exId, userId, 'pending', '', resp || '']);
+  _append('Assignments', _assignmentRow(id, exId, userId, 'pending', '', resp || '', '', ''));
   return { id: id, exercise_id: exId, user_id: userId, status: 'pending', responsibility: resp || '' };
 }
 

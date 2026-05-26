@@ -222,7 +222,11 @@ function _extraProfileFields(target) {
 }
 
 function _roleHe(r) {
-  return r === 'admin' ? 'מפקד קורס' : r === 'commander' ? 'מפקד צוות' : r === 'trainee' ? 'חניך' : r;
+  if (r === 'admin') return 'מפקד קורס';
+  if (r === 'commander') return 'מפקד צוות';
+  if (r === 'tutor') return 'חונך';
+  if (r === 'trainee') return 'חניך';
+  return r;
 }
 
 function _statusHe(s) {
@@ -244,7 +248,7 @@ function _drawerNavItems(user) {
       { page: 'timeline', label: 'ציר זמן', icon: '📅' },
       { page: 'assign', label: 'לוח שיבוץ', icon: '🔀' }
     );
-  } else if (user.role === 'commander') {
+  } else if (user.role === 'commander' || user.role === 'tutor') {
     items.push({ page: 'timeline', label: 'ציר זמן', icon: '📅' });
   }
   return items;
@@ -348,6 +352,7 @@ function Views_dashboard(p) {
   let content = '';
   if (user.role === 'admin')          content = _adminDashboard(sid);
   else if (user.role === 'commander') content = _commanderDashboard(user, sid);
+  else if (user.role === 'tutor')     content = _tutorDashboard(user, sid);
   else                                content = _traineeDashboard(user, sid);
 
   const body = _topbar(user, sid) +
