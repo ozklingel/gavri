@@ -35,11 +35,11 @@ function _usersTab(sid) {
     s += '<div class="empty">אין משתמשים</div>';
   } else {
     s += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
-      '<th>מס׳ אישי</th><th>שם</th><th>תפקיד</th><th>צוות</th><th>פעולות</th></tr></thead><tbody>';
+      '<th>שיוך חיילי</th><th>שם</th><th>תפקיד</th><th>צוות</th><th>פעולות</th></tr></thead><tbody>';
     users.forEach(function(u) {
       const team = u.team_id ? Teams_get(u.team_id) : null;
       s += '<tr>' +
-        '<td class="mono">' + _esc(u.id) + '</td>' +
+        '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td>' + _userLink(u.id, u.name, '') + '</td>' +
         '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : 'muted') + '</td>' +
         '<td>' + _esc(team ? team.name : '—') + '</td>' +
@@ -113,8 +113,14 @@ function _teamsTab(sid) {
       if (members.length) {
         s += '<ul style="margin:8px 0 0;padding:0;list-style:none">';
         members.forEach(function(m) {
+          let sub = '';
+          if (m.role === 'trainee' && m.military_affiliation) {
+            sub = ' <span style="font-size:10px;color:var(--muted)">' + _esc(m.military_affiliation) + '</span>';
+          } else if (m.role !== 'trainee') {
+            sub = ' <span class="mono" style="font-size:10px">' + _esc(m.id) + '</span>';
+          }
           s += '<li style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
-            '<span>' + _esc(m.name) + ' <span class="mono" style="font-size:10px">' + m.id + '</span></span>' +
+            '<span>' + _esc(m.name) + sub + '</span>' +
             _formOpen('form-inline') +
             '<input type="hidden" name="action" value="removeMember">' +
             '<input type="hidden" name="userId" value="' + _esc(m.id) + '">' +
