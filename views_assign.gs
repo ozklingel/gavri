@@ -44,9 +44,15 @@ function Views_assign(p) {
     exMap[a.exercise_id].push({ id: a.id, userId: a.user_id, resp: a.responsibility, status: a.status });
   });
 
-  // Unassigned users (not assigned to any exercise)
-  const assignedUserIds = new Set(assigns.map(function(a) { return a.user_id; }));
-  const unassigned = allUsers.filter(function(u) { return !assignedUserIds.has(u.id); });
+  // Unassigned = users with no row in Assignments (any exercise)
+  const assignedUserIds = {};
+  assigns.forEach(function(a) {
+    const uid = String(a.user_id || '').trim();
+    if (uid) assignedUserIds[uid] = true;
+  });
+  const unassigned = allUsers.filter(function(u) {
+    return !assignedUserIds[String(u.id).trim()];
+  });
 
   const jsonData = JSON.stringify({
     exercises: exData,
@@ -564,7 +570,29 @@ function _assignBoardJs() {
   }
 
   // ── Render board ──
+  function rebuildUnassigned() {
+    var assignedIds = {};
+    Object.keys(data.exMap).forEach(function(exId) {
+      (data.exMap[exId] || []).forEach(function(a) {
+        var uid = String(a.userId || '').trim();
+        if (uid) assignedIds[uid] = true;
+      });
+    });
+    var list = [];
+    Object.keys(data.userMap).forEach(function(uid) {
+      if (assignedIds[uid]) return;
+      var u = data.userMap[uid];
+      if (!u) return;
+      list.push({ id: uid, name: u.name, role: u.role });
+    });
+    list.sort(function(a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+    });
+    data.unassigned = list;
+  }
+
   function render() {
+    rebuildUnassigned();
     hideUserPopoverForce();
     board.innerHTML = '';
 
@@ -625,10 +653,6 @@ function _assignBoardJs() {
             status: 'pending'
           });
 
-          data.unassigned = data.unassigned.filter(function(u) {
-            return u.id !== userId;
-          });
-
           render();
 
           setStatus('✓ שובץ בהצלחה', '#4ade80');
@@ -659,14 +683,6 @@ function _assignBoardJs() {
 
           data.exMap[fromExId] = data.exMap[fromExId].filter(function(x) {
             return x.id !== assignId;
-          });
-        }
-
-        if (userId && data.userMap[userId]) {
-          data.unassigned.push({
-            id: userId,
-            name: data.userMap[userId].name,
-            role: data.userMap[userId].role
           });
         }
 
