@@ -18,12 +18,23 @@ function Views_assign(p) {
   const exData = exercises.map(function(e) {
     return { id: e.id, title: e.title, start: e.start_date || '', end: e.end_date || '' };
   });
+  const teamById = {};
+  Teams_all().forEach(function(t) { teamById[t.id] = t.name; });
+
   const userMap = {};
   allUsers.forEach(function(u) {
     userMap[u.id] = {
       name: u.name,
       role: u.role,
-      corps: String(u.military_affiliation || '').replace(/״/g, '').trim()
+      corps: String(u.military_affiliation || '').replace(/״/g, '').trim(),
+      teamId: u.team_id,
+      teamName: u.team_id ? (teamById[u.team_id] || u.team_id) : '',
+      unitAffiliation: String(u.unit_affiliation || ''),
+      serviceType: String(u.service_type || ''),
+      militaryAffiliation: String(u.military_affiliation || ''),
+      unitClassification: String(u.unit_classification || ''),
+      targetRole: String(u.target_role || ''),
+      phone: String(u.phone || '')
     };
   });
 
@@ -62,7 +73,7 @@ function Views_assign(p) {
     '</div></div>' +
 
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
-    '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד' +
+    '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד · ריחוף או לחיצה ארוכה לפרטים אישיים' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:14px">' +
     _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
@@ -75,6 +86,10 @@ function Views_assign(p) {
     '<script id="assignData" type="application/json">' + jsonData + '</script>' +
     '<input type="hidden" id="assignSid" value="' + _esc(sid) + '">' +
     _respDatalistHtml('assignRespList') +
+    '<div id="assignUserPopover" role="tooltip" style="display:none;position:fixed;z-index:10000;' +
+    'max-width:280px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border2);' +
+    'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-family:var(--mono);font-size:11px;' +
+    'color:var(--text1);pointer-events:none;line-height:1.45"></div>' +
 
     // Board
     '<div id="assignBoard" style="display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:16px">' +
@@ -103,6 +118,136 @@ function _assignBoardJs() {
 
   var ROLE_LABELS = { admin: 'מפקד קורס', commander: 'מפקד צוות', trainee: 'חניך' };
   var ROLE_COLORS = { admin: '#4ade80', commander: '#60a5fa', trainee: '#94a3b8' };
+  var popoverPinned = false;
+  var hoverTimer = null;
+  var popoverAnchor = null;
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function profileRow(label, val) {
+    if (!val) return '';
+    return '<div style="display:flex;gap:8px;margin-bottom:3px">' +
+      '<span style="color:var(--muted);flex-shrink:0">' + escHtml(label) + '</span>' +
+      '<span style="word-break:break-word">' + escHtml(val) + '</span></div>';
+  }
+
+  function buildProfileHtml(u) {
+    if (!u) return '';
+    var h = '<div style="font-weight:700;margin-bottom:8px;font-size:12px">' + escHtml(u.name) +
+      ' <span style="font-weight:400;color:var(--muted)">' + escHtml(u.id || '') + '</span></div>';
+    h += profileRow('תפקיד', ROLE_LABELS[u.role] || u.role);
+    h += profileRow('צוות', u.teamName);
+    h += profileRow('טלפון', u.phone);
+    h += profileRow('שיוך יחידתי', u.unitAffiliation);
+    h += profileRow('סוג שירות', u.serviceType);
+    h += profileRow('שיוך חיילי', u.militaryAffiliation);
+    h += profileRow('אפיון יחידתי', u.unitClassification);
+    h += profileRow('תפקיד מיועד', u.targetRole);
+    return h;
+  }
+
+  function getPopover() {
+    return document.getElementById('assignUserPopover');
+  }
+
+  function positionPopover(anchor) {
+    var pop = getPopover();
+    if (!pop || !anchor) return;
+    pop.style.display = 'block';
+    var rect = anchor.getBoundingClientRect();
+    var pw = pop.offsetWidth || 260;
+    var ph = pop.offsetHeight || 120;
+    var left = rect.left;
+    var top = rect.bottom + 6;
+    if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+    if (left < 8) left = 8;
+    if (top + ph > window.innerHeight - 8) top = rect.top - ph - 6;
+    if (top < 8) top = 8;
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+
+  function showUserPopover(userId, anchor, pin) {
+    var u = data.userMap[userId];
+    var pop = getPopover();
+    if (!pop || !u) return;
+    popoverPinned = !!pin;
+    popoverAnchor = anchor;
+    pop.innerHTML = buildProfileHtml(u);
+    positionPopover(anchor);
+  }
+
+  function hideUserPopover() {
+    if (popoverPinned) return;
+    var pop = getPopover();
+    if (pop) pop.style.display = 'none';
+    popoverAnchor = null;
+  }
+
+  function hideUserPopoverForce() {
+    popoverPinned = false;
+    var pop = getPopover();
+    if (pop) pop.style.display = 'none';
+    popoverAnchor = null;
+  }
+
+  function attachProfileHints(chipEl, userId) {
+    var longPressTimer = null;
+    var longPressTriggered = false;
+
+    chipEl.addEventListener('mouseenter', function() {
+      if (chipEl.dataset.editing === '1') return;
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function() {
+        if (!popoverPinned) showUserPopover(userId, chipEl, false);
+      }, 350);
+    });
+
+    chipEl.addEventListener('mouseleave', function() {
+      clearTimeout(hoverTimer);
+      if (!popoverPinned) hideUserPopover();
+    });
+
+    chipEl.addEventListener('pointerdown', function(e) {
+      if (e.target.closest && e.target.closest('.assign-chip-del')) return;
+      if (chipEl.dataset.editing === '1') return;
+      longPressTriggered = false;
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(function() {
+        longPressTriggered = true;
+        showUserPopover(userId, chipEl, true);
+      }, 500);
+    });
+
+    chipEl.addEventListener('pointerup', function() {
+      clearTimeout(longPressTimer);
+    });
+
+    chipEl.addEventListener('pointercancel', function() {
+      clearTimeout(longPressTimer);
+    });
+
+    chipEl.addEventListener('pointerleave', function() {
+      clearTimeout(longPressTimer);
+    });
+
+    chipEl.addEventListener('click', function(e) {
+      if (longPressTriggered) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    }, true);
+  }
+
+  document.addEventListener('pointerdown', function(e) {
+    if (!popoverPinned) return;
+    if (e.target.closest && (e.target.closest('#assignUserPopover') || e.target.closest('.assign-chip'))) return;
+    hideUserPopoverForce();
+  });
 
   function setStatus(msg, color) {
     status.textContent = msg;
@@ -136,6 +281,7 @@ function _assignBoardJs() {
   }
 
   function openRespEditor(chipEl, assignId, exId, userId, currentResp, userName) {
+    hideUserPopoverForce();
     if (editingChip && editingChip !== chipEl) closeRespEditor(editingChip);
     if (chipEl.dataset.editing === '1') return;
     editingChip = chipEl;
@@ -304,6 +450,7 @@ function _assignBoardJs() {
     }
 
     var del = document.createElement('span');
+    del.className = 'assign-chip-del';
     del.textContent = '✕';
     del.title = 'הסר מתרגיל';
     del.style.cssText = 'color:var(--muted);cursor:pointer;padding:0 2px;flex-shrink:0';
@@ -327,6 +474,8 @@ function _assignBoardJs() {
     div.addEventListener('dragend', function() {
       div.style.opacity = '1';
     });
+
+    attachProfileHints(div, userId);
 
     return div;
   }
@@ -416,6 +565,7 @@ function _assignBoardJs() {
 
   // ── Render board ──
   function render() {
+    hideUserPopoverForce();
     board.innerHTML = '';
 
     // Unassigned column
