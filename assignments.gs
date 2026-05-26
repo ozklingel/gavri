@@ -275,6 +275,14 @@ function Assignments_autoAssignAll(p) {
 
   const userExMap = _buildUserExerciseMap(allAssigns);
 
+  const userById = {};
+  allUsers.forEach(function(u) { userById[u.id] = u; });
+
+  const teamCommanderId = {};
+  Teams_all().forEach(function(t) {
+    if (t.id && t.commander_id) teamCommanderId[String(t.id)] = String(t.commander_id);
+  });
+
   const trainees = allUsers
     .filter(function(u) { return u.role === 'trainee'; })
     .sort(function(a, b) { return priority(b) - priority(a); });
@@ -395,15 +403,58 @@ function Assignments_autoAssignAll(p) {
     return pickBestTrainee(candidates, preferredTeam);
   }
 
-  function pickCommander(exId, exIdx, onEx) {
+  function pickCommander(exId, exIdx, onEx, dominantTeam) {
     if (!commanders.length) return null;
+    const candidates = [];
     for (let j = 0; j < commanders.length; j++) {
       const c = commanders[(exIdx + j) % commanders.length];
       if (onEx[c.id]) continue;
       if (_userTimeConflict(c.id, exId, exRanges, userExMap)) continue;
-      return c;
+      candidates.push(c);
     }
-    return null;
+    if (!candidates.length) return null;
+
+    function commanderScore(c) {
+      let s = 0;
+      if (dominantTeam) {
+        if (teamCommanderId[dominantTeam] === String(c.id)) s += 10000;
+        if (String(c.team_id) === String(dominantTeam)) s += 5000;
+      }
+      s -= assignCount(c.id, allRows) * 10;
+      return s;
+    }
+
+    candidates.sort(function(a, b) {
+      const diff = commanderScore(b) - commanderScore(a);
+      if (diff !== 0) return diff;
+      return a.id.localeCompare(b.id);
+    });
+    return candidates[0];
+  }
+
+  function teamCountsOnExercise(exId, pendingRows) {
+    const teamCount = {};
+    function countTrainee(userId) {
+      const u = userById[userId];
+      if (!u || u.role !== 'trainee' || !u.team_id) return;
+      const tid = String(u.team_id);
+      teamCount[tid] = (teamCount[tid] || 0) + 1;
+    }
+    allAssigns.forEach(function(a) {
+      if (String(a.exercise_id) === String(exId)) countTrainee(a.user_id);
+    });
+    pendingRows.forEach(function(r) {
+      if (String(r[1]) === String(exId)) countTrainee(r[2]);
+    });
+    return teamCount;
+  }
+
+  function dominantTeamOnExercise(exId, pendingRows) {
+    const teamCount = teamCountsOnExercise(exId, pendingRows);
+    const keys = Object.keys(teamCount).sort(function(a, b) {
+      return teamCount[b] - teamCount[a];
+    });
+    return keys[0] || '';
   }
 
   function preferredTeamForEx(exId, onEx) {
@@ -430,20 +481,18 @@ function Assignments_autoAssignAll(p) {
   };
 
   sortedExercises.forEach(function(ex, exIdx) {
-    const preferredTeam = preferredTeamForEx(ex.id, onExercise(ex.id, allRows));
+    const onExStart = onExercise(ex.id, allRows);
+    let preferredTeam = dominantTeamOnExercise(ex.id, allRows);
+    if (!preferredTeam) preferredTeam = preferredTeamForEx(ex.id, onExStart);
 
     SLOTS.forEach(function(slot) {
+      if (slot.kind === 'commander') return;
+
       const need = slot.count - respCount(ex.id, slot.resp, allRows);
       for (let n = 0; n < need; n++) {
         const onEx = onExercise(ex.id, allRows);
-        let user = null;
-
-        if (slot.kind === 'commander') {
-          user = pickCommander(ex.id, exIdx, onEx);
-        } else {
-          const pool = corpsPools[slot.corpsKey] || [];
-          user = pickTrainee(pool, ex.id, preferredTeam, onEx);
-        }
+        const pool = corpsPools[slot.corpsKey] || [];
+        const user = pickTrainee(pool, ex.id, preferredTeam, onEx);
 
         if (!user) {
           stats.slotsMissing++;
@@ -463,6 +512,33 @@ function Assignments_autoAssignAll(p) {
         stats.added++;
       }
     });
+
+    const dominantTeam = dominantTeamOnExercise(ex.id, allRows);
+    const cmdSlot = SLOTS.filter(function(s) { return s.kind === 'commander'; })[0];
+    if (cmdSlot) {
+      const need = cmdSlot.count - respCount(ex.id, cmdSlot.resp, allRows);
+      for (let n = 0; n < need; n++) {
+        const onEx = onExercise(ex.id, allRows);
+        const user = pickCommander(ex.id, exIdx, onEx, dominantTeam);
+
+        if (!user) {
+          stats.slotsMissing++;
+          continue;
+        }
+
+        const row = [
+          'A' + Date.now() + '_' + exIdx + '_c' + stats.added,
+          ex.id,
+          user.id,
+          'pending',
+          '',
+          cmdSlot.resp
+        ];
+        allRows.push(row);
+        _addUserToExerciseMap(userExMap, user.id, ex.id);
+        stats.added++;
+      }
+    }
 
     const filled = SLOTS.reduce(function(sum, slot) {
       return sum + Math.min(slot.count, respCount(ex.id, slot.resp, allRows));
