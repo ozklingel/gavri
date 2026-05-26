@@ -223,51 +223,6 @@ s += _confirmDelete(
     if (!available.length) {
       indivForm = '<div class="empty">כל המשתמשים כבר הוקצו</div>';
     } else {
-const respOptions = [
-  'מפ חיר א',
-  'סמפ חיר א',
-  'חונך מפ א',
-  'מפ חיר ב',
-  'סמפ חיר ב',
-  'חונך מפ ב',
-  'מפ מסייעת',
-  'סמפ מסייעת',
-  'חונך מפ מסייעת',
-  'מפ חהן',
-  'סמפ חהן',
-  'חנוך מפ חהן',
-  'מפ חשן',
-  'סמפ חשן',
-  'חונך מפ חשן',
-
-  'מנהל התרגיל (מפקץ / מחט)',
-  'רען ק בטיחות (מלי)',
-  'קמבץ מנהל תרגיל (קמפ)',
-  'בקר שטח וצלם (ארזים)',
-  'מטיס רחפן תחקור (ארזים)',
-  'מפעיל מגנט (בגירה)',
-  'מנהל לחימה (ארזים)',
-  'מסח (מרהש - מלי)',
-  'קלח (ארזים)',
-  'ע קלח (השלמה חיילית לוגיסטיקה)',
-  'קמן (ארזים)',
-  'מדריכת שוב (מח שוב מלפק)',
-
-  'מפקד אחראי גדוד',
-
-  'מגד (חניך קמג)',
-  'מפקד מכלול מבצעים (חניך קמג)',
-  'קמבץ גדוד (חניך קמפ)',
-  'מ חפק מגד רגלי (ממ מגדוד שתפ)',
-  'קשא (השלמה חיילית)',
-  'קשרג (השלמה חילית)',
-  'קמן (השלמה חיילית)',
-  'קסג (השלמה חיילית)',
-  'קמן (השלמה חיילית)',
-  'קשרג (השלמה חיילית)',
-  'מ מכלול מנהלה (חניך קמפ)',
-  'חונך מפ חלג'
-];
       const userOptions = available.map(function(u){ return [u.id, u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')']; });
       indivForm =
         _formOpen() +
@@ -277,7 +232,7 @@ const respOptions = [
         '<div class="form-row"><label class="form-label">חייל</label>' + _select('userId', userOptions) + '</div>' +
         '<div class="form-row"><label class="form-label">תפקיד</label>' +
         '<input name="responsibility" list="respList" placeholder="בחר או הקלד..." class="form-input" required>' +
-        '<datalist id="respList">' + respOptions.map(function(r){ return '<option value="' + r + '">'; }).join('') + '</datalist>' +
+        _respDatalistHtml('respList') +
         '</div>' +
         _submitBtn('➤ הקצה חייל', 'btn btn-primary') +
         '</form>';

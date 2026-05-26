@@ -590,3 +590,25 @@ function moveAssignmentById(sid, assignId, toExId) {
   _cacheInvalidate('Assignments');
   return { ok: true };
 }
+
+// Update responsibility from assignment board (inline edit)
+function updateAssignmentRespFromBoard(sid, assignId, exerciseId, responsibility) {
+  var p = { sid: sid };
+  Auth_requireRole(p, ['admin']);
+  if (!assignId) throw new Error('חסר מזהה הקצאה.');
+  var resp = String(responsibility || '').trim();
+  if (!resp) throw new Error('יש לציין תפקיד.');
+
+  var row = _findRowIndex('Assignments', assignId);
+  if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
+
+  var sh = _sheet('Assignments');
+  var exId = String(sh.getRange(row, 2).getValue());
+  if (exerciseId && String(exerciseId) !== exId) {
+    throw new Error('ההקצאה אינה שייכת לתרגיל זה.');
+  }
+
+  sh.getRange(row, 6).setValue(resp);
+  _cacheInvalidate('Assignments');
+  return { ok: true, responsibility: resp };
+}

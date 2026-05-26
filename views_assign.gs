@@ -48,7 +48,8 @@ function Views_assign(p) {
       { key: 'חהן', label: 'חה״ן' },
       { key: 'מסייעת', label: 'מסייעת' },
       { key: 'מנהלי', label: 'מנהלי' }
-    ]
+    ],
+    respOptions: _assignmentRespOptions()
   });
 
   const body = _topbar(user, sid) +
@@ -61,7 +62,7 @@ function Views_assign(p) {
     '</div></div>' +
 
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
-    '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה' +
+    '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:14px">' +
     _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
@@ -73,6 +74,7 @@ function Views_assign(p) {
     // Data island
     '<script id="assignData" type="application/json">' + jsonData + '</script>' +
     '<input type="hidden" id="assignSid" value="' + _esc(sid) + '">' +
+    _respDatalistHtml('assignRespList') +
 
     // Board
     '<div id="assignBoard" style="display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:16px">' +
@@ -105,6 +107,103 @@ function _assignBoardJs() {
   function setStatus(msg, color) {
     status.textContent = msg;
     status.style.color = color || 'var(--muted)';
+  }
+
+  var editingChip = null;
+
+  function saveAssignmentResp(assignId, exId, newResp) {
+    if (!newResp) { alert('יש לציין תפקיד'); return; }
+    setStatus('⏳ מעדכן תפקיד...', '#fbbf24');
+    showPageLoader('// UPDATING ROLE...');
+    google.script.run
+      .withSuccessHandler(function() {
+        hidePageLoader();
+        var list = data.exMap[exId];
+        if (list) {
+          list.forEach(function(a) {
+            if (a.id === assignId) a.resp = newResp;
+          });
+        }
+        editingChip = null;
+        render();
+        setStatus('✓ תפקיד עודכן', '#4ade80');
+      })
+      .withFailureHandler(function(err) {
+        hidePageLoader();
+        setStatus('✗ ' + err.message, '#f87171');
+      })
+      .updateAssignmentRespFromBoard(sid, assignId, exId, newResp);
+  }
+
+  function openRespEditor(chipEl, assignId, exId, userId, currentResp, userName) {
+    if (editingChip && editingChip !== chipEl) closeRespEditor(editingChip);
+    if (chipEl.dataset.editing === '1') return;
+    editingChip = chipEl;
+    chipEl.dataset.editing = '1';
+    chipEl.draggable = false;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'assign-resp-edit';
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%';
+    wrap.onclick = function(e) { e.stopPropagation(); };
+
+    var lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:10px;color:var(--muted)';
+    lbl.textContent = userName + ' — תפקיד';
+
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'form-input';
+    inp.setAttribute('list', 'assignRespList');
+    inp.placeholder = 'בחר או הקלד...';
+    inp.value = currentResp || '';
+    inp.style.cssText = 'width:100%;font-size:11px';
+
+    var btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;gap:4px';
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn btn-primary btn-sm';
+    saveBtn.textContent = 'שמור';
+    saveBtn.onclick = function(e) {
+      e.stopPropagation();
+      saveAssignmentResp(assignId, exId, inp.value.trim());
+    };
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn btn-secondary btn-sm';
+    cancelBtn.textContent = 'ביטול';
+    cancelBtn.onclick = function(e) {
+      e.stopPropagation();
+      closeRespEditor(chipEl);
+      render();
+    };
+
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveBtn.click(); }
+      if (e.key === 'Escape') { e.preventDefault(); cancelBtn.click(); }
+    });
+
+    btns.appendChild(saveBtn);
+    btns.appendChild(cancelBtn);
+    wrap.appendChild(lbl);
+    wrap.appendChild(inp);
+    wrap.appendChild(btns);
+
+    chipEl._respEditBackup = chipEl.innerHTML;
+    chipEl.innerHTML = '';
+    chipEl.appendChild(wrap);
+    inp.focus();
+    inp.select();
+  }
+
+  function closeRespEditor(chipEl) {
+    if (!chipEl) return;
+    chipEl.dataset.editing = '0';
+    chipEl.draggable = true;
+    if (editingChip === chipEl) editingChip = null;
   }
 
   function countAssignments(userId) {
@@ -194,6 +293,15 @@ function _assignBoardJs() {
     var txt = document.createElement('span');
     txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
     txt.textContent = u.name + (resp ? ' · ' + resp : '');
+
+    if (assignId && exId && exId !== '__unassigned__') {
+      txt.style.cursor = 'pointer';
+      txt.title = 'לחץ לשינוי תפקיד';
+      txt.onclick = function(e) {
+        e.stopPropagation();
+        openRespEditor(div, assignId, exId, userId, resp, u.name);
+      };
+    }
 
     var del = document.createElement('span');
     del.textContent = '✕';
