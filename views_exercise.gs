@@ -150,8 +150,32 @@ s += _confirmDelete(
         '</tr>';
     });
     pHtml += '</tbody></table></div>';
+  } else if (user.role === 'trainee') {
+    const myAssign = parts.find(function(a) { return String(a.user_id) === String(user.id); });
+    if (myAssign) {
+      pHtml += '<div class="card-body" style="border-bottom:1px solid var(--border);padding:10px 14px">' +
+        '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">השיבוץ שלי</div>' +
+        '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">' +
+        '<span><span style="color:var(--muted)">תפקיד: </span><b>' + _esc(myAssign.responsibility) + '</b></span>' +
+        '<span><span style="color:var(--muted)">סטטוס: </span>' + _statusBadge(myAssign.status) + '</span>' +
+        '<span><span style="color:var(--muted)">ציון: </span>' +
+        (myAssign.score ? _badge(myAssign.score, 'green') : '—') + '</span>' +
+        '</div></div>';
+    }
+    pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
+      '<th>שם</th><th>תפקיד</th>' +
+      '</tr></thead><tbody>';
+    parts.forEach(function(a) {
+      const u = Users_get(a.user_id);
+      const isSelf = String(a.user_id) === String(user.id);
+      pHtml += '<tr' + (isSelf ? ' style="background:rgba(74,222,128,0.06)"' : '') + '>' +
+        '<td>' + (isSelf ? '<b>' + _esc(u ? u.name : a.user_id) + '</b>' : _esc(u ? u.name : a.user_id)) + '</td>' +
+        '<td>' + _esc(a.responsibility) + '</td>' +
+        '</tr>';
+    });
+    pHtml += '</tbody></table></div>';
   } else {
-    // Non-admin: read-only table (+ משוב for commander)
+    // מפקד צוות: read-only + משוב לחניכי הצוות
     const showFeedback = user.role === 'commander';
     pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
       '<th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
