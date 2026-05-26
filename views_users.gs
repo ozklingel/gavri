@@ -44,11 +44,6 @@ function _usersTab(sid) {
         '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : 'muted') + '</td>' +
         '<td>' + _esc(team ? team.name : '—') + '</td>' +
         '<td class="actions" style="white-space:nowrap">' +
-        _formOpen('form-inline') +
-        '<input type="hidden" name="action" value="updateRole">' +
-        '<input type="hidden" name="targetId" value="' + _esc(u.id) + '">' +
-        _select('newRole', [['admin','מפקד קורס'],['commander','מפקד צוות'],['trainee','חניך']], u.role) +
-        '<button type="submit" class="btn btn-secondary btn-sm">תפקיד</button></form> ' +
         _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?') +
         '</td></tr>';
     });
