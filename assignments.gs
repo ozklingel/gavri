@@ -245,11 +245,11 @@ function Assignments_autoAssignAll(p) {
 
   const SLOTS = [
     { kind: 'commander', resp: 'מפקד צוות', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.SUP, resp: 'מסייעת', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.ARM, resp: 'חשן', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.INF, resp: 'חי״ר', count: 2 },
-    { kind: 'corps', corpsKey: CORPS.ENG, resp: 'חה״ן', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.ADM, resp: 'מנהלי', count: 1 }
+    { kind: 'corps', corpsKey: CORPS.SUP, resp: 'מפ מסייעת', count: 1 },
+    { kind: 'corps', corpsKey: CORPS.ARM, resp: 'מפ חשן', count: 1 },
+    { kind: 'corps', corpsKey: CORPS.INF, resp: 'מפ חי״ר', count: 2 },
+    { kind: 'corps', corpsKey: CORPS.ENG, resp: 'מפ חה״ן', count: 1 },
+    { kind: 'corps', corpsKey: CORPS.ADM, resp: 'מפ מנהלי', count: 1 }
   ];
 
   function priority(u) {
