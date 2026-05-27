@@ -1,13 +1,12 @@
 // series_builder.gs — automatic exercise series scheduling (admin)
+// סדרה = כל התרגילים במערכת; כל רשומה = תרגיל יום (6ש) או תרגיל לילה (9ש), ללא ציר זמן פנימי.
 
-var SERIES_PREP_NIGHT_H = 11;
-var SERIES_PREP_DAY_H = 12;
-var SERIES_MAIN_H = 8;
+var SERIES_NIGHT_H = 9;
+var SERIES_DAY_H = 6;
 var SERIES_GAP_MS = 18 * 3600000;
 var SERIES_MAX_CONCURRENT = 3;
-var SERIES_BLOCK_START_HOUR = 18;
-var SERIES_PREP_DAY_START_H = 6;
-var SERIES_MAIN_START_H = 6;
+var SERIES_FIRST_DAY_HOUR = 6;
+var SERIES_STEP_MS = 30 * 60000;
 var SERIES_SUMMER_MONTHS = [6, 7, 8, 9];
 var SERIES_HEAT_START_H = 12;
 var SERIES_HEAT_END_H = 16;
@@ -27,16 +26,14 @@ function _seriesTypesFromParams(p) {
 function _seriesYmdToMs(ymd, hour, minute) {
   const parts = String(ymd).split('-').map(Number);
   if (parts.length !== 3) return NaN;
-  const d = new Date(parts[0], parts[1] - 1, parts[2], hour || 0, minute || 0, 0, 0);
-  return d.getTime();
+  return new Date(parts[0], parts[1] - 1, parts[2], hour || 0, minute || 0, 0, 0).getTime();
 }
 
 function _seriesMsToYmd(ms) {
   const d = new Date(ms);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + dd;
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
 }
 
 function _seriesMsToHm(ms) {
@@ -44,46 +41,25 @@ function _seriesMsToHm(ms) {
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
-function _seriesBlockPlan(blockStartMs) {
-  const prepNightStart = blockStartMs;
-  const prepNightEnd = prepNightStart + SERIES_PREP_NIGHT_H * 3600000;
-  const prepDayStart = _seriesAlignToHour(prepNightEnd, SERIES_PREP_DAY_START_H);
-  if (prepDayStart < prepNightEnd) {
-    return null;
-  }
-  const prepDayEnd = prepDayStart + SERIES_PREP_DAY_H * 3600000;
-  const mainStart = _seriesAlignToHour(prepDayEnd, SERIES_MAIN_START_H);
-  if (mainStart < prepDayEnd) {
-    return null;
-  }
-  const mainEnd = mainStart + SERIES_MAIN_H * 3600000;
-  return {
-    startMs: prepNightStart,
-    endMs: mainEnd,
-    prepNightStart: prepNightStart,
-    prepNightEnd: prepNightEnd,
-    prepDayStart: prepDayStart,
-    prepDayEnd: prepDayEnd,
-    mainStart: mainStart,
-    mainEnd: mainEnd
-  };
+function _seriesSlotDurationH(slotKind) {
+  return slotKind === 'night' ? SERIES_NIGHT_H : SERIES_DAY_H;
 }
 
-function _seriesAlignToHour(afterMs, hour) {
-  const d = new Date(afterMs);
-  const candidate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0).getTime();
-  if (candidate >= afterMs) return candidate;
-  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, hour, 0, 0, 0);
-  return next.getTime();
+function _seriesSlotPlan(startMs, slotKind) {
+  const dur = _seriesSlotDurationH(slotKind) * 3600000;
+  return {
+    startMs: startMs,
+    endMs: startMs + dur,
+    slotKind: slotKind
+  };
 }
 
 function _seriesIsSummerMonth(ms) {
   return SERIES_SUMMER_MONTHS.indexOf(new Date(ms).getMonth() + 1) !== -1;
 }
 
-function _seriesStartInForbiddenHour(ms) {
+function _seriesStartForbidden(ms) {
   const h = new Date(ms).getHours();
-  const m = new Date(ms).getMinutes();
   if (h === SERIES_FORBIDDEN_START_H) return true;
   if (_seriesIsSummerMonth(ms) && h >= SERIES_HEAT_START_H && h < SERIES_HEAT_END_H) return true;
   return false;
@@ -101,10 +77,10 @@ function _seriesFetchHolyDays(startYmd, endYmd) {
     (data.items || []).forEach(function(item) {
       const subcat = String(item.subcat || '');
       const title = String(item.title || '');
-      const yomtov = item.yomtov === true || subcat === 'shabbat' || subcat === 'holiday' ||
+      const blocked = item.yomtov === true || subcat === 'shabbat' || subcat === 'holiday' ||
         title.indexOf('Shabbat') !== -1 || title.indexOf('שבת') !== -1 ||
         title.indexOf('Erev') !== -1 || title.indexOf('ערב') !== -1;
-      if (!yomtov && subcat !== 'shabbat' && subcat !== 'yomtov') return;
+      if (!blocked && subcat !== 'shabbat' && subcat !== 'yomtov') return;
       const raw = String(item.date || '').slice(0, 10);
       if (raw) days[raw] = true;
     });
@@ -113,13 +89,9 @@ function _seriesFetchHolyDays(startYmd, endYmd) {
   }
   let cur = _seriesYmdToMs(startYmd, 12, 0);
   const end = _seriesYmdToMs(endYmd, 12, 0);
-  if (!isNaN(cur) && !isNaN(end)) {
-    while (cur <= end) {
-      if (new Date(cur).getDay() === 6) {
-        days[_seriesMsToYmd(cur)] = true;
-      }
-      cur += 86400000;
-    }
+  while (!isNaN(cur) && !isNaN(end) && cur <= end) {
+    if (new Date(cur).getDay() === 6) days[_seriesMsToYmd(cur)] = true;
+    cur += 86400000;
   }
   return days;
 }
@@ -128,7 +100,7 @@ function _seriesDayBlocked(ymd, holyDays) {
   return !!holyDays[ymd];
 }
 
-function _seriesRangeTouchesHoly(plan, holyDays) {
+function _seriesTouchesHoly(plan, holyDays) {
   let t = plan.startMs;
   while (t < plan.endMs) {
     if (_seriesDayBlocked(_seriesMsToYmd(t), holyDays)) return true;
@@ -137,33 +109,53 @@ function _seriesRangeTouchesHoly(plan, holyDays) {
   return false;
 }
 
-function _seriesOverlapsCount(plan, ranges) {
-  let n = 0;
-  ranges.forEach(function(r) {
-    if (r.startMs < plan.endMs && plan.startMs < r.endMs) n++;
-  });
-  return n;
-}
-
 function _seriesExistingRanges(rangeStartMs, rangeEndMs) {
   const out = [];
   Exercises_all().forEach(function(ex) {
     const r = _exerciseTimeRange(ex);
     if (!r) return;
     if (r.endMs < rangeStartMs || r.startMs > rangeEndMs) return;
-    out.push(r);
+    out.push({
+      startMs: r.startMs,
+      endMs: r.endMs,
+      type: String(ex.exercise_type || '').trim()
+    });
   });
   return out;
 }
 
-function _seriesCanPlace(plan, holyDays, ranges, lastEndMs) {
-  if (!plan) return false;
-  if (_seriesStartInForbiddenHour(plan.startMs)) return false;
-  if (_seriesStartInForbiddenHour(plan.mainStart)) return false;
-  if (_seriesRangeTouchesHoly(plan, holyDays)) return false;
-  if (lastEndMs && plan.startMs < lastEndMs + SERIES_GAP_MS) return false;
-  if (_seriesOverlapsCount(plan, ranges) >= SERIES_MAX_CONCURRENT) return false;
+function _seriesOverlapInfo(plan, exType, ranges) {
+  let count = 0;
+  let sameType = false;
+  ranges.forEach(function(r) {
+    if (r.startMs < plan.endMs && plan.startMs < r.endMs) {
+      count++;
+      if (r.type && exType && r.type === exType) sameType = true;
+    }
+  });
+  return { count: count, sameType: sameType };
+}
+
+function _seriesCanPlace(plan, exType, holyDays, ranges, typeLastEndMs, rangeEndMs) {
+  if (!plan || plan.endMs > rangeEndMs) return false;
+  if (_seriesStartForbidden(plan.startMs)) return false;
+  if (_seriesTouchesHoly(plan, holyDays)) return false;
+  if (typeLastEndMs && plan.startMs < typeLastEndMs + SERIES_GAP_MS) return false;
+
+  const ov = _seriesOverlapInfo(plan, exType, ranges);
+  if (ov.sameType) return false;
+  if (ov.count >= SERIES_MAX_CONCURRENT) return false;
   return true;
+}
+
+function _seriesSeriesStartMs(startYmd, holyDays) {
+  let ms = _seriesYmdToMs(startYmd, SERIES_FIRST_DAY_HOUR, 0);
+  const endGuard = ms + 400 * 86400000;
+  while (ms < endGuard && _seriesDayBlocked(_seriesMsToYmd(ms), holyDays)) {
+    ms += 86400000;
+    ms = _seriesYmdToMs(_seriesMsToYmd(ms), SERIES_FIRST_DAY_HOUR, 0);
+  }
+  return ms;
 }
 
 function _seriesBuildQueue(types) {
@@ -177,57 +169,60 @@ function _seriesBuildQueue(types) {
   return shuffled;
 }
 
+function _seriesSlotLabel(slotKind) {
+  return slotKind === 'night' ? 'תרגיל לילה' : 'תרגיל יום';
+}
+
 function Series_schedule(startYmd, endYmd, types) {
-  const rangeStartMs = _seriesYmdToMs(startYmd, 0, 0);
   const rangeEndMs = _seriesYmdToMs(endYmd, 23, 59) + 60000;
-  if (isNaN(rangeStartMs) || isNaN(rangeEndMs) || rangeEndMs <= rangeStartMs) {
+  if (isNaN(_parseRawDate(startYmd)) || isNaN(_parseRawDate(endYmd))) {
     throw new Error('טווח תאריכים לא תקין.');
   }
   if (!types.length) throw new Error('יש לציין לפחות תרגיל אחד בסדרה.');
 
   const holyDays = _seriesFetchHolyDays(startYmd, endYmd);
+  const rangeStartMs = _seriesSeriesStartMs(startYmd, holyDays);
+  if (isNaN(rangeStartMs) || rangeStartMs >= rangeEndMs) {
+    throw new Error('טווח תאריכים לא תקין.');
+  }
+
   const ranges = _seriesExistingRanges(rangeStartMs, rangeEndMs);
   const queue = _seriesBuildQueue(types);
   const placed = [];
-  let cursorMs = rangeStartMs;
-  let qi = 0;
-  let lastPlacedEnd = 0;
+  const typeLastEnd = {};
+  const slotKinds = ['day', 'night'];
 
-  while (qi < queue.length && cursorMs < rangeEndMs) {
-    const blockStart = _seriesYmdToMs(_seriesMsToYmd(cursorMs), SERIES_BLOCK_START_HOUR, 0);
-    if (blockStart < rangeStartMs) {
-      cursorMs += 86400000;
-      continue;
+  queue.forEach(function(exType) {
+    let searchMs = rangeStartMs;
+    if (typeLastEnd[exType]) {
+      searchMs = Math.max(searchMs, typeLastEnd[exType] + SERIES_GAP_MS);
     }
-    if (blockStart >= rangeEndMs) break;
 
-    const plan = _seriesBlockPlan(blockStart);
-    if (plan && plan.endMs <= rangeEndMs && _seriesCanPlace(plan, holyDays, ranges, lastPlacedEnd)) {
-      placed.push({ type: queue[qi], plan: plan });
-      ranges.push({ startMs: plan.startMs, endMs: plan.endMs });
-      lastPlacedEnd = plan.endMs;
-      cursorMs = lastPlacedEnd + SERIES_GAP_MS;
-      qi++;
-    } else {
-      cursorMs += 86400000;
+    let found = false;
+    while (!found && searchMs < rangeEndMs) {
+      for (let k = 0; k < slotKinds.length; k++) {
+        const plan = _seriesSlotPlan(searchMs, slotKinds[k]);
+        if (_seriesCanPlace(plan, exType, holyDays, ranges, typeLastEnd[exType], rangeEndMs)) {
+          placed.push({ type: exType, plan: plan });
+          ranges.push({
+            startMs: plan.startMs,
+            endMs: plan.endMs,
+            type: exType
+          });
+          typeLastEnd[exType] = plan.endMs;
+          found = true;
+          break;
+        }
+      }
+      if (!found) searchMs += SERIES_STEP_MS;
     }
-  }
+  });
 
-  const skippedCount = queue.length - qi;
   return {
     placed: placed,
-    skippedCount: skippedCount,
+    skippedCount: queue.length - placed.length,
     holyDayCount: Object.keys(holyDays).length
   };
-}
-
-function _seriesDetailRows(exId, plan, typeLabel, stamp) {
-  const s = String(stamp);
-  return [
-    ['D' + s + '_n', exId, _seriesMsToHm(plan.prepNightStart), '', 'יבש רטוב לילה'],
-    ['D' + s + '_d', exId, _seriesMsToHm(plan.prepDayStart), '', 'יבש רטוב יום'],
-    ['D' + s + '_m', exId, _seriesMsToHm(plan.mainStart), '', 'תרגיל ' + typeLabel]
-  ];
 }
 
 function Exercises_buildSeries(p) {
@@ -252,20 +247,18 @@ function Exercises_buildSeries(p) {
   }
 
   const exRows = [];
-  const detailRows = [];
   const baseTs = Date.now();
 
   result.placed.forEach(function(item, idx) {
     const plan = item.plan;
     const type = item.type;
+    const slotLabel = _seriesSlotLabel(plan.slotKind);
     const id = 'E' + baseTs + '_' + idx;
-    const title = type + ' — סדרה ' + (idx + 1);
-    const desc = 'נוצר בבניית סדרה. שלבים: יבש רטוב לילה → יבש רטוב יום → תרגיל ' + type;
 
     exRows.push([
       id,
-      title,
-      desc,
+      type + ' — ' + slotLabel + ' ' + (idx + 1),
+      'נוצר בבניית סדרה (' + slotLabel + ', ' + _seriesSlotDurationH(plan.slotKind) + ' שעות)',
       u.id,
       _seriesMsToYmd(plan.startMs),
       _seriesMsToYmd(plan.endMs),
@@ -277,13 +270,9 @@ function Exercises_buildSeries(p) {
       _seriesMsToHm(plan.startMs),
       _seriesMsToHm(plan.endMs)
     ]);
-    _seriesDetailRows(id, plan, type, baseTs + '_' + idx).forEach(function(r) {
-      detailRows.push(r);
-    });
   });
 
   if (exRows.length) _appendBatch('Exercises', exRows);
-  if (detailRows.length) _appendBatch('ExerciseDetails', detailRows);
 
   let info = '✅ נוצרו ' + result.placed.length + ' תרגילים בסדרה';
   const byType = {};
