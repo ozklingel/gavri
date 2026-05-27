@@ -216,9 +216,28 @@ s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140p
 
   return s;
 }
+function _dashCell(val) {
+  return val ? _esc(val) : '<span style="color:var(--muted)">—</span>';
+}
+
+function _commanderTraineeExercisesHtml(assigns) {
+  if (!assigns.length) {
+    return '<span style="color:var(--muted)">אין תרגילים</span>';
+  }
+  let html = '<ul style="margin:0;padding:0 18px 0 0;list-style:disc;min-width:140px">';
+  assigns.forEach(function(a) {
+    const ex = Exercises_get(a.exercise_id);
+    html += '<li style="margin:5px 0;line-height:1.4">' +
+      (ex ? _exerciseLink(ex.id, ex.title) : _esc(a.exercise_id)) +
+      '<div style="font-size:11px;margin-top:2px;color:var(--muted)">' +
+      _esc(a.responsibility || '—') + ' · ' + _statusBadge(a.status) +
+      '</div></li>';
+  });
+  return html + '</ul>';
+}
+
 // ── Commander Dashboard ──
 function _commanderDashboard(user, sid) {
-  const sidQ = encodeURIComponent(sid);
   const trainees = Users_traineesOfCommander(user.id);
 
   let s = '<div class="page-title">⊞ לוח בקרה — מפקד צוות</div>';
@@ -227,54 +246,43 @@ function _commanderDashboard(user, sid) {
     return s + '<div class="card"><div class="empty">אין חיילים מוקצים לצוות שלך עדיין</div></div>';
   }
 
-  // Summary stats
-  let totalAssigns = 0, totalDone = 0;
+  let totalAssigns = 0;
   trainees.forEach(function(t) {
-    const a = Assignments_byUser(t.id);
-    totalAssigns += a.length;
-    totalDone += a.filter(function(x){ return x.status === 'completed'; }).length;
+    totalAssigns += Assignments_byUser(t.id).length;
   });
 
   s += '<div class="grid-2" style="margin-bottom:16px">' +
-    '<div class="stat-box"><div class="stat-num">' + trainees.length + '</div><div class="stat-label">חיילים בצוות</div></div>' +
-    '<div class="stat-box"><div class="stat-num">' + totalDone + '/' + totalAssigns + '</div><div class="stat-label">הקצאות הושלמו</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + trainees.length + '</div><div class="stat-label">חניכים בצוות</div></div>' +
+    '<div class="stat-box"><div class="stat-num">' + totalAssigns + '</div><div class="stat-label">הקצאות לתרגילים</div></div>' +
     '</div>';
+
+  s += '<div class="card"><div class="card-header"><div class="card-title">🪖 חניכי הצוות</div></div>' +
+    '<div class="card-body" style="padding:0;overflow-x:auto">' +
+    '<table class="tbl"><thead><tr>' +
+    '<th>שיוך חיילי</th>' +
+    '<th>סוג שירות</th>' +
+    '<th>שם חניך</th>' +
+    '<th>פלאפון</th>' +
+    '<th>פירוט יחידה</th>' +
+    '<th>תפקיד מיועד</th>' +
+    '<th>תרגילים</th>' +
+    '</tr></thead><tbody>';
 
   trainees.forEach(function(t) {
     const assigns = Assignments_byUser(t.id);
-    let inner = '';
-    if (!assigns.length) {
-      inner = '<div class="empty">אין תרגילים מוקצים</div>';
-    } else {
-      inner = '<table class="tbl"><thead><tr>' +
-        '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>פעולה</th>' +
-        '</tr></thead><tbody>';
-      assigns.forEach(function(a) {
-        const ex = Exercises_get(a.exercise_id);
-        inner += '<tr>' +
-          '<td>' + (ex ? _exerciseLink(ex.id, ex.title) : _esc(a.exercise_id)) + '</td>' +
-          '<td>' + _esc(a.responsibility) + '</td>' +
-          '<td>' + _statusBadge(a.status) + '</td>' +
-          '<td class="actions">';
-        if (a.status !== 'completed') {
-          inner += _a('action=complete&assignmentId=' + encodeURIComponent(a.id) + '&sid=' + sidQ, '✓ סמן הושלם', 'btn btn-primary btn-sm');
-        } else {
-          inner += _badge('✓ הושלם', 'green');
-        }
-        inner += '</td></tr>';
-      });
-      inner += '</tbody></table>';
-    }
-
-    s += '<div class="collapsible" style="margin-bottom:8px">' +
-      '<button class="collapsible-toggle">🪖 ' + _esc(t.name) +
-      ' <span class="badge badge-muted" style="font-size:10px;margin-right:6px">' + assigns.length + ' תרגילים</span>' +
-      '<span class="arrow">▾</span></button>' +
-      '<div class="collapsible-content">' +
-      '<div class="card"><div class="card-body" style="padding:0">' + inner + '</div></div>' +
-      '</div></div>';
+    const unitDetail = t.unit_affiliation || t.unit_classification || '';
+    s += '<tr>' +
+      '<td>' + _dashCell(t.military_affiliation) + '</td>' +
+      '<td>' + (t.service_type ? _badge(t.service_type, 'muted') : _dashCell('')) + '</td>' +
+      '<td style="white-space:nowrap">' + _userLink(t.id, t.name, '') + '</td>' +
+      '<td class="mono" style="font-size:12px">' + _dashCell(t.phone) + '</td>' +
+      '<td>' + _dashCell(unitDetail) + '</td>' +
+      '<td>' + _dashCell(t.target_role) + '</td>' +
+      '<td>' + _commanderTraineeExercisesHtml(assigns) + '</td>' +
+      '</tr>';
   });
 
+  s += '</tbody></table></div></div>';
   return s;
 }
 

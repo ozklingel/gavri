@@ -19,24 +19,18 @@ function Views_timeline(p) {
 
   if (user.role === 'commander') {
 
-    const myTrainees =
-      Users_traineesOfCommander(user.id)
-      .map(t => t.id);
-
-    const allAssigns =
-      Assignments_all
-      ? Assignments_all()
-      : [];
-
-    exercises = exercises.filter(ex =>
-
-      ex.created_by === user.id ||
-
-      allAssigns.some(a =>
-        a.exercise_id === ex.id &&
-        myTrainees.indexOf(a.user_id) !== -1
-      )
-    );
+    const traineeIds = Users_traineesOfCommander(user.id).map(function(t) {
+      return t.id;
+    });
+    const teamExerciseIds = {};
+    (Assignments_all ? Assignments_all() : []).forEach(function(a) {
+      if (traineeIds.indexOf(a.user_id) !== -1) {
+        teamExerciseIds[a.exercise_id] = true;
+      }
+    });
+    exercises = exercises.filter(function(ex) {
+      return !!teamExerciseIds[ex.id];
+    });
 
   } else if (user.role === 'tutor') {
 
