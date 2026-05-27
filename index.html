@@ -764,6 +764,34 @@ body {
     .dp-year-btn:hover { background: var(--bg4); border-color: var(--border2); }
     .dp-year-btn.selected { background: var(--green3); color: #fff; border-color: var(--green2); }
 
+    /* ── TIMELINE WEEK / EDIT ── */
+    .timeline-track.edit-mode .tl-bar {
+      cursor: grab;
+      box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.35);
+    }
+    .timeline-track.edit-mode .tl-bar:active { cursor: grabbing; }
+    .timeline-track.edit-mode .tl-bar-link { pointer-events: none; }
+    .timeline-track.edit-mode .tl-handle {
+      display: block;
+      width: 8px;
+      min-width: 8px;
+      height: 100%;
+      cursor: ew-resize;
+      flex-shrink: 0;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .timeline-track.edit-mode .tl-handle:hover {
+      background: rgba(74, 222, 128, 0.55);
+    }
+    .timeline-track:not(.edit-mode) .tl-handle { display: none; }
+    .tl-bar.tl-saving { opacity: 0.6; pointer-events: none; }
+    #timelineEditToggle.active {
+      border-color: var(--green);
+      color: var(--green);
+      background: rgba(74, 222, 128, 0.1);
+    }
+
     /* ── ASSIGNMENTS PAGE ── */
     .user-chip {
       display: flex;
@@ -1003,6 +1031,7 @@ body {
       if (typeof initDatePickers === 'function') initDatePickers();
       initFlatpickr();
       initAppDrawer();
+      if (typeof initTimelineWeek === 'function') initTimelineWeek();
     }
 
     function initAppDrawer() {
@@ -1141,7 +1170,11 @@ body {
         el.closest('.dp-tab') ||
         el.closest('.dp-wrap') ||
         el.closest('.dp-popup') ||
-        el.closest('#page-loader');
+        el.closest('#page-loader') ||
+        el.closest('#timelineWeekSelect') ||
+        el.closest('#timelineEditToggle') ||
+        el.closest('.tl-bar') ||
+        el.closest('.tl-handle');
     }
 
     document.addEventListener('click', function(e) {
@@ -1569,6 +1602,170 @@ body {
       if (e.target && e.target.id === 'xlsxFile') onFileChange(e.target);
     });
   })();
+
+  function initTimelineWeek() {
+    var weekSel = document.getElementById('timelineWeekSelect');
+    if (weekSel && !weekSel._bound) {
+      weekSel._bound = true;
+      weekSel.addEventListener('change', function() {
+        if (!window.MapimSpa) return;
+        MapimSpa.navigate('timeline', { week: parseInt(weekSel.value, 10) || 0 });
+      });
+    }
+
+    var track = document.getElementById('timelineTrack');
+    var editBtn = document.getElementById('timelineEditToggle');
+    var hint = document.getElementById('timelineEditHint');
+    if (!track || track.getAttribute('data-can-edit') !== '1') return;
+
+    var MIN_MS = 30 * 60 * 1000;
+    var drag = null;
+
+    function weekMs() {
+      return (+track.dataset.weekEnd) - (+track.dataset.weekStart);
+    }
+
+    function clampRange(startMs, endMs) {
+      var ws = +track.dataset.weekStart;
+      var we = +track.dataset.weekEnd;
+      if (endMs - startMs < MIN_MS) endMs = startMs + MIN_MS;
+      if (startMs < ws) {
+        endMs += ws - startMs;
+        startMs = ws;
+      }
+      if (endMs > we) {
+        startMs -= endMs - we;
+        endMs = we;
+      }
+      if (endMs - startMs < MIN_MS) return null;
+      return { startMs: startMs, endMs: endMs };
+    }
+
+    function msToParts(ms) {
+      var d = new Date(ms);
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var dd = String(d.getDate()).padStart(2, '0');
+      return {
+        date: y + '-' + m + '-' + dd,
+        time: String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+      };
+    }
+
+    function applyBar(bar, startMs, endMs) {
+      var w = weekMs();
+      var ws = +track.dataset.weekStart;
+      var rightPct = ((startMs - ws) / w) * 100;
+      var widthPct = ((endMs - startMs) / w) * 100;
+      bar.style.right = rightPct + '%';
+      bar.style.width = Math.max(widthPct, 1.5) + '%';
+      bar.dataset.startMs = String(startMs);
+      bar.dataset.endMs = String(endMs);
+    }
+
+    function pointerToMs(clientX) {
+      var rect = track.getBoundingClientRect();
+      var fromRight = rect.right - clientX;
+      var pct = Math.max(0, Math.min(1, fromRight / rect.width));
+      return +track.dataset.weekStart + pct * weekMs();
+    }
+
+    function saveBar(bar) {
+      var startMs = +bar.dataset.startMs;
+      var endMs = +bar.dataset.endMs;
+      var origStart = +bar.getAttribute('data-orig-start');
+      var origEnd = +bar.getAttribute('data-orig-end');
+      if (startMs === origStart && endMs === origEnd) return;
+
+      var s = msToParts(startMs);
+      var e = msToParts(endMs);
+      bar.classList.add('tl-saving');
+      MapimSpa.showLoader('// SAVING...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          bar.classList.remove('tl-saving');
+          MapimSpa.applyResult(result);
+        })
+        .withFailureHandler(function(err) {
+          bar.classList.remove('tl-saving');
+          MapimSpa.hideLoader();
+          applyBar(bar, origStart, origEnd);
+          alert(err && err.message ? err.message : String(err));
+        })
+        .apiUpdateExerciseTimes(
+          MapimSpa.getSid(),
+          bar.dataset.exerciseId,
+          s.date, s.time, e.date, e.time,
+          track.dataset.weekOffset || '0'
+        );
+    }
+
+    if (editBtn && !editBtn._bound) {
+      editBtn._bound = true;
+      editBtn.addEventListener('click', function() {
+        var on = track.classList.toggle('edit-mode');
+        editBtn.classList.toggle('active', on);
+        editBtn.textContent = on ? '✓ יציאה מעריכה' : '✏ מצב עריכה';
+        if (hint) hint.style.display = on ? 'block' : 'none';
+      });
+    }
+
+    if (track._tlBound) return;
+    track._tlBound = true;
+
+    track.addEventListener('pointerdown', function(e) {
+      if (!track.classList.contains('edit-mode')) return;
+      var bar = e.target.closest('.tl-bar');
+      if (!bar || !bar.dataset.exerciseId) return;
+      e.preventDefault();
+
+      var mode = 'move';
+      if (e.target.classList.contains('tl-handle-start')) mode = 'resizeStart';
+      if (e.target.classList.contains('tl-handle-end')) mode = 'resizeEnd';
+
+      drag = {
+        bar: bar,
+        mode: mode,
+        startX: e.clientX,
+        origStart: +bar.dataset.startMs,
+        origEnd: +bar.dataset.endMs
+      };
+      bar.setAttribute('data-orig-start', String(drag.origStart));
+      bar.setAttribute('data-orig-end', String(drag.origEnd));
+      bar.setPointerCapture(e.pointerId);
+    });
+
+    track.addEventListener('pointermove', function(e) {
+      if (!drag) return;
+      var rect = track.getBoundingClientRect();
+      var deltaMs = -((e.clientX - drag.startX) / rect.width) * weekMs();
+      var startMs = drag.origStart;
+      var endMs = drag.origEnd;
+
+      if (drag.mode === 'move') {
+        startMs += deltaMs;
+        endMs += deltaMs;
+      } else if (drag.mode === 'resizeStart') {
+        startMs = pointerToMs(e.clientX);
+      } else if (drag.mode === 'resizeEnd') {
+        endMs = pointerToMs(e.clientX);
+      }
+
+      var clamped = clampRange(startMs, endMs);
+      if (clamped) applyBar(drag.bar, clamped.startMs, clamped.endMs);
+    });
+
+    function endDrag(e) {
+      if (!drag) return;
+      var bar = drag.bar;
+      drag = null;
+      try { bar.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      saveBar(bar);
+    }
+
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+  }
 
   MapimSpa.boot();
 

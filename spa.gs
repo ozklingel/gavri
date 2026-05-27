@@ -11,6 +11,24 @@ function apiRenderPage(sid, page, paramsJson) {
 }
 
 // Direct update for participant row save (explicit params — reliable in HtmlService iframe)
+function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, endTime, week) {
+  _cacheFlush();
+  const p = {
+    sid: String(sid || '').trim(),
+    id: String(exerciseId || '').trim(),
+    start_date: String(startDate || '').trim(),
+    start_time: startTime == null ? '' : String(startTime),
+    end_date: String(endDate || '').trim(),
+    end_time: endTime == null ? '' : String(endTime),
+    week: week == null ? '0' : String(week)
+  };
+  try {
+    return _spaEnsureWrap(Exercises_updateTimes(p));
+  } catch (err) {
+    return _spaEnsureWrap(Views_error(err && err.message ? err.message : String(err), p));
+  }
+}
+
 function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, responsibility, tutor) {
   _cacheFlush();
   const p = {
@@ -104,6 +122,7 @@ function _spaDispatchAction(action, p) {
     case 'addMember':          return Teams_addMember(p);
     case 'removeMember':       return Teams_removeMember(p);
     case 'saveFeedback':       return Assignments_saveFeedback(p);
+    case 'updateExerciseTimes':return Exercises_updateTimes(p);
     default:
       throw new Error('פעולה לא מוכרת: ' + action);
   }

@@ -1,4 +1,39 @@
-// views_timeline.gs — Compact weekly timeline RTL
+// views_timeline.gs — Weekly timeline RTL + week picker + edit mode (admin)
+
+function _timelineWeekOffset(p) {
+  let w = parseInt(p && p.week != null ? p.week : 0, 10);
+  if (isNaN(w)) w = 0;
+  if (w < -3) w = -3;
+  if (w > 3) w = 3;
+  return w;
+}
+
+function _timelineWeekLabel(offset) {
+  if (offset === 0) return 'השבוע הנוכחי';
+  if (offset > 0) return offset === 1 ? 'שבוע קדימה' : offset + ' שבועות קדימה';
+  const n = -offset;
+  return n === 1 ? 'שבוע אחורה' : n + ' שבועות אחורה';
+}
+
+function _timelineParseExercise(ex) {
+  const DAY_MS  = 86400000;
+  const HOUR_MS = 3600000;
+  let startMs = _parseRawDate(ex.rawStartDate);
+  let endMs = _parseRawDate(ex.rawEndDate || ex.rawStartDate);
+  if (isNaN(startMs)) return null;
+  if (isNaN(endMs)) endMs = startMs + DAY_MS;
+  if (ex.rawStartTime) {
+    const parts = ex.rawStartTime.split(':').map(Number);
+    startMs += parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
+  }
+  if (ex.rawEndTime) {
+    const parts = ex.rawEndTime.split(':').map(Number);
+    endMs = _parseRawDate(ex.rawEndDate || ex.rawStartDate) +
+      parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
+  }
+  if (endMs <= startMs) endMs = startMs + HOUR_MS;
+  return { ex: ex, startMs: startMs, endMs: endMs };
+}
 
 function Views_timeline(p) {
 
@@ -58,22 +93,19 @@ function Views_timeline(p) {
     );
   }
 
-  // ─────────────────────────────────────
-  // Time setup
-  // ─────────────────────────────────────
+  const weekOffset = _timelineWeekOffset(p);
+  const canEdit = user.role === 'admin';
 
   const nowMs   = Date.now();
   const nowDate = new Date(nowMs);
-
   const DAY_MS  = 86400000;
-  const HOUR_MS = 3600000;
 
-  const dow = nowDate.getDay();
+  const baseWeek = new Date(nowDate);
+  baseWeek.setHours(0, 0, 0, 0);
+  baseWeek.setDate(nowDate.getDate() - nowDate.getDay());
 
-  const weekStart = new Date(nowDate);
-
-  weekStart.setHours(0,0,0,0);
-  weekStart.setDate(nowDate.getDate() - dow);
+  const weekStart = new Date(baseWeek);
+  weekStart.setDate(baseWeek.getDate() + weekOffset * 7);
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 7);
@@ -81,62 +113,7 @@ function Views_timeline(p) {
   const weekStartMs = weekStart.getTime();
   const weekEndMs   = weekEnd.getTime();
 
-  // ─────────────────────────────────────
-  // Parse exercises
-  // ─────────────────────────────────────
-
-  const parsed = exercises.map(ex => {
-
-    let startMs =
-      _parseRawDate(ex.rawStartDate);
-
-    let endMs =
-      _parseRawDate(
-        ex.rawEndDate || ex.rawStartDate
-      );
-
-    if (isNaN(startMs)) {
-      return null;
-    }
-
-    if (isNaN(endMs)) {
-      endMs = startMs + DAY_MS;
-    }
-
-    if (ex.rawStartTime) {
-
-      const [sh, sm] =
-        ex.rawStartTime
-        .split(':')
-        .map(Number);
-
-      startMs +=
-        sh * HOUR_MS +
-        sm * 60000;
-    }
-
-    if (ex.rawEndTime) {
-
-      const [eh, em] =
-        ex.rawEndTime
-        .split(':')
-        .map(Number);
-
-      endMs =
-        _parseRawDate(
-          ex.rawEndDate || ex.rawStartDate
-        ) +
-        eh * HOUR_MS +
-        em * 60000;
-    }
-
-    return {
-      ex,
-      startMs,
-      endMs
-    };
-
-  }).filter(Boolean);
+  const parsed = exercises.map(_timelineParseExercise).filter(Boolean);
 
   const weekItems = parsed.filter(item =>
 
@@ -181,16 +158,35 @@ function Views_timeline(p) {
 
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
 
-  s += '<div class="page-title" style="margin:0">📅 השבוע הקרוב</div>';
+  s += '<div class="page-title" style="margin:0">📅 ציר זמן — ' + _esc(_timelineWeekLabel(weekOffset)) + '</div>';
 
-  s += '<div style="display:flex;gap:6px">';
+  s += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
 
-  s += _a(
-    'page=dashboard&sid=' + sidQ,
-    '← לוח בקרה',
-    'btn btn-ghost btn-sm'
-  );
+  if (weekOffset > -3) {
+    s += '<a href="#" class="btn btn-secondary btn-sm" data-spa-page="timeline"' +
+      _spaParamsAttr({ week: weekOffset - 1 }) + '>שבוע →</a>';
+  }
+  if (weekOffset < 3) {
+    s += '<a href="#" class="btn btn-secondary btn-sm" data-spa-page="timeline"' +
+      _spaParamsAttr({ week: weekOffset + 1 }) + '>← שבוע</a>';
+  }
+  if (weekOffset !== 0) {
+    s += '<a href="#" class="btn btn-ghost btn-sm" data-spa-page="timeline"' +
+      _spaParamsAttr({ week: 0 }) + '>היום</a>';
+  }
 
+  s += '<select id="timelineWeekSelect" class="form-select" style="width:auto;min-width:150px;font-size:12px">';
+  for (let w = -3; w <= 3; w++) {
+    s += '<option value="' + w + '"' + (w === weekOffset ? ' selected' : '') + '>' +
+      _esc(_timelineWeekLabel(w)) + '</option>';
+  }
+  s += '</select>';
+
+  if (canEdit) {
+    s += '<button type="button" id="timelineEditToggle" class="btn btn-ghost btn-sm">✏ מצב עריכה</button>';
+  }
+
+  s += _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
   s += '</div>';
   s += '</div>';
 
@@ -198,7 +194,7 @@ function Views_timeline(p) {
   // Timeline card
   // ─────────────────────────────────────
 
-  s += '<div class="card" style="overflow:hidden;margin-bottom:20px">';
+  s += '<div class="card" style="overflow:hidden;margin-bottom:20px" id="timelineWeekCard">';
 
   const wStartFmt =
     weekStart.getDate() +
@@ -229,9 +225,14 @@ function Views_timeline(p) {
   // Timeline
   // ─────────────────────────────────────
 
-  s += '<div style="position:relative;height:' +
-       Math.max(320, weekItems.length * 42 + 40) +
-       'px;background:var(--bg2)">';
+  const trackH = Math.max(320, weekItems.length * 44 + 48);
+
+  s += '<div id="timelineTrack" class="timeline-track" style="position:relative;height:' +
+       trackH + 'px;background:var(--bg2)"' +
+       ' data-week-start="' + weekStartMs + '"' +
+       ' data-week-end="' + weekEndMs + '"' +
+       ' data-week-offset="' + weekOffset + '"' +
+       ' data-can-edit="' + (canEdit ? '1' : '0') + '">';
 
   // vertical day lines RTL
 
@@ -259,8 +260,11 @@ function Views_timeline(p) {
     const dayDate =
       new Date(dayStart);
 
-    const isToday =
-      d === nowDate.getDay();
+    const dayMs = weekStartMs + d * DAY_MS;
+    const isTodayDay =
+      weekOffset === 0 &&
+      nowMs >= dayMs &&
+      nowMs < dayMs + DAY_MS;
 
     s += '<div style="' +
          'position:absolute;' +
@@ -274,14 +278,14 @@ function Views_timeline(p) {
          'align-items:center;' +
          'justify-content:center;' +
 
-         (isToday
+         (isTodayDay
            ? 'background:rgba(74,222,128,0.06);'
            : '') +
 
          '">' +
 
          '<div style="font-family:var(--mono);font-size:12px;font-weight:bold;color:' +
-         (isToday ? 'var(--green)' : 'var(--text2)') +
+         (isTodayDay ? 'var(--green)' : 'var(--text2)') +
          '">' +
 
          DAY_LABELS[d] +
@@ -299,81 +303,57 @@ function Views_timeline(p) {
          '</div>';
   }
 
-  // now line RTL
+  if (weekOffset === 0 && nowMs >= weekStartMs && nowMs < weekEndMs) {
+    const nowOffset = ((nowMs - weekStartMs) / (7 * DAY_MS)) * 100;
+    s += '<div class="timeline-now" style="' +
+         'position:absolute;top:42px;bottom:0;right:' + nowOffset + '%;width:2px;' +
+         'background:var(--green);z-index:30"></div>';
+  }
 
-  const nowOffset =
-    ((nowMs - weekStartMs) / (7 * DAY_MS)) * 100;
+  weekItems.forEach(function(item, idx) {
+    const startPct = ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
+    const widthPct = ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
+    const topPx = 52 + idx * 44;
+    const color = COLORS[idx % COLORS.length];
+    const isPast = item.endMs < nowMs;
 
-  s += '<div style="' +
-       'position:absolute;' +
-       'top:42px;' +
-       'bottom:0;' +
-       'right:' + nowOffset + '%;' +
-       'width:2px;' +
-       'background:var(--green);' +
-       'z-index:30">' +
-       '</div>';
+    const barStyle =
+      'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;' +
+      'width:' + Math.max(widthPct, 1.5) + '%;height:32px;' +
+      'background:' + color + '22;border:1px solid ' + color + ';border-radius:8px;' +
+      'padding:0 6px;overflow:hidden;color:var(--text);opacity:' + (isPast ? '0.55' : '1') + ';' +
+      'z-index:10;display:flex;align-items:center;box-sizing:border-box';
 
-  // exercises RTL
+    const dataAttrs =
+      ' data-tl-bar="1" data-exercise-id="' + _esc(item.ex.id) + '"' +
+      ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';
 
-  weekItems.forEach((item, idx) => {
-
-    const startPct =
-      ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
-
-    const widthPct =
-      ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
-
-    const topPx =
-      52 + idx * 42;
-
-    const color =
-      COLORS[idx % COLORS.length];
-
-    const isPast =
-      item.endMs < nowMs;
-
-    s += '<a ' + _spaBarLink('exercise', { id: item.ex.id }) + ' style="' +
-
-         'position:absolute;' +
-         'top:' + topPx + 'px;' +
-         'right:' + startPct + '%;' +
-         'width:' + Math.max(widthPct, 2) + '%;' +
-         'height:30px;' +
-
-         'background:' + color + '22;' +
-         'border:1px solid ' + color + ';' +
-         'border-radius:8px;' +
-
-         'padding:4px 6px;' +
-         'overflow:hidden;' +
-         'text-decoration:none;' +
-         'color:var(--text);' +
-         'opacity:' + (isPast ? '0.5' : '1') + ';' +
-         'z-index:10">' +
-
-         '<div style="' +
-         'font-size:11px;' +
-         'font-weight:bold;' +
-         'white-space:nowrap;' +
-         'overflow:hidden;' +
-         'text-overflow:ellipsis">' +
-
-         _esc(item.ex.title) +
-
-         '</div>' +
-
-         '</a>';
+    if (canEdit) {
+      s += '<div class="tl-bar"' + dataAttrs + ' style="' + barStyle + '">' +
+        '<span class="tl-handle tl-handle-start" title="שינוי התחלה"></span>' +
+        '<span class="tl-bar-label" style="flex:1;font-size:11px;font-weight:bold;white-space:nowrap;' +
+        'overflow:hidden;text-overflow:ellipsis;text-align:center">' + _esc(item.ex.title) + '</span>' +
+        '<span class="tl-handle tl-handle-end" title="שינוי סיום"></span>' +
+        '</div>';
+    } else {
+      s += '<a class="tl-bar tl-bar-link"' + dataAttrs + ' ' + _spaBarLink('exercise', { id: item.ex.id }) +
+        ' style="' + barStyle + 'text-decoration:none">' +
+        '<span class="tl-bar-label" style="font-size:11px;font-weight:bold;white-space:nowrap;' +
+        'overflow:hidden;text-overflow:ellipsis">' + _esc(item.ex.title) + '</span></a>';
+    }
   });
 
   s += '</div>';
+
+  if (canEdit) {
+    s += '<div id="timelineEditHint" style="display:none;padding:8px 14px;border-top:1px solid var(--border);' +
+      'font-size:11px;color:var(--muted);font-family:var(--mono)">' +
+      'מצב עריכה: גרור להזזה · ידית ימין = התחלה · ידית שמאל = סיום (RTL)</div>';
+  }
+
   s += '</div>';
 
-  // ─────────────────────────────────────
-  // Table
-  // ─────────────────────────────────────
-
-  s += '<div class="page-title" style="margin-top:10px">📋 כל התרגילים</div>';
+  s += '<div class="page-title" style="margin-top:10px">📋 תרגילים בשבוע זה</div>';
 
   s += '<div class="card" style="padding:0">';
 
@@ -390,9 +370,10 @@ function Views_timeline(p) {
 
   s += '</tr></thead><tbody>';
 
-  parsed
-    .sort((a,b) => a.startMs - b.startMs)
-    .forEach(item => {
+  weekItems
+    .slice()
+    .sort(function(a, b) { return a.startMs - b.startMs; })
+    .forEach(function(item) {
 
       const ex = item.ex;
 

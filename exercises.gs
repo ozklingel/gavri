@@ -198,6 +198,29 @@ function Exercises_edit(p) {
   return Views_exercise({ sid: p.sid, id: p.id, info: 'התרגיל עודכן בהצלחה.' });
 }
 
+// Update only schedule fields (timeline drag / resize)
+function Exercises_updateTimes(p) {
+  Auth_requireRole(p, ['admin']);
+  const id = String(p.id || '').trim();
+  if (!id) throw new Error('חסר מזהה תרגיל.');
+  const row = _findRowIndex('Exercises', id);
+  if (row < 0) throw new Error('התרגיל לא נמצא.');
+
+  const sh = _sheet('Exercises');
+  sh.getRange(row, 5).setValue(String(p.start_date || '').trim());
+  sh.getRange(row, 6).setValue(String(p.end_date || '').trim());
+  sh.getRange(row, 12).setValue(String(p.start_time != null ? p.start_time : '').trim());
+  sh.getRange(row, 13).setValue(String(p.end_time != null ? p.end_time : '').trim());
+  _cacheInvalidate('Exercises');
+
+  const week = p.week != null ? String(p.week) : '0';
+  return Views_timeline({
+    sid: p.sid,
+    week: week,
+    info: 'זמני התרגיל עודכנו.'
+  });
+}
+
 function Exercises_duplicate(p) {
   const u    = Auth_requireRole(p, ['admin']);
   const orig = Exercises_get(p.id);
