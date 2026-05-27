@@ -15,7 +15,7 @@ function Views_exercises(p) {
     s += '<div class="empty">אין תרגילים במערכת</div>';
   } else {
     s += '<table class="tbl"><thead><tr>' +
-      '<th>שם</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
+      '<th>שם</th><th>סוג</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
       '</tr></thead><tbody>';
 
     exs.forEach(function(e) {
@@ -24,6 +24,7 @@ function Views_exercises(p) {
           '<div class="ex-title">' + _esc(e.title) + '</div>' +
           '<div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div>' +
         '</td>' +
+        '<td>' + (e.exercise_type ? _badge(e.exercise_type, 'muted') : '—') + '</td>' +
         '<td>' + _esc(e.start_date || '—') + '</td>' +
         '<td>' + _esc(e.end_date || '—') + '</td>' +
         '<td style="text-align:left;white-space:nowrap">' +
@@ -102,6 +103,38 @@ function Views_exercises(p) {
       _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +
     '</form>' +
     '</div></div>';
+
+  s += '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">📅 בניית סדרה</div></div>' +
+    '<div class="card-body">' +
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">' +
+    'יצירת תרגילים אוטומטית בטווח תאריכים לפי מכסות סוג (חיר / חשן / 900). ' +
+    'לכל תרגיל: יבש רטוב לילה → יבש רטוב יום → תרגיל עיקרי.</p>' +
+    '<ul style="font-size:11px;color:var(--muted);margin:0 0 14px 18px;line-height:1.6">' +
+    '<li>ללא שבתות וחגים (Hebcal + שבת)</li>' +
+    '<li>לא התחלה בין 05:00–06:00</li>' +
+    '<li>מינימום 18 שעות בין בלוק לבלוק</li>' +
+    '<li>עד 3 תרגילים במקביל (כולל קיימים)</li>' +
+    '<li>בקיץ (יוני–ספט׳) ללא התחלה 12:00–16:00</li>' +
+    '</ul>' +
+    _formOpen() +
+    '<input type="hidden" name="action" value="buildSeries">' +
+    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">מתאריך</label>' +
+    '<input type="text" name="series_start" class="form-input datepicker" required></div>' +
+    '<div class="form-row"><label class="form-label">עד תאריך</label>' +
+    '<input type="text" name="series_end" class="form-input datepicker" required></div>' +
+    '</div>' +
+    '<div class="form-grid" style="margin-top:8px">' +
+    '<div class="form-row"><label class="form-label">חיר</label>' +
+    '<input type="number" name="count_chir" class="form-input" min="0" value="0" required></div>' +
+    '<div class="form-row"><label class="form-label">חשן</label>' +
+    '<input type="number" name="count_chashan" class="form-input" min="0" value="0" required></div>' +
+    '<div class="form-row"><label class="form-label">900</label>' +
+    '<input type="number" name="count_900" class="form-input" min="0" value="0" required></div>' +
+    '</div>' +
+    _submitBtn('בנה סדרה', 'btn btn-primary btn-full') +
+    '</form></div></div>';
 
   s += '</div></div>';
 

@@ -79,6 +79,7 @@ function _spaDispatchAction(action, p) {
     case 'login':              return Auth_login(p);
     case 'logout':             return Auth_logout(p);
     case 'createExercise':     return Exercises_create(p);
+    case 'buildSeries':        return Exercises_buildSeries(p);
     case 'editExercise':       return Exercises_edit(p);
     case 'duplicateExercise':  return Exercises_duplicate(p);
     case 'deleteExercise':     return Exercises_delete(p);
