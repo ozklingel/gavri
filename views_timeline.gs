@@ -42,21 +42,75 @@ function _timelineAttrEsc(s) {
     .replace(/</g, '&lt;');
 }
 
-function _timelineAssignLanes(items) {
-  const sorted = items.slice().sort(function(a, b) { return a.startMs - b.startMs; });
-  const laneEnds = [];
-  sorted.forEach(function(item) {
-    let lane = 0;
-    for (; lane < laneEnds.length; lane++) {
-      if (item.startMs >= laneEnds[lane]) break;
-    }
-    if (lane === laneEnds.length) laneEnds.push(0);
-    laneEnds[lane] = item.endMs;
-    item.lane = lane;
-  });
-  let maxLane = 0;
+function _timelineNormalizeType(ex) {
+  const t = String(ex.exercise_type || '').replace(/״/g, '').trim();
+  if (t === '900' || t.indexOf('900') !== -1) return '900';
+  if (t.indexOf('חשן') !== -1) return 'חשן';
+  if (t.indexOf('חיר') !== -1 || t.indexOf('חי') !== -1) return 'חיר';
+  return 'אחר';
+}
+
+var TIMELINE_TYPE_LANES = {
+  'חיר': 0,
+  'חשן': 1,
+  '900': 2
+};
+
+var TIMELINE_TYPE_COLORS = {
+  'חיר': '#4ade80',
+  'חשן': '#60a5fa',
+  '900': '#fbbf24',
+  'אחר': '#c084fc'
+};
+
+function _timelineMsToHmLocal(ms) {
+  const d = new Date(ms);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function _timelineMsToYmdLocal(ms) {
+  const d = new Date(ms);
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function _timelineWeekTableRowsHtml(items, sidQ) {
+  let s = '';
   items.forEach(function(item) {
-    if (item.lane > maxLane) maxLane = item.lane;
+    const ex = item.ex;
+    const typeKey = item.typeKey || _timelineNormalizeType(ex);
+    const startYmd = _timelineMsToYmdLocal(item.startMs);
+    const endYmd = _timelineMsToYmdLocal(item.endMs);
+    const startHm = _timelineMsToHmLocal(item.startMs);
+    const endHm = _timelineMsToHmLocal(item.endMs);
+    s += '<tr data-exercise-id="' + _timelineAttrEsc(ex.id) + '">' +
+      '<td>' + _badge(typeKey, typeKey === 'חיר' ? 'green' : typeKey === 'חשן' ? 'blue' : 'yellow') + '</td>' +
+      '<td><b>' + _esc(ex.title) + '</b></td>' +
+      '<td class="mono">' + _esc(startYmd) + '</td>' +
+      '<td class="mono">' + _esc(startHm) + '</td>' +
+      '<td class="mono">' + _esc(endYmd) + '</td>' +
+      '<td class="mono">' + _esc(endHm) + '</td>' +
+      '<td><a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: ex.id }) +
+      ' class="btn btn-secondary btn-sm">↗</a></td></tr>';
+  });
+  if (!items.length) {
+    s += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
+  }
+  return s;
+}
+
+function _timelineAssignTypeLanes(items) {
+  let maxLane = 2;
+  items.forEach(function(item) {
+    const typeKey = _timelineNormalizeType(item.ex);
+    item.typeKey = typeKey;
+    if (TIMELINE_TYPE_LANES.hasOwnProperty(typeKey)) {
+      item.lane = TIMELINE_TYPE_LANES[typeKey];
+    } else {
+      item.lane = 3;
+      if (item.lane > maxLane) maxLane = item.lane;
+    }
   });
   return maxLane;
 }
@@ -147,8 +201,11 @@ function Views_timeline(p) {
     item.endMs > weekStartMs
   );
 
-  weekItems.sort(function(a, b) { return a.startMs - b.startMs; });
-  const maxLane = _timelineAssignLanes(weekItems);
+  const maxLane = _timelineAssignTypeLanes(weekItems);
+  weekItems.sort(function(a, b) {
+    if (a.lane !== b.lane) return a.lane - b.lane;
+    return a.startMs - b.startMs;
+  });
 
   // ─────────────────────────────────────
   // UI
@@ -252,14 +309,27 @@ function Views_timeline(p) {
   // Timeline
   // ─────────────────────────────────────
 
-  const trackH = Math.max(320, (maxLane + 1) * 44 + 48);
+  const rowCount = maxLane + 1;
+  const trackH = Math.max(200, 52 + rowCount * 44 + 12);
 
   s += '<div id="timelineTrack" class="timeline-track" style="position:relative;height:' +
-       trackH + 'px;background:var(--bg2)"' +
+       trackH + 'px;background:var(--bg2);padding-right:36px' +
        ' data-week-start="' + weekStartMs + '"' +
        ' data-week-end="' + weekEndMs + '"' +
        ' data-week-offset="' + weekOffset + '"' +
+       ' data-sid-q="' + _timelineAttrEsc(sidQ) + '"' +
        ' data-can-edit="' + (canEdit ? '1' : '0') + '">';
+
+  const rowLabels = [
+    { lane: 0, label: 'חי״ר' },
+    { lane: 1, label: 'חשן' },
+    { lane: 2, label: '900' }
+  ];
+  rowLabels.forEach(function(row) {
+    s += '<div class="timeline-row-label" style="position:absolute;right:4px;top:' +
+      (52 + row.lane * 44 + 8) + 'px;font-family:var(--mono);font-size:10px;color:var(--muted);' +
+      'z-index:5;pointer-events:none">' + row.label + '</div>';
+  });
 
   // vertical day lines RTL
 
@@ -341,7 +411,7 @@ function Views_timeline(p) {
     const startPct = ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
     const widthPct = ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
     const topPx = 52 + (item.lane || 0) * 44;
-    const color = COLORS[idx % COLORS.length];
+    const color = TIMELINE_TYPE_COLORS[item.typeKey] || COLORS[idx % COLORS.length];
     const isPast = item.endMs < nowMs;
     const exId = String(item.ex.id);
     const barDomId = 'tl-bar-' + exId.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -356,6 +426,8 @@ function Views_timeline(p) {
     const dataAttrs =
       ' id="' + _timelineAttrEsc(barDomId) + '"' +
       ' data-tl-bar="1" data-exercise-id="' + _timelineAttrEsc(exId) + '"' +
+      ' data-exercise-type="' + _timelineAttrEsc(item.typeKey || '') + '"' +
+      ' data-lane="' + (item.lane || 0) + '"' +
       ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';
 
     if (canEdit) {
@@ -385,12 +457,13 @@ function Views_timeline(p) {
 
   s += '<div class="page-title" style="margin-top:10px">📋 תרגילים בשבוע זה</div>';
 
-  s += '<div class="card" style="padding:0">';
+  s += '<div class="card" style="padding:0" id="timelineWeekTableCard">';
 
-  s += '<table class="tbl">';
+  s += '<table class="tbl" id="timelineWeekTable">';
 
   s += '<thead><tr>';
 
+  s += '<th>סוג</th>';
   s += '<th>שם</th>';
   s += '<th>התחלה</th>';
   s += '<th>שעה</th>';
@@ -398,51 +471,9 @@ function Views_timeline(p) {
   s += '<th>שעה</th>';
   s += '<th>פתיחה</th>';
 
-  s += '</tr></thead><tbody>';
+  s += '</tr></thead><tbody id="timelineWeekTableBody">';
 
-  weekItems
-    .slice()
-    .sort(function(a, b) { return a.startMs - b.startMs; })
-    .forEach(function(item) {
-
-      const ex = item.ex;
-
-      s += '<tr>';
-
-      s += '<td><b>' +
-           _esc(ex.title) +
-           '</b></td>';
-
-      s += '<td class="mono">' +
-           _esc(ex.start_date || '—') +
-           '</td>';
-
-      s += '<td class="mono">' +
-           _esc(ex.rawStartTime || '—') +
-           '</td>';
-
-      s += '<td class="mono">' +
-           _esc(ex.end_date || '—') +
-           '</td>';
-
-      s += '<td class="mono">' +
-           _esc(ex.rawEndTime || '—') +
-           '</td>';
-
-      s += '<td>' +
-
-           _a(
-             'page=exercise&id=' +
-             ex.id +
-             '&sid=' + sidQ,
-             '↗',
-             'btn btn-secondary btn-sm'
-           ) +
-
-           '</td>';
-
-      s += '</tr>';
-    });
+  s += _timelineWeekTableRowsHtml(weekItems, sidQ);
 
   s += '</tbody></table>';
 
