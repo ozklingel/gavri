@@ -765,6 +765,10 @@ body {
     .dp-year-btn.selected { background: var(--green3); color: #fff; border-color: var(--green2); }
 
     /* ── TIMELINE WEEK / EDIT ── */
+    .timeline-row-label {
+      font-weight: bold;
+      letter-spacing: 0.02em;
+    }
     .timeline-track.edit-mode .tl-bar {
       cursor: grab;
       box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.35);
@@ -1772,6 +1776,46 @@ body {
       saveBar(d.exerciseId, d.origStart, d.origEnd);
     }
 
+    function refreshTimelineWeekTable() {
+      var tbody = document.getElementById('timelineWeekTableBody');
+      if (!tbody || !track) return;
+      var sidQ = track.getAttribute('data-sid-q') || '';
+      var bars = Array.prototype.slice.call(track.querySelectorAll('.tl-bar'));
+      bars.sort(function(a, b) {
+        var la = parseInt(a.getAttribute('data-lane') || '9', 10);
+        var lb = parseInt(b.getAttribute('data-lane') || '9', 10);
+        if (la !== lb) return la - lb;
+        return (+a.dataset.startMs) - (+b.dataset.startMs);
+      });
+      if (!bars.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
+        return;
+      }
+      var typeBadge = function(t) {
+        var c = t === 'חיר' ? 'green' : t === 'חשן' ? 'blue' : t === '900' ? 'yellow' : 'muted';
+        return '<span class="badge badge-' + c + '">' + t + '</span>';
+      };
+      tbody.innerHTML = bars.map(function(bar) {
+        var s = msToParts(+bar.dataset.startMs);
+        var e = msToParts(+bar.dataset.endMs);
+        var titleEl = bar.querySelector('.tl-bar-label');
+        var title = titleEl ? titleEl.textContent : '';
+        var exId = bar.getAttribute('data-exercise-id') || '';
+        var typeKey = bar.getAttribute('data-exercise-type') || '';
+        var open = '<a href="#" data-spa-page="exercise" data-spa-params="' +
+          JSON.stringify({ id: exId }).replace(/"/g, '&quot;') +
+          '" class="btn btn-secondary btn-sm">↗</a>';
+        return '<tr data-exercise-id="' + exId + '">' +
+          '<td>' + typeBadge(typeKey) + '</td>' +
+          '<td><b>' + title + '</b></td>' +
+          '<td class="mono">' + s.date + '</td>' +
+          '<td class="mono">' + s.time + '</td>' +
+          '<td class="mono">' + e.date + '</td>' +
+          '<td class="mono">' + e.time + '</td>' +
+          '<td>' + open + '</td></tr>';
+      }).join('');
+    }
+
     if (editBtn && !editBtn._bound) {
       editBtn._bound = true;
       editBtn.addEventListener('click', function() {
@@ -1779,6 +1823,7 @@ body {
         editBtn.classList.toggle('active', on);
         editBtn.textContent = on ? '✓ יציאה מעריכה' : '✏ מצב עריכה';
         if (hint) hint.style.display = on ? 'block' : 'none';
+        if (!on) refreshTimelineWeekTable();
       });
     }
 
