@@ -213,6 +213,10 @@ function Exercises_updateTimes(p) {
   sh.getRange(row, 13).setValue(String(p.end_time != null ? p.end_time : '').trim());
   _cacheInvalidate('Exercises');
 
+  if (p.timelineInline) {
+    return { ok: true, info: 'זמני התרגיל עודכנו.' };
+  }
+
   const week = p.week != null ? String(p.week) : '0';
   return Views_timeline({
     sid: p.sid,

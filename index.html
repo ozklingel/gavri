@@ -786,6 +786,11 @@ body {
     }
     .timeline-track:not(.edit-mode) .tl-handle { display: none; }
     .tl-bar.tl-saving { opacity: 0.6; pointer-events: none; }
+    .tl-bar.is-dragging {
+      z-index: 200 !important;
+      box-shadow: 0 0 0 2px var(--green), 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+    .timeline-track.edit-mode .tl-bar-label { pointer-events: none; user-select: none; }
     #timelineEditToggle.active {
       border-color: var(--green);
       color: var(--green);
@@ -1625,6 +1630,13 @@ body {
       return (+track.dataset.weekEnd) - (+track.dataset.weekStart);
     }
 
+    function getBarByExerciseId(exerciseId) {
+      if (!exerciseId) return null;
+      var domId = 'tl-bar-' + String(exerciseId).replace(/[^a-zA-Z0-9_-]/g, '_');
+      var bar = document.getElementById(domId);
+      return bar && track.contains(bar) ? bar : null;
+    }
+
     function clampRange(startMs, endMs) {
       var ws = +track.dataset.weekStart;
       var we = +track.dataset.weekEnd;
@@ -1653,6 +1665,7 @@ body {
     }
 
     function applyBar(bar, startMs, endMs) {
+      if (!bar) return;
       var w = weekMs();
       var ws = +track.dataset.weekStart;
       var rightPct = ((startMs - ws) / w) * 100;
@@ -1670,11 +1683,28 @@ body {
       return +track.dataset.weekStart + pct * weekMs();
     }
 
-    function saveBar(bar) {
+    function showTimelineFlash(msg) {
+      var card = document.getElementById('timelineWeekCard');
+      if (!card) return;
+      var el = card.querySelector('.timeline-save-flash');
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'timeline-save-flash flash flash-info';
+        el.style.margin = '0';
+        el.style.borderRadius = '0';
+        el.style.border = 'none';
+        el.style.borderBottom = '1px solid var(--border)';
+        card.insertBefore(el, card.firstChild.nextSibling);
+      }
+      el.textContent = '✓ ' + msg;
+      el.style.display = 'block';
+    }
+
+    function saveBar(exerciseId, origStart, origEnd) {
+      var bar = getBarByExerciseId(exerciseId);
+      if (!bar) return;
       var startMs = +bar.dataset.startMs;
       var endMs = +bar.dataset.endMs;
-      var origStart = +bar.getAttribute('data-orig-start');
-      var origEnd = +bar.getAttribute('data-orig-end');
       if (startMs === origStart && endMs === origEnd) return;
 
       var s = msToParts(startMs);
@@ -1684,7 +1714,10 @@ body {
       google.script.run
         .withSuccessHandler(function(result) {
           bar.classList.remove('tl-saving');
-          MapimSpa.applyResult(result);
+          MapimSpa.hideLoader();
+          bar.setAttribute('data-orig-start', String(startMs));
+          bar.setAttribute('data-orig-end', String(endMs));
+          if (result && result.info) showTimelineFlash(result.info);
         })
         .withFailureHandler(function(err) {
           bar.classList.remove('tl-saving');
@@ -1694,10 +1727,49 @@ body {
         })
         .apiUpdateExerciseTimes(
           MapimSpa.getSid(),
-          bar.dataset.exerciseId,
+          exerciseId,
           s.date, s.time, e.date, e.time,
           track.dataset.weekOffset || '0'
         );
+    }
+
+    function onPointerMove(e) {
+      if (!drag) return;
+      e.preventDefault();
+      var bar = getBarByExerciseId(drag.exerciseId);
+      if (!bar) return;
+      var rect = track.getBoundingClientRect();
+      var deltaMs = -((e.clientX - drag.startX) / rect.width) * weekMs();
+      var startMs = drag.origStart;
+      var endMs = drag.origEnd;
+
+      if (drag.mode === 'move') {
+        startMs += deltaMs;
+        endMs += deltaMs;
+      } else if (drag.mode === 'resizeStart') {
+        startMs = pointerToMs(e.clientX);
+      } else if (drag.mode === 'resizeEnd') {
+        endMs = pointerToMs(e.clientX);
+      }
+
+      var clamped = clampRange(startMs, endMs);
+      if (clamped) applyBar(bar, clamped.startMs, clamped.endMs);
+    }
+
+    function endDrag(e) {
+      if (!drag) return;
+      var d = drag;
+      drag = null;
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', endDrag);
+      document.removeEventListener('pointercancel', endDrag);
+
+      var bar = getBarByExerciseId(d.exerciseId);
+      if (bar) bar.classList.remove('is-dragging');
+      try {
+        if (bar) bar.releasePointerCapture(e.pointerId);
+      } catch (err) { /* ignore */ }
+      saveBar(d.exerciseId, d.origStart, d.origEnd);
     }
 
     if (editBtn && !editBtn._bound) {
@@ -1717,14 +1789,17 @@ body {
       if (!track.classList.contains('edit-mode')) return;
       var bar = e.target.closest('.tl-bar');
       if (!bar || !bar.dataset.exerciseId) return;
+      if (!track.contains(bar)) return;
       e.preventDefault();
+      e.stopPropagation();
 
+      var exerciseId = bar.getAttribute('data-exercise-id');
       var mode = 'move';
       if (e.target.classList.contains('tl-handle-start')) mode = 'resizeStart';
-      if (e.target.classList.contains('tl-handle-end')) mode = 'resizeEnd';
+      else if (e.target.classList.contains('tl-handle-end')) mode = 'resizeEnd';
 
       drag = {
-        bar: bar,
+        exerciseId: exerciseId,
         mode: mode,
         startX: e.clientX,
         origStart: +bar.dataset.startMs,
@@ -1732,39 +1807,13 @@ body {
       };
       bar.setAttribute('data-orig-start', String(drag.origStart));
       bar.setAttribute('data-orig-end', String(drag.origEnd));
+      bar.classList.add('is-dragging');
       bar.setPointerCapture(e.pointerId);
+
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', endDrag);
+      document.addEventListener('pointercancel', endDrag);
     });
-
-    track.addEventListener('pointermove', function(e) {
-      if (!drag) return;
-      var rect = track.getBoundingClientRect();
-      var deltaMs = -((e.clientX - drag.startX) / rect.width) * weekMs();
-      var startMs = drag.origStart;
-      var endMs = drag.origEnd;
-
-      if (drag.mode === 'move') {
-        startMs += deltaMs;
-        endMs += deltaMs;
-      } else if (drag.mode === 'resizeStart') {
-        startMs = pointerToMs(e.clientX);
-      } else if (drag.mode === 'resizeEnd') {
-        endMs = pointerToMs(e.clientX);
-      }
-
-      var clamped = clampRange(startMs, endMs);
-      if (clamped) applyBar(drag.bar, clamped.startMs, clamped.endMs);
-    });
-
-    function endDrag(e) {
-      if (!drag) return;
-      var bar = drag.bar;
-      drag = null;
-      try { bar.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      saveBar(bar);
-    }
-
-    track.addEventListener('pointerup', endDrag);
-    track.addEventListener('pointercancel', endDrag);
   }
 
   MapimSpa.boot();

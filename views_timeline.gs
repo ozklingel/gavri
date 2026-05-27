@@ -35,6 +35,32 @@ function _timelineParseExercise(ex) {
   return { ex: ex, startMs: startMs, endMs: endMs };
 }
 
+function _timelineAttrEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+function _timelineAssignLanes(items) {
+  const sorted = items.slice().sort(function(a, b) { return a.startMs - b.startMs; });
+  const laneEnds = [];
+  sorted.forEach(function(item) {
+    let lane = 0;
+    for (; lane < laneEnds.length; lane++) {
+      if (item.startMs >= laneEnds[lane]) break;
+    }
+    if (lane === laneEnds.length) laneEnds.push(0);
+    laneEnds[lane] = item.endMs;
+    item.lane = lane;
+  });
+  let maxLane = 0;
+  items.forEach(function(item) {
+    if (item.lane > maxLane) maxLane = item.lane;
+  });
+  return maxLane;
+}
+
 function Views_timeline(p) {
 
   const user = Auth_current(p);
@@ -121,7 +147,8 @@ function Views_timeline(p) {
     item.endMs > weekStartMs
   );
 
-  weekItems.sort((a,b) => a.startMs - b.startMs);
+  weekItems.sort(function(a, b) { return a.startMs - b.startMs; });
+  const maxLane = _timelineAssignLanes(weekItems);
 
   // ─────────────────────────────────────
   // UI
@@ -225,7 +252,7 @@ function Views_timeline(p) {
   // Timeline
   // ─────────────────────────────────────
 
-  const trackH = Math.max(320, weekItems.length * 44 + 48);
+  const trackH = Math.max(320, (maxLane + 1) * 44 + 48);
 
   s += '<div id="timelineTrack" class="timeline-track" style="position:relative;height:' +
        trackH + 'px;background:var(--bg2)"' +
@@ -313,19 +340,22 @@ function Views_timeline(p) {
   weekItems.forEach(function(item, idx) {
     const startPct = ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
     const widthPct = ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
-    const topPx = 52 + idx * 44;
+    const topPx = 52 + (item.lane || 0) * 44;
     const color = COLORS[idx % COLORS.length];
     const isPast = item.endMs < nowMs;
+    const exId = String(item.ex.id);
+    const barDomId = 'tl-bar-' + exId.replace(/[^a-zA-Z0-9_-]/g, '_');
 
     const barStyle =
       'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;' +
       'width:' + Math.max(widthPct, 1.5) + '%;height:32px;' +
       'background:' + color + '22;border:1px solid ' + color + ';border-radius:8px;' +
       'padding:0 6px;overflow:hidden;color:var(--text);opacity:' + (isPast ? '0.55' : '1') + ';' +
-      'z-index:10;display:flex;align-items:center;box-sizing:border-box';
+      'z-index:' + (10 + (item.lane || 0)) + ';display:flex;align-items:center;box-sizing:border-box';
 
     const dataAttrs =
-      ' data-tl-bar="1" data-exercise-id="' + _esc(item.ex.id) + '"' +
+      ' id="' + _timelineAttrEsc(barDomId) + '"' +
+      ' data-tl-bar="1" data-exercise-id="' + _timelineAttrEsc(exId) + '"' +
       ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';
 
     if (canEdit) {

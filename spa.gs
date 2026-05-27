@@ -20,7 +20,8 @@ function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, 
     start_time: startTime == null ? '' : String(startTime),
     end_date: String(endDate || '').trim(),
     end_time: endTime == null ? '' : String(endTime),
-    week: week == null ? '0' : String(week)
+    week: week == null ? '0' : String(week),
+    timelineInline: true
   };
   try {
     return _spaEnsureWrap(Exercises_updateTimes(p));
@@ -73,7 +74,7 @@ function _spaMergeParams(sid, paramsJson) {
 }
 
 function _spaEnsureWrap(result) {
-  if (result && result.body != null) return result;
+  if (result && (result.body != null || result.ok === true)) return result;
   throw new Error('תגובת שרת לא תקינה');
 }
 
