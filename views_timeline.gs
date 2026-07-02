@@ -132,7 +132,7 @@ function Views_timeline(p) {
   // Permissions
   // ─────────────────────────────────────
 
-  if (user.role === 'commander') {
+  if (Roles_isCompanyCommander(user.role)) {
 
     const traineeIds = Users_traineesOfCommander(user.id).map(function(t) {
       return t.id;
@@ -147,7 +147,7 @@ function Views_timeline(p) {
       return !!teamExerciseIds[ex.id];
     });
 
-  } else if (user.role === 'tutor') {
+  } else if (Roles_isTutor(user.role)) {
 
     const tutoredExIds = {};
     (Assignments_byTutor ? Assignments_byTutor(user.id) : []).forEach(function(a) {
@@ -158,7 +158,7 @@ function Views_timeline(p) {
       return !!tutoredExIds[ex.id];
     });
 
-  } else if (user.role === 'trainee') {
+  } else if (Roles_isTrainee(user.role)) {
 
     const myAssigns =
       Assignments_byUser
@@ -174,7 +174,7 @@ function Views_timeline(p) {
   }
 
   const weekOffset = _timelineWeekOffset(p);
-  const canEdit = user.role === 'admin';
+  const canEdit = Roles_hasAdminAccess(user.role);
 
   const nowMs   = Date.now();
   const nowDate = new Date(nowMs);

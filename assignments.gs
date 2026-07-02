@@ -33,27 +33,27 @@ function Assignments_get(id) {
 }
 
 function Assignments_isTuteeOf(user, assignment) {
-  if (!user || !assignment || user.role !== 'tutor') return false;
+  if (!user || !assignment || !Roles_isTutor(user.role)) return false;
   if (String(assignment.tutor) !== String(user.id)) return false;
   const u = Users_get(assignment.user_id);
-  return !!(u && u.role === 'trainee');
+  return !!(u && Roles_isTrainee(u.role));
 }
 
 function Assignments_canEditFeedback(user, assignment) {
   if (!user || !assignment) return false;
-  if (user.role === 'admin') return true;
-  if (user.role === 'commander') {
+  if (Roles_hasAdminAccess(user.role)) return true;
+  if (Roles_isCompanyCommander(user.role)) {
     const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
     return traineeIds.indexOf(assignment.user_id) !== -1;
   }
-  if (user.role === 'tutor') return Assignments_isTuteeOf(user, assignment);
+  if (Roles_isTutor(user.role)) return Assignments_isTuteeOf(user, assignment);
   return false;
 }
 
 function Assignments_canEditScore(user, assignment) {
   if (!user || !assignment) return false;
-  if (user.role === 'admin') return true;
-  if (user.role === 'tutor') return Assignments_isTuteeOf(user, assignment);
+  if (Roles_hasAdminAccess(user.role)) return true;
+  if (Roles_isTutor(user.role)) return Assignments_isTuteeOf(user, assignment);
   return false;
 }
 
@@ -104,12 +104,12 @@ function Assignments_remove(p) {
 
 // Mark assignment as complete (admin or commander)
 function Assignments_complete(p) {
-  const u = Auth_requireRole(p, ['admin','commander']);
+  const u = Auth_requireRole(p, ['admin', 'companyCommander', 'commander']);
   const aid = (p.assignmentId || '').trim();
   const row = _findRowIndex('Assignments', aid);
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
   const sh = _sheet('Assignments');
-  if (u.role === 'commander') {
+  if (Roles_isCompanyCommander(u.role)) {
     const userId = String(sh.getRange(row, 3).getValue());
     const trainees = Users_traineesOfCommander(u.id).map(t => t.id);
     if (trainees.indexOf(userId) === -1) throw new Error('לא ניתן לסמן הקצאה מחוץ לצוות שלך.');
@@ -136,10 +136,10 @@ function Assignments_assignTeam(exerciseId, teamId, sid) {
     commander = Users_get(team.commander_id);
   }
   if (!commander) {
-    commander = members.find(function(u){ return u.role === 'commander'; }) || null;
+    commander = members.find(function(u) { return Roles_isCompanyCommander(u.role); }) || null;
   }
 
-  const trainees = members.filter(function(u){ return u.role === 'trainee'; }).slice(0, 2);
+  const trainees = members.filter(function(u) { return Roles_isTrainee(u.role); }).slice(0, 2);
 
   const toAssign = [];
   if (commander) toAssign.push({ user: commander, resp: 'מפקד צוות' });
@@ -317,7 +317,7 @@ function Assignments_autoAssignAll(p) {
   });
 
   const trainees = allUsers
-    .filter(function(u) { return u.role === 'trainee'; })
+    .filter(function(u) { return Roles_isTrainee(u.role); })
     .sort(function(a, b) { return priority(b) - priority(a); });
 
   const corpsPools = {
@@ -328,7 +328,7 @@ function Assignments_autoAssignAll(p) {
     [CORPS.ADM]: trainees.filter(function(u) { return corps(u) === CORPS.ADM; })
   };
 
-  const commanders = shuffle(allUsers.filter(function(u) { return u.role === 'commander'; }));
+  const commanders = shuffle(allUsers.filter(function(u) { return Roles_isCompanyCommander(u.role); }));
 
   const sortedExercises = exercises.slice().sort(function(a, b) {
     const ra = exRanges[a.id];
@@ -469,7 +469,7 @@ function Assignments_autoAssignAll(p) {
     const teamCount = {};
     function countTrainee(userId) {
       const u = userById[userId];
-      if (!u || u.role !== 'trainee' || !u.team_id) return;
+      if (!u || !Roles_isTrainee(u.role) || !u.team_id) return;
       const tid = String(u.team_id);
       teamCount[tid] = (teamCount[tid] || 0) + 1;
     }
@@ -615,7 +615,7 @@ function Assignments_update(p) {
 
   const sh = _sheet('Assignments');
 
-  if (u.role === 'tutor') {
+  if (Roles_isTutor(u.role)) {
     if (!Assignments_canEditScore(u, assignment)) {
       throw new Error('אין הרשאה לעדכן ציון להקצאה זו.');
     }
@@ -624,7 +624,7 @@ function Assignments_update(p) {
     return Views_exercise({ sid: p.sid, id: exId || assignment.exercise_id, info: 'הציון נשמר.' });
   }
 
-  if (u.role !== 'admin') throw new Error('אין הרשאה לפעולה זו.');
+  if (!Roles_hasAdminAccess(u.role)) throw new Error('אין הרשאה לפעולה זו.');
 
   const newStatus = String(p.status != null ? p.status : '').trim();
   const newScore  = String(p.score  != null ? p.score  : '').trim();
@@ -642,7 +642,7 @@ function Assignments_update(p) {
 
 // Save free-text feedback on trainee performance in an exercise
 function Assignments_saveFeedback(p) {
-  const user = Auth_requireRole(p, ['admin', 'commander', 'tutor']);
+  const user = Auth_requireRole(p, ['admin', 'companyCommander', 'commander', 'tutor']);
   const aid  = (p.assignmentId || '').trim();
   const exId = (p.exerciseId || p.id || '').trim();
   if (!aid) throw new Error('חסר מזהה הקצאה.');

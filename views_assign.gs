@@ -2,7 +2,7 @@
 function Views_assign(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
-  if (user.role !== 'admin') return Views_error('גישה למפקדי קורס בלבד.', p);
+  if (!Roles_hasAdminAccess(user.role)) return Views_error('גישה לסגל בלבד.', p);
 
   const sid  = user.id;
   const sidQ = encodeURIComponent(sid);
@@ -122,8 +122,14 @@ function _assignBoardJs() {
   var status = document.getElementById('assignStatus');
   var leastPanel = document.getElementById('assignLeastPanel');
 
-  var ROLE_LABELS = { admin: 'מפקד קורס', commander: 'מפקד צוות', trainee: 'חניך' };
-  var ROLE_COLORS = { admin: '#4ade80', commander: '#60a5fa', trainee: '#94a3b8' };
+  var ROLE_LABELS = {
+    admin: 'סגל', unitCommander: 'מגד', companyCommander: 'מפ',
+    departmentCommander: 'ממ', tutor: 'חונך', trainee: 'חניך', commander: 'מפ'
+  };
+  var ROLE_COLORS = {
+    admin: '#4ade80', unitCommander: '#4ade80', companyCommander: '#60a5fa',
+    departmentCommander: '#60a5fa', tutor: '#fbbf24', trainee: '#94a3b8', commander: '#60a5fa'
+  };
   var popoverPinned = false;
   var hoverTimer = null;
   var popoverAnchor = null;

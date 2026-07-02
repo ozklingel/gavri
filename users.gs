@@ -8,7 +8,7 @@ function Users_all() {
   return _rows('Users').data.map(r => ({
     id:                    String(r[0]),
     name:                  String(r[1]),
-    role:                  String(r[2]),
+    role:                  Roles_normalize(String(r[2])),
     team_id:               String(r[3] || ''),
     unit_affiliation:      String(r[4] || ''),
     service_type:          String(r[5] || ''),
@@ -29,11 +29,29 @@ function Users_byTeam(teamId) {
   return Users_all().filter(u => u.team_id === String(teamId));
 }
 
+function Users_isTeamCommanderOf(commanderId, userId) {
+  const target = Users_get(userId);
+  if (!target || !target.team_id) return false;
+  const team = Teams_get(target.team_id);
+  return !!(team && String(team.commander_id) === String(commanderId));
+}
+
+function Users_canViewScores(viewer, targetUserId) {
+  if (!viewer || !targetUserId) return false;
+  if (String(viewer.id) === String(targetUserId)) return true;
+  const role = Roles_normalize(viewer.role);
+  if (role === 'admin' || role === 'unitCommander') return true;
+  if (Roles_isCompanyCommander(role) && Users_isTeamCommanderOf(viewer.id, targetUserId)) return true;
+  return false;
+}
+
 function Users_traineesOfCommander(commanderId) {
   const teams = _rows('Teams').data
     .filter(r => String(r[2]) === String(commanderId))
     .map(r => String(r[0]));
-  return Users_all().filter(u => u.role === 'trainee' && teams.indexOf(u.team_id) !== -1);
+  return Users_all().filter(function(u) {
+    return Roles_isTrainee(u.role) && teams.indexOf(u.team_id) !== -1;
+  });
 }
 
 // Create a new user (admin only)
@@ -48,12 +66,12 @@ function Users_create(p) {
   if (!newId)  throw new Error('נא להזין מספר אישי.');
   if (!name)   throw new Error('נא להזין שם מלא.');
   if (!pass)   throw new Error('נא להזין סיסמה.');
-  if (['admin','commander','trainee','tutor'].indexOf(role) === -1) throw new Error('תפקיד לא חוקי.');
+  if (!Roles_isValid(role)) throw new Error('תפקיד לא חוקי.');
 
   if (Users_get(newId)) throw new Error('מספר אישי ' + newId + ' כבר קיים במערכת.');
 
   _append('Users', [
-    newId, name, role, teamId,
+    newId, name, Roles_normalize(role), teamId,
     (p.unit_affiliation     || '').trim(),
     (p.service_type         || '').trim(),
     (p.military_affiliation || '').trim(),
@@ -114,11 +132,11 @@ function Users_updateRole(p) {
   const targetId = (p.targetId || '').trim();
   const newRole  = (p.newRole  || '').trim();
   if (!targetId) throw new Error('חסר מזהה משתמש.');
-  if (['admin','commander','trainee','tutor'].indexOf(newRole) === -1) throw new Error('תפקיד לא חוקי.');
+  if (!Roles_isValid(newRole)) throw new Error('תפקיד לא חוקי.');
 
   const row = _findRowIndex('Users', targetId);
   if (row < 0) throw new Error('המשתמש לא נמצא.');
-  _sheet('Users').getRange(row, 3).setValue(newRole);
+  _sheet('Users').getRange(row, 3).setValue(Roles_normalize(newRole));
   _cacheInvalidate('Users');
 
   return Views_users({ sid: p.sid, tab: 'users', info: 'התפקיד עודכן בהצלחה.' });
@@ -185,10 +203,10 @@ function Teams_autoSplit(p) {
   const prefix = (p.teamNamePrefix || 'צוות').trim() || 'צוות';
 
   const trainees = Users_all()
-    .filter(function(u) { return u.role === 'trainee' && !u.team_id; })
+    .filter(function(u) { return Roles_isTrainee(u.role) && !u.team_id; })
     .sort(function(a, b) { return a.id.localeCompare(b.id); });
   const commanders = Users_all()
-    .filter(function(u) { return u.role === 'commander' && !u.team_id; })
+    .filter(function(u) { return Roles_isCompanyCommander(u.role) && !u.team_id; })
     .sort(function(a, b) { return a.id.localeCompare(b.id); });
 
   if (!trainees.length) throw new Error('אין חניכים ללא צוות לחלוקה.');
@@ -344,7 +362,7 @@ function Users_updateProfile(p) {
   }
   // Update role if provided
   if (p.newRole) {
-    sh.getRange(row, 3).setValue(p.newRole.trim());
+    sh.getRange(row, 3).setValue(Roles_normalize(p.newRole.trim()));
   }
   _cacheInvalidate('Users');
 
@@ -392,8 +410,8 @@ function Users_importBulk(p) {
     if (!id || !name) { errors.push('שורה ' + (i+1) + ': חסר id או שם'); return; }
     if (!password)    { errors.push('שורה ' + (i+1) + ': חסרה סיסמה ל-' + id); return; }
 
-    const validRoles = ['admin','commander','trainee','tutor'];
-    const finalRole  = validRoles.includes(role) ? role : 'trainee';
+    const validRoles = Roles_allValid();
+    const finalRole  = validRoles.includes(role) ? Roles_normalize(role) : 'trainee';
 
     if (existing.has(id)) { skipped++; return; }
 

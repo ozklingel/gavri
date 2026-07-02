@@ -175,7 +175,7 @@ function _dashboardCorpsAssignedCounts() {
 
   assigns.forEach(function(a) {
     const u = userById[a.user_id];
-    if (!u || u.role !== 'trainee') return;
+    if (!u || !Roles_isTrainee(u.role)) return;
     const aff = _normalizeAffiliation(u.military_affiliation);
     if (counts.hasOwnProperty(aff)) counts[aff]++;
     else other++;
@@ -189,7 +189,7 @@ function _adminDashboard(sid) {
   const corpsStats = _dashboardCorpsAssignedCounts();
 
   let s = '<div class="page">';
-  s += '<h1 class="page-title">לוח בקרה מפקד</h1>';
+  s += '<h1 class="page-title">לוח בקרה — סגל</h1>';
 
   s += '<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px">' +
     'סך ההקצאות — לפי שיוך חיילי</p>';
@@ -217,6 +217,34 @@ s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140p
 
   return s;
 }
+
+function _unitCommanderDashboard(sid) {
+  const corpsStats = _dashboardCorpsAssignedCounts();
+  let s = '<div class="page">';
+  s += '<h1 class="page-title">לוח בקרה — מגד</h1>';
+  s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:24px">';
+  corpsStats.order.forEach(function(c) {
+    s += '<div class="stat-box"><div class="stat-num">' + corpsStats.counts[c.key] +
+      '</div><div class="stat-label">' + c.label + '</div></div>';
+  });
+  s += '</div>';
+  s += '<div style="display:flex;justify-content:center;margin:24px 0">';
+  s += _spaNavCard('timeline', {}, '📅', 'ציר זמן');
+  s += '</div></div>';
+  return s;
+}
+
+function _departmentCommanderDashboard(user, sid) {
+  let s = '<div class="page-title">⊞ לוח בקרה — ממ</div>';
+  s += '<div class="card"><div class="card-body">' +
+    '<p style="font-size:13px;color:var(--muted);margin:0;line-height:1.6">' +
+    'חפש משתמשים למעלה לצפייה בפרטים. ציונים נגישים רק לסגל, מגד ומפקד הצוות.</p>' +
+    '</div></div>';
+  s += '<div style="display:flex;justify-content:center;margin:24px 0">';
+  s += _spaNavCard('timeline', {}, '📅', 'ציר זמן');
+  s += '</div>';
+  return s;
+}
 function _dashCell(val) {
   return val ? _esc(val) : '<span style="color:var(--muted)">—</span>';
 }
@@ -241,7 +269,7 @@ function _commanderTraineeExercisesHtml(assigns) {
 function _commanderDashboard(user, sid) {
   const trainees = Users_traineesOfCommander(user.id);
 
-  let s = '<div class="page-title">⊞ לוח בקרה — מפקד צוות</div>';
+  let s = '<div class="page-title">⊞ לוח בקרה — מפ</div>';
 
   if (!trainees.length) {
     return s + '<div class="card"><div class="empty">אין חיילים מוקצים לצוות שלך עדיין</div></div>';
@@ -294,7 +322,7 @@ function _tutorDashboard(user, sid) {
 
   myAssigns.forEach(function(a) {
     const u = Users_get(a.user_id);
-    if (!u || u.role !== 'trainee') return;
+    if (!u || !Roles_isTrainee(u.role)) return;
     if (!exMap[a.exercise_id]) exMap[a.exercise_id] = [];
     exMap[a.exercise_id].push({ assign: a, trainee: u });
   });

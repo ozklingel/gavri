@@ -131,7 +131,9 @@ function Auth_require(p) {
 
 function Auth_requireRole(p, roles) {
   const u = Auth_require(p);
-  if (roles.indexOf(u.role) === -1) throw new Error('אין הרשאה לפעולה זו.');
+  const norm = Roles_normalize(u.role);
+  const allowed = roles.map(function(r) { return Roles_normalize(r); });
+  if (allowed.indexOf(norm) === -1) throw new Error('אין הרשאה לפעולה זו.');
   return u;
 }
 

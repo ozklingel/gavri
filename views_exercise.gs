@@ -1,19 +1,22 @@
 // views_exercise.gs — exercise detail page + user profile
 
 function _canViewExercise(user, exId) {
-  if (user.role === 'admin') return true;
-  if (user.role === 'trainee') {
+  if (Roles_canSeeAllExercises(user.role)) return true;
+  if (Roles_isTrainee(user.role)) {
     return Assignments_byUser(user.id).some(function(a) {
       return String(a.exercise_id) === String(exId);
     });
   }
-  if (user.role === 'commander') {
+  if (Roles_isCompanyCommander(user.role)) {
     const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
     return Assignments_byExercise(exId).some(function(a) {
       return traineeIds.indexOf(a.user_id) !== -1;
     });
   }
-  if (user.role === 'tutor') {
+  if (Roles_isDepartmentCommander(user.role)) {
+    return Assignments_byExercise(exId).length > 0;
+  }
+  if (Roles_isTutor(user.role)) {
     return Assignments_byExercise(exId).some(function(a) {
       return String(a.tutor) === String(user.id);
     });
@@ -43,7 +46,7 @@ function Views_exercise(p) {
     '<div style="display:flex;gap:6px">' +
     _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
 
-  if (user.role === 'admin') {
+  if (Roles_hasAdminAccess(user.role)) {
     s += _a('action=duplicateExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, '⎘ שכפל', 'btn btn-ghost btn-sm');
 s += _confirmDelete(
   'action=deleteExercise&id=' + encodeURIComponent(ex.id) + '&from=exercise&sid=' + sidQ,
@@ -87,7 +90,7 @@ s += _confirmDelete(
   let tlHtml = '<div class="card">' +
     '<div class="card-header"><span class="card-title">🕐 ציר זמן (' + details.length + ')</span>';
 
-  if (user.role === 'admin') {
+  if (Roles_hasAdminAccess(user.role)) {
     tlHtml += '<button class="btn btn-ghost btn-sm" onclick="toggleCollapsible(\'add-detail\')">➕ הוסף</button>';
   }
   tlHtml += '</div>';
@@ -102,7 +105,7 @@ s += _confirmDelete(
     tlHtml += '</tbody></table></div>';
   }
 
-  if (user.role === 'admin') {
+  if (Roles_hasAdminAccess(user.role)) {
     tlHtml += '<div id="add-detail" style="display:none">' +
       '<div class="card-body" style="border-top:1px solid var(--border)">' +
       _formOpen() +
@@ -127,7 +130,7 @@ s += _confirmDelete(
 
   if (!parts.length) {
     pHtml += '<div class="empty">אין משתתפים</div>';
-  } else if (user.role === 'admin') {
+  } else if (Roles_hasAdminAccess(user.role)) {
     const allUsers = Users_all();
     const tutorOpts = [['', '— ללא חונך —']].concat(
       allUsers.map(function(u) { return [u.id, u.name + ' (' + _roleHe(u.role) + ')']; })
@@ -160,7 +163,7 @@ s += _confirmDelete(
         '</tr>';
     });
     pHtml += '</tbody></table></div>';
-  } else if (user.role === 'trainee') {
+  } else if (Roles_isTrainee(user.role)) {
     const myAssign = parts.find(function(a) { return String(a.user_id) === String(user.id); });
     if (myAssign) {
       pHtml += '<div class="card-body" style="border-bottom:1px solid var(--border);padding:10px 14px">' +
@@ -184,7 +187,7 @@ s += _confirmDelete(
         '</tr>';
     });
     pHtml += '</tbody></table></div>';
-  } else if (user.role === 'tutor') {
+  } else if (Roles_isTutor(user.role)) {
     pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
       '<th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>משוב</th>' +
       '</tr></thead><tbody>';
@@ -208,19 +211,23 @@ s += _confirmDelete(
     });
     pHtml += '</tbody></table></div>';
   } else {
-    // מפקד צוות: read-only + משוב לחניכי הצוות
-    const showFeedback = user.role === 'commander';
+    const showFeedback = Roles_isCompanyCommander(user.role);
+    const showScoreCol = Roles_isAdmin(user.role) || Roles_isUnitCommander(user.role) || showFeedback;
     pHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
-      '<th>שם</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
+      '<th>שם</th><th>תפקיד</th><th>סטטוס</th>' +
+      (showScoreCol ? '<th>ציון</th>' : '') +
       (showFeedback ? '<th>משוב</th>' : '') +
       '</tr></thead><tbody>';
     parts.forEach(function(a) {
       const u = Users_get(a.user_id);
       const canFb = showFeedback && Assignments_canEditFeedback(user, a);
+      const showScore = Users_canViewScores(user, a.user_id);
       pHtml += '<tr><td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
         '<td>' + _esc(a.responsibility) + '</td>' +
-        '<td>' + _statusBadge(a.status) + '</td>' +
-        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>';
+        '<td>' + _statusBadge(a.status) + '</td>';
+      if (showScoreCol) {
+        pHtml += '<td>' + (showScore && a.score ? _badge(a.score, 'green') : (showScore ? '—' : '<span style="color:var(--muted)">מוסתר</span>')) + '</td>';
+      }
       if (showFeedback) {
         pHtml += '<td>' + (canFb ? _feedbackBtn(a.id, ex.id, !!a.feedback) : '—') + '</td>';
       }
@@ -233,7 +240,7 @@ s += _confirmDelete(
   s += '</div>'; // end grid-2
 
   // ── Admin-only panels ──
-  if (user.role === 'admin') {
+  if (Roles_hasAdminAccess(user.role)) {
     s += _respDatalistHtml('respList');
 
     // Edit exercise + Assign soldier — side by side
@@ -349,7 +356,8 @@ function Views_user(p) {
 
   const team     = target.team_id ? Teams_get(target.team_id) : null;
   const teamName = team ? team.name : (target.team_id || '—');
-  const isAdmin  = user.role === 'admin';
+  const isAdmin  = Roles_hasAdminAccess(user.role);
+  const canViewScores = Users_canViewScores(user, targetId);
 
   let s = _topbar(user, sid) + '<div class="page">';
   s += _flash(p);
@@ -374,7 +382,7 @@ function Views_user(p) {
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">שם</td>' +
     '<td><b>' + _esc(target.name) + '</b></td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">תפקיד</td>' +
-    '<td>' + _badge(_roleHe(target.role), target.role === 'admin' ? 'green' : target.role === 'commander' ? 'blue' : target.role === 'tutor' ? 'yellow' : 'muted') + '</td></tr>' +
+    '<td>' + _badge(_roleHe(target.role), _roleBadgeType(target.role)) + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">צוות</td>' +
     '<td>' + _esc(teamName) + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">מספר טלפון</td>' +
@@ -398,11 +406,16 @@ function Views_user(p) {
   const assignments = Assignments_byUser(targetId);
   s += '<div class="card" style="margin-bottom:14px">' +
     '<div class="card-header"><span class="card-title">🎯 תרגילים (' + assignments.length + ')</span></div>';
+  if (!canViewScores && assignments.length && String(user.id) !== String(targetId)) {
+    s += '<div style="padding:8px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">' +
+      'ציונים מוסתרים — נגישים לסגל, מגד ומפקד הצוות בלבד</div>';
+  }
   if (!assignments.length) {
     s += '<div class="empty">אין הקצאות</div>';
   } else {
     s += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
-      '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
+      '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th>' +
+      (canViewScores ? '<th>ציון</th>' : '') +
       '</tr></thead><tbody>';
     assignments.forEach(function(a) {
       const ex = Exercises_get(a.exercise_id);
@@ -411,9 +424,11 @@ function Views_user(p) {
         '<td><a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: a.exercise_id }) + ' style="color:var(--blue);text-decoration:underline">' +
         _esc(exTitle) + '</a></td>' +
         '<td>' + _esc(a.responsibility || '—') + '</td>' +
-        '<td>' + _statusBadge(a.status) + '</td>' +
-        '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
-        '</tr>';
+        '<td>' + _statusBadge(a.status) + '</td>';
+      if (canViewScores) {
+        s += '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>';
+      }
+      s += '</tr>';
     });
     s += '</tbody></table></div>';
   }
@@ -436,7 +451,7 @@ function Views_user(p) {
       '<input type="hidden" name="returnTo" value="user">' +
       '<div class="form-grid">' +
       '<div class="form-row"><label class="form-label">תפקיד</label>' +
-        _select('newRole', [['admin','מפקד קורס'],['commander','מפקד צוות'],['tutor','חונך'],['trainee','חניך']], target.role) +
+        _select('newRole', Roles_selectOptions(), target.role) +
       '</div>' +
       '<div class="form-row"><label class="form-label">צוות</label>' +
         _select('newTeamId', teamOpts, target.team_id) +

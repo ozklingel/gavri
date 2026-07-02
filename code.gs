@@ -133,7 +133,7 @@ function setupSheets() {
   const usersSh = ss.getSheetByName('Users');
   if (usersSh.getLastRow() === 1) {
     usersSh.appendRow(['U001','Admin User','admin','']);
-    usersSh.appendRow(['U002','Commander Alpha','commander','T1']);
+    usersSh.appendRow(['U002','Commander Alpha','companyCommander','T1']);
     usersSh.appendRow(['U003','Trainee One','trainee','T1']);
     usersSh.appendRow(['U004','Trainee Two','trainee','T1']);
     ss.getSheetByName('Credentials').appendRow(['U001','admin123']);
@@ -164,7 +164,7 @@ function resetTrainingTables() {
 
   ss.getSheetByName('Users').appendRow(['U001','Admin','admin','']);
   ss.getSheetByName('Credentials').appendRow(['U001','admin123']);
-  ss.getSheetByName('Users').appendRow(['U002','Commander Alpha','commander','T1']);
+  ss.getSheetByName('Users').appendRow(['U002','Commander Alpha','companyCommander','T1']);
   ss.getSheetByName('Users').appendRow(['U003','Trainee One','trainee','T1']);
   ss.getSheetByName('Users').appendRow(['U004','Trainee Two','trainee','T1']);
   ss.getSheetByName('Credentials').appendRow(['U002','cmd123']);

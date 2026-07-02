@@ -41,7 +41,7 @@ function _usersTab(sid) {
       s += '<tr>' +
         '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td>' + _userLink(u.id, u.name, '') + '</td>' +
-        '<td>' + _badge(_roleHe(u.role), u.role === 'admin' ? 'green' : u.role === 'commander' ? 'blue' : u.role === 'tutor' ? 'yellow' : 'muted') + '</td>' +
+        '<td>' + _badge(_roleHe(u.role), _roleBadgeType(u.role)) + '</td>' +
         '<td>' + _esc(team ? team.name : '—') + '</td>' +
         '<td class="actions" style="white-space:nowrap">' +
         _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?') +
@@ -62,7 +62,7 @@ function _usersTab(sid) {
     _input('email', 'user@example.com', '', 'email') + '</div>' +
     '<div class="form-grid">' +
     '<div class="form-row"><label class="form-label">תפקיד</label>' +
-    _select('newRole', [['trainee','חניך'],['commander','מפקד צוות'],['tutor','חונך'],['admin','מפקד קורס']], 'trainee') + '</div>' +
+    _select('newRole', Roles_selectOptions(), 'trainee') + '</div>' +
     '<div class="form-row"><label class="form-label">צוות</label>' + _select('newTeamId', teamOpts, '') + '</div>' +
     '</div>' +
     _submitBtn('צור משתמש', 'btn btn-primary btn-full') +
@@ -82,7 +82,9 @@ function _usersTab(sid) {
 
 function _teamsTab(sid) {
   const teams = Teams_all();
-  const commanders = Users_all().filter(function(u) { return u.role === 'commander' || u.role === 'admin'; });
+  const commanders = Users_all().filter(function(u) {
+    return Roles_isCompanyCommander(u.role) || Roles_isAdmin(u.role) || Roles_isUnitCommander(u.role);
+  });
   const cmdOpts = [['', '— ללא —']].concat(commanders.map(function(u) { return [u.id, u.id + ' — ' + u.name]; }));
   const unassigned = Users_all().filter(function(u) { return !u.team_id; });
 
@@ -116,9 +118,9 @@ function _teamsTab(sid) {
         s += '<ul style="margin:8px 0 0;padding:0;list-style:none">';
         members.forEach(function(m) {
           let sub = '';
-          if (m.role === 'trainee' && m.military_affiliation) {
+          if (Roles_isTrainee(m.role) && m.military_affiliation) {
             sub = ' <span style="font-size:10px;color:var(--muted)">' + _esc(m.military_affiliation) + '</span>';
-          } else if (m.role !== 'trainee') {
+          } else if (!Roles_isTrainee(m.role)) {
             sub = ' <span class="mono" style="font-size:10px">' + _esc(m.id) + '</span>';
           }
           s += '<li style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
@@ -151,9 +153,9 @@ function _teamsTab(sid) {
     _submitBtn('צור צוות', 'btn btn-primary btn-full') +
     '</form></div></div>';
 
-  const unassignedTrainees = unassigned.filter(function(u) { return u.role === 'trainee'; });
+  const unassignedTrainees = unassigned.filter(function(u) { return Roles_isTrainee(u.role); });
   const freeCommanders = Users_all().filter(function(u) {
-    return u.role === 'commander' && !u.team_id;
+    return Roles_isCompanyCommander(u.role) && !u.team_id;
   });
   const previewTeams = unassignedTrainees.length
     ? Math.ceil(unassignedTrainees.length / 10)

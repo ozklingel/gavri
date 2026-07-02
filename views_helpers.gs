@@ -224,11 +224,29 @@ function _extraProfileFields(target) {
 }
 
 function _roleHe(r) {
-  if (r === 'admin') return 'מפקד קורס';
-  if (r === 'commander') return 'מפקד צוות';
-  if (r === 'tutor') return 'חונך';
-  if (r === 'trainee') return 'חניך';
-  return r;
+  return Roles_label(r);
+}
+
+function _roleBadgeType(r) {
+  return Roles_badgeType(r);
+}
+
+function _dashboardUserSearchBar() {
+  const users = Users_all().map(function(u) {
+    return { id: u.id, name: u.name, role: Roles_label(u.role) };
+  });
+  const json = JSON.stringify(users).replace(/</g, '\\u003c');
+  return '<div class="card user-search-bar" style="margin-bottom:16px">' +
+    '<div class="card-body" style="padding:12px 16px">' +
+    '<label class="form-label" style="margin-bottom:6px">🔍 חיפוש משתמש</label>' +
+    '<div class="user-search-wrap">' +
+    '<input type="text" id="dashboardUserSearch" class="form-input" ' +
+    'placeholder="הקלד שם או מספר אישי..." autocomplete="off" ' +
+    'data-users="' + json.replace(/"/g, '&quot;') + '">' +
+    '<div id="dashboardUserSearchResults" class="user-search-results" hidden></div>' +
+    '</div>' +
+    '<p style="font-size:11px;color:var(--muted);margin:8px 0 0">ציונים נראים רק לסגל, מגד ומפקד הצוות של החניך</p>' +
+    '</div></div>';
 }
 
 function _statusHe(s) {
@@ -243,14 +261,14 @@ function _statusBadge(s) {
 
 function _drawerNavItems(user) {
   const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
-  if (user.role === 'admin') {
+  if (Roles_hasAdminAccess(user.role)) {
     items.push(
       { page: 'exercises', label: 'תרגילים', icon: '🎯' },
       { page: 'users', label: 'משתמשים וצוותים', icon: '👤', params: { tab: 'users' } },
       { page: 'timeline', label: 'ציר זמן', icon: '📅' },
       { page: 'assign', label: 'לוח שיבוץ', icon: '🔀' }
     );
-  } else if (user.role === 'commander' || user.role === 'tutor') {
+  } else if (Roles_hasTimelineAccess(user.role)) {
     items.push({ page: 'timeline', label: 'ציר זמן', icon: '📅' });
   }
   return items;
@@ -337,8 +355,8 @@ function Views_login(p) {
     '<hr class="divider">' +
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">// משתמשי דמו</div>' +
     '<div class="demo-grid">' +
-    '<div class="demo-item"><div class="demo-role">מפקד קורס</div><div class="demo-cred">1<br>111</div></div>' +
-    '<div class="demo-item"><div class="demo-role">מפקד צוות</div><div class="demo-cred">222<br>222</div></div>' +
+    '<div class="demo-item"><div class="demo-role">סגל</div><div class="demo-cred">1<br>111</div></div>' +
+    '<div class="demo-item"><div class="demo-role">מפ</div><div class="demo-cred">222<br>222</div></div>' +
     '<div class="demo-item"><div class="demo-role">חניך</div><div class="demo-cred">3332<br>3332</div></div>' +
     '</div>' +
     '</div></div></div>';
@@ -391,14 +409,17 @@ function Views_dashboard(p) {
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
 
+  const role = Roles_normalize(user.role);
   let content = '';
-  if (user.role === 'admin')          content = _adminDashboard(sid);
-  else if (user.role === 'commander') content = _commanderDashboard(user, sid);
-  else if (user.role === 'tutor')     content = _tutorDashboard(user, sid);
-  else                                content = _traineeDashboard(user, sid);
+  if (Roles_isAdmin(role))                 content = _adminDashboard(sid);
+  else if (Roles_isUnitCommander(role))     content = _unitCommanderDashboard(sid);
+  else if (Roles_isCompanyCommander(role))  content = _commanderDashboard(user, sid);
+  else if (Roles_isDepartmentCommander(role)) content = _departmentCommanderDashboard(user, sid);
+  else if (Roles_isTutor(role))             content = _tutorDashboard(user, sid);
+  else                                      content = _traineeDashboard(user, sid);
 
   const body = _topbar(user, sid) +
-    '<div class="page">' + _flash(p) + content + '</div>';
+    '<div class="page">' + _flash(p) + _dashboardUserSearchBar() + content + '</div>';
   return _wrapPage(body, 'לוח בקרה');
 }
 

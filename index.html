@@ -551,6 +551,46 @@ body {
     .demo-role { font-family: var(--mono); font-size: 10px; color: var(--muted); }
     .demo-cred { font-family: var(--mono); font-size: 11px; color: var(--green2); margin-top: 3px; }
 
+    .user-search-wrap { position: relative; }
+    .user-search-results {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      left: 0;
+      z-index: 50;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      max-height: 240px;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+    }
+    .user-search-item {
+      display: block;
+      width: 100%;
+      text-align: right;
+      padding: 10px 12px;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .user-search-item:hover,
+    .user-search-item.active {
+      background: var(--bg4);
+      color: var(--green);
+    }
+    .user-search-item small {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
     /* ── TABS (simulated via hash) ── */
     .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 14px; }
     .tab-link {
@@ -1054,6 +1094,7 @@ body {
       initFlatpickr();
       initAppDrawer();
       if (typeof initTimelineWeek === 'function') initTimelineWeek();
+      if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
     }
 
     function initAppDrawer() {
@@ -1273,6 +1314,104 @@ body {
     });
   }
   window.spaSaveAssignmentRow = spaSaveAssignmentRow;
+
+  function initDashboardUserSearch() {
+    var input = document.getElementById('dashboardUserSearch');
+    var results = document.getElementById('dashboardUserSearchResults');
+    if (!input || !results || input._searchInit) return;
+    input._searchInit = true;
+
+    var users = [];
+    try {
+      users = JSON.parse(input.getAttribute('data-users') || '[]');
+    } catch (e) {
+      users = [];
+    }
+
+    var activeIdx = -1;
+
+    function hideResults() {
+      results.hidden = true;
+      results.innerHTML = '';
+      activeIdx = -1;
+    }
+
+    function openUser(id) {
+      if (!id || !window.MapimSpa) return;
+      hideResults();
+      input.value = '';
+      MapimSpa.navigate('user', { id: id });
+    }
+
+    function renderMatches(q) {
+      var query = String(q || '').trim().toLowerCase();
+      if (!query) {
+        hideResults();
+        return;
+      }
+      var matches = users.filter(function(u) {
+        return String(u.id || '').toLowerCase().indexOf(query) !== -1 ||
+          String(u.name || '').toLowerCase().indexOf(query) !== -1;
+      }).slice(0, 10);
+
+      if (!matches.length) {
+        results.innerHTML = '<div style="padding:10px 12px;color:var(--muted);font-size:12px">לא נמצאו משתמשים</div>';
+        results.hidden = false;
+        return;
+      }
+
+      results.innerHTML = matches.map(function(u, i) {
+        return '<button type="button" class="user-search-item' + (i === activeIdx ? ' active' : '') + '" data-user-id="' +
+          String(u.id).replace(/"/g, '&quot;') + '">' +
+          '<span>' + String(u.name).replace(/</g, '&lt;') + '</span>' +
+          '<small>' + String(u.id).replace(/</g, '&lt;') + ' · ' + String(u.role || '').replace(/</g, '&lt;') + '</small>' +
+          '</button>';
+      }).join('');
+      results.hidden = false;
+
+      results.querySelectorAll('.user-search-item').forEach(function(btn) {
+        btn.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          openUser(btn.getAttribute('data-user-id'));
+        });
+      });
+    }
+
+    input.addEventListener('input', function() {
+      activeIdx = -1;
+      renderMatches(input.value);
+    });
+
+    input.addEventListener('keydown', function(e) {
+      var items = results.querySelectorAll('.user-search-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (results.hidden) renderMatches(input.value);
+        items = results.querySelectorAll('.user-search-item');
+        activeIdx = Math.min(activeIdx + 1, items.length - 1);
+        items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIdx = Math.max(activeIdx - 1, 0);
+        items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
+      } else if (e.key === 'Enter') {
+        if (!results.hidden && activeIdx >= 0 && items[activeIdx]) {
+          e.preventDefault();
+          openUser(items[activeIdx].getAttribute('data-user-id'));
+        } else if (!results.hidden && items.length === 1) {
+          e.preventDefault();
+          openUser(items[0].getAttribute('data-user-id'));
+        }
+      } else if (e.key === 'Escape') {
+        hideResults();
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.user-search-wrap')) hideResults();
+    });
+  }
+  window.initDashboardUserSearch = initDashboardUserSearch;
 
   // Inline edit-panel toggle for user rows
   function toggleEditPanel(btn) {
