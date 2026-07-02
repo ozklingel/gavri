@@ -96,6 +96,7 @@ function _spaDispatchPage(page, p) {
     case 'teamMatrix':  return Views_teamMatrix(p);
     case 'exerciseMatrix': return Views_exerciseMatrix(p);
     case 'homeConstraints': return Views_homeConstraints(p);
+    case 'statistics':    return Views_statistics(p);
     default:          return Views_login(p);
   }
 }

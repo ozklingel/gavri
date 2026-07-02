@@ -311,6 +311,9 @@ function _checkboxRow(name, label, checked) {
 
 function _drawerNavItems(user) {
   const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
+  if (Roles_hasAdminAccess(user.role)) {
+    items.push({ page: 'statistics', label: 'סטטיסטיקות', icon: '📊' });
+  }
   items.push(
     { page: 'teamMatrix', label: 'תצוגת צוות', icon: '🪖' },
     { page: 'exerciseMatrix', label: 'תצוגה לפי תרגיל', icon: '🎯' },

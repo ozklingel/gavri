@@ -205,14 +205,6 @@ function _dashboardCorpsStatsHtml(corpsStats, compact) {
   return s + '</div>';
 }
 
-function _adminDashboardPanels(sid) {
-  const corpsStats = _dashboardCorpsAssignedCounts();
-  let s = '<div class="drawer-section-title">לוח בקרה — סגל</div>';
-  s += _dashboardCorpsStatsHtml(corpsStats, true);
-  s += _assignmentConflictsDashboardWidget();
-  return s;
-}
-
 function _unitCommanderDashboardPanels(sid) {
   const corpsStats = _dashboardCorpsAssignedCounts();
   let s = '<div class="drawer-section-title">לוח בקרה — מגד</div>';
@@ -228,8 +220,7 @@ function _drawerDashboardPanels(user, sid) {
   if (!user) return '';
   let s = _homeConstraintsDashboardWidget(user, sid);
   const role = Roles_normalize(user.role);
-  if (Roles_isAdmin(role))                 s += _adminDashboardPanels(sid);
-  else if (Roles_isUnitCommander(role))     s += _unitCommanderDashboardPanels(sid);
+  if (Roles_isUnitCommander(role))     s += _unitCommanderDashboardPanels(sid);
   else if (Roles_isCompanyCommander(role))  s += _commanderDashboardPanels(user, sid);
   else if (Roles_isDepartmentCommander(role)) s += _departmentCommanderDashboardPanels(user, sid);
   else if (Roles_isTutor(role))             s += _tutorDashboardPanels(user, sid);
