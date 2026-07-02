@@ -315,8 +315,6 @@ function _drawerNavItems(user) {
     items.push({ page: 'statistics', label: 'סטטיסטיקות', icon: '📊' });
   }
   items.push(
-    { page: 'teamMatrix', label: 'תצוגת צוות', icon: '🪖' },
-    { page: 'exerciseMatrix', label: 'תצוגה לפי תרגיל', icon: '🎯' },
     { page: 'homeConstraints', label: 'אילוצי בית', icon: '🏠' },
     { page: 'fieldForces', label: 'כוחות בשטח', icon: '⚔' },
     { page: 'fireZones', label: 'שטחי אש', icon: '🔥' }
@@ -472,22 +470,72 @@ function Views_login_mfa(p) {
 }
 
 // ─────────── DASHBOARD ───────────
+
+function _dashboardTabItems(user) {
+  const items = [{ id: 'search', label: '🔍 חיפוש' }];
+  if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
+    items.push({ id: 'team', label: '🪖 תצוגת צוות' });
+  }
+  items.push({ id: 'exercise', label: '🎯 תצוגה לפי תרגיל' });
+  if (Roles_hasAdminAccess(user.role)) {
+    items.push({ id: 'conflicts', label: '⚠ התנגשויות' });
+  }
+  return items;
+}
+
+function _dashboardResolveTab(p, user) {
+  const tab = String((p && p.tab) || 'search').trim();
+  const allowed = _dashboardTabItems(user).map(function(item) { return item.id; });
+  if (allowed.indexOf(tab) === -1) return 'search';
+  return tab;
+}
+
+function _dashboardTabsBar(user, activeTab, extraParams) {
+  extraParams = extraParams || {};
+  let s = '<nav class="dashboard-tabs" aria-label="לשוניות לוח בקרה">';
+  _dashboardTabItems(user).forEach(function(item) {
+    const params = { tab: item.id };
+    if (extraParams.searchUserId) params.searchUserId = extraParams.searchUserId;
+    s += '<a href="#" class="dashboard-tab' + (item.id === activeTab ? ' active' : '') +
+      '" data-spa-page="dashboard"' + _spaParamsAttr(params) + '>' +
+      _esc(item.label) + '</a>';
+  });
+  return s + '</nav>';
+}
+
+function _dashboardTabContent(user, sid, tab, p) {
+  if (tab === 'team') {
+    return '<div class="dashboard-tab-panel team-matrix-page">' +
+      _teamMatrixEmbedHtml(user, p) + '</div>';
+  }
+  if (tab === 'exercise') {
+    return '<div class="dashboard-tab-panel ex-matrix-page">' +
+      _exerciseMatrixEmbedHtml(user, p) + '</div>';
+  }
+  if (tab === 'conflicts') {
+    return '<div class="dashboard-tab-panel">' + _dashboardConflictsTabHtml(sid) + '</div>';
+  }
+
+  const searchUserId = String((p && p.searchUserId) || '').trim();
+  let s = _dashboardUserSearchBar(searchUserId);
+  if (searchUserId) {
+    s += _dashboardUserExerciseResults(user, searchUserId);
+  }
+  return '<div class="dashboard-tab-panel dashboard-tab-search">' + s + '</div>';
+}
+
 function Views_dashboard(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
 
+  const tab = _dashboardResolveTab(p, user);
   const searchUserId = String(p.searchUserId || '').trim();
-
-  let searchResults = '';
-  if (searchUserId) {
-    searchResults = _dashboardUserExerciseResults(user, searchUserId);
-  }
 
   const body = _topbar(user, sid) +
     '<div class="page page-dashboard">' + _flash(p) +
-    _dashboardUserSearchBar(searchUserId) +
-    searchResults +
+    _dashboardTabsBar(user, tab, { searchUserId: searchUserId }) +
+    _dashboardTabContent(user, sid, tab, p) +
     '</div>';
   return _wrapPage(body, 'לוח בקרה');
 }

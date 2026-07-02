@@ -376,6 +376,40 @@ body {
     #dashboardUserExerciseResults {
       width: 100%;
     }
+    .dashboard-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 20px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-gutter: stable;
+    }
+    .dashboard-tab {
+      display: inline-flex;
+      align-items: center;
+      padding: 10px 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .dashboard-tab:hover {
+      color: var(--text2);
+    }
+    .dashboard-tab.active {
+      color: var(--green);
+      border-bottom-color: var(--green);
+      font-weight: bold;
+    }
+    .dashboard-tab-panel {
+      width: 100%;
+    }
     .page-title {
       font-family: var(--mono);
       font-size: 20px;
@@ -773,6 +807,28 @@ body {
       font-size: 11px;
       color: var(--text2);
       line-height: 1.4;
+    }
+    .ex-matrix-cell-editor-current {
+      font-size: 12px;
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      line-height: 1.4;
+    }
+    .ex-matrix-cell-editor-current-label {
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .ex-matrix-cell-editor-current-phone {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      direction: ltr;
+    }
+    .ex-matrix-cell-editor-delete {
+      margin-bottom: 8px;
     }
     .ex-matrix-cell-editor-results {
       position: relative;

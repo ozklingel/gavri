@@ -151,10 +151,12 @@ function _exerciseMatrixBuildPayload() {
 }
 
 function Views_exerciseMatrix(p) {
-  const user = Auth_current(p);
-  if (!user) return Views_login({ error: 'נדרשת התחברות.' });
+  p = p || {};
+  p.tab = 'exercise';
+  return Views_dashboard(p);
+}
 
-  const sid = user.id;
+function _exerciseMatrixEmbedHtml(user, p) {
   const canEdit = Roles_hasAdminAccess(user.role);
   const payload = _exerciseMatrixBuildPayload();
   payload.canEdit = canEdit;
@@ -171,21 +173,15 @@ function Views_exerciseMatrix(p) {
       '<span id="exMatrixCellEditorTitle" class="ex-matrix-cell-editor-title"></span>' +
       '<button type="button" id="exMatrixCellEditorClose" class="btn btn-ghost btn-sm">✕</button>' +
       '</div>' +
+      '<div id="exMatrixCellEditorCurrent" class="ex-matrix-cell-editor-current" hidden></div>' +
+      '<button type="button" id="exMatrixCellEditorDelete" class="btn btn-danger btn-sm btn-full ex-matrix-cell-editor-delete" hidden>🗑 מחק שיבוץ</button>' +
       '<input type="text" id="exMatrixCellEditorInput" class="form-input" ' +
       'placeholder="חיפוש לפי שם או מספר אישי..." autocomplete="off">' +
       '<div id="exMatrixCellEditorResults" class="user-search-results ex-matrix-cell-editor-results"></div>' +
       '</div>'
     : '';
 
-  const body = _topbar(user, sid) +
-    '<div class="page ex-matrix-page">' + _flash(p) +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0" id="exMatrixPageTitle">🎯 טבלת שליטה לפי תרגיל</div>' +
-    _a('page=dashboard', '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div>' +
-
-    '<script id="exerciseMatrixData" type="application/json">' + jsonData + '</script>' +
-
+  return '<script id="exerciseMatrixData" type="application/json">' + jsonData + '</script>' +
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:12px 16px">' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
     '<div id="exMatrixRoleFilters" class="team-matrix-tabs"></div>' +
@@ -195,13 +191,9 @@ function Views_exerciseMatrix(p) {
     '<div class="form-label" style="margin-bottom:8px">בחר תרגילים:</div>' +
     '<div id="exMatrixWeekTabs" class="team-matrix-tabs"></div>' +
     '</div></div>' +
-
     '<div id="exMatrixAccordions"></div>' +
     editorHtml +
-    '<script>' + _exerciseMatrixJs() + '</script>' +
-    '</div>';
-
-  return _wrapPage(body, 'טבלת שליטה לפי תרגיל');
+    '<script>' + _exerciseMatrixJs() + '</script>';
 }
 
 function _exerciseMatrixJs() {
@@ -219,7 +211,8 @@ function _exerciseMatrixJs() {
   function cellHtml(exId, role, c) {
     var cls = 'ex-matrix-assign-cell' + (c ? ' filled' : '') + (canEdit ? ' editable' : '');
     var attrs = ' class="' + cls + '" data-ex-id="' + esc(exId) + '" data-role="' + esc(role) + '"';
-    if (canEdit) attrs += ' title="לחץ לשיבוץ משתמש" tabindex="0"';
+    if (c && c.assignmentId) attrs += ' data-assignment-id="' + esc(c.assignmentId) + '"';
+    if (canEdit) attrs += ' title="לחץ לעריכת שיבוץ" tabindex="0"';
     var inner = '';
     if (c) {
       inner += '<div class="ex-matrix-person"><div class="ex-matrix-person-name">' + esc(c.name) + '</div>';
@@ -234,7 +227,38 @@ function _exerciseMatrixJs() {
   }
 
   function setCellData(exId, role, cell) {
-    data.cells[exId + '\\x1f' + role] = cell;
+    var key = exId + '\\x1f' + role;
+    if (cell) data.cells[key] = cell;
+    else delete data.cells[key];
+  }
+
+  function clearCellAssignment() {
+    if (!activeCell) return;
+    var exId = activeCell.getAttribute('data-ex-id');
+    var role = activeCell.getAttribute('data-role');
+    var cell = cellData(exId, role);
+    if (!cell) return;
+    if (!confirm('למחוק את השיבוץ של ' + cell.name + '?')) return;
+
+    var sid = window.MapimSpa && MapimSpa.getSid ? MapimSpa.getSid() : '';
+    if (!sid) { alert('נדרשת התחברות'); return; }
+
+    var td = activeCell;
+    closeCellEditor();
+    td.classList.add('ex-matrix-cell-saving');
+
+    google.script.run
+      .withSuccessHandler(function() {
+        td.classList.remove('ex-matrix-cell-saving');
+        setCellData(exId, role, null);
+        td.outerHTML = cellHtml(exId, role, null);
+        updateTitle();
+      })
+      .withFailureHandler(function(err) {
+        td.classList.remove('ex-matrix-cell-saving');
+        alert(err && err.message ? err.message : String(err));
+      })
+      .clearExerciseMatrixCell(sid, exId, role);
   }
 
   function closeCellEditor() {
@@ -251,7 +275,8 @@ function _exerciseMatrixJs() {
     var top = rect.bottom + 6;
     var left = Math.max(8, rect.left);
     var width = Math.max(rect.width, 260);
-    if (top + 220 > window.innerHeight) top = Math.max(8, rect.top - 220);
+    var editorH = editor.offsetHeight || 280;
+    if (top + editorH > window.innerHeight) top = Math.max(8, rect.top - editorH - 6);
     if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
     editor.style.top = top + 'px';
     editor.style.left = left + 'px';
@@ -317,15 +342,32 @@ function _exerciseMatrixJs() {
     var editor = document.getElementById('exMatrixCellEditor');
     var input = document.getElementById('exMatrixCellEditorInput');
     var title = document.getElementById('exMatrixCellEditorTitle');
+    var current = document.getElementById('exMatrixCellEditorCurrent');
+    var deleteBtn = document.getElementById('exMatrixCellEditorDelete');
     if (!editor || !input) return;
 
     activeCell = td;
     var exId = td.getAttribute('data-ex-id');
     var role = td.getAttribute('data-role');
+    var cell = cellData(exId, role);
     var exLabel = (data.exMeta[exId] && data.exMeta[exId].label) || exId;
     if (title) title.textContent = exLabel + ' · ' + role;
 
+    if (cell && current) {
+      current.hidden = false;
+      current.innerHTML = '<span class="ex-matrix-cell-editor-current-label">משובץ:</span> ' +
+        '<b>' + esc(cell.name) + '</b>' +
+        (cell.phone ? ' <span class="ex-matrix-cell-editor-current-phone">' + esc(cell.phone) + '</span>' : '');
+    } else if (current) {
+      current.hidden = true;
+      current.innerHTML = '';
+    }
+
+    if (deleteBtn) deleteBtn.hidden = !cell;
+
     input.value = '';
+    input.placeholder = cell ? 'החלף משתמש — חיפוש לפי שם או מספר אישי...' :
+      'חיפוש לפי שם או מספר אישי...';
     renderEditorMatches('');
     positionCellEditor(td);
     input.focus();
@@ -337,6 +379,7 @@ function _exerciseMatrixJs() {
     var input = document.getElementById('exMatrixCellEditorInput');
     var results = document.getElementById('exMatrixCellEditorResults');
     var closeBtn = document.getElementById('exMatrixCellEditorClose');
+    var deleteBtn = document.getElementById('exMatrixCellEditorDelete');
     if (!editor || !input) return;
 
     document.getElementById('exMatrixAccordions').addEventListener('click', function(e) {
@@ -347,6 +390,7 @@ function _exerciseMatrixJs() {
     });
 
     if (closeBtn) closeBtn.addEventListener('click', closeCellEditor);
+    if (deleteBtn) deleteBtn.addEventListener('click', clearCellAssignment);
 
     input.addEventListener('input', function() {
       editorActiveIdx = -1;

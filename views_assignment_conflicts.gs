@@ -76,6 +76,15 @@ function _assignmentConflictsDashboardWidget() {
   return s;
 }
 
+function _dashboardConflictsTabHtml(sid) {
+  const conflicts = AssignmentConflicts_scan();
+  let s = _assignmentConflictsPanel(conflicts, { alwaysShow: true });
+  s += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' +
+    _a('page=assign&sid=' + encodeURIComponent(sid), '↗ מעבר ללוח שיבוץ', 'btn btn-secondary btn-sm') +
+    '</div>';
+  return s;
+}
+
 function _assignmentConflictsExerciseBanner(exerciseId) {
   const conflicts = AssignmentConflicts_forExercise(exerciseId);
   return _assignmentConflictsPanel(conflicts, { alwaysShow: false });

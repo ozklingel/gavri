@@ -141,57 +141,42 @@ function _teamMatrixBuildPayload(user) {
 }
 
 function Views_teamMatrix(p) {
-  const user = Auth_current(p);
-  if (!user) return Views_login({ error: 'נדרשת התחברות.' });
+  p = p || {};
+  p.tab = 'team';
+  return Views_dashboard(p);
+}
 
+function _teamMatrixEmbedHtml(user, p) {
   const teams = _teamMatrixAllowedTeams(user);
   if (!teams.length) {
-    return Views_error('אין צוות משויך לתצוגה זו.', p);
+    return '<div class="card"><div class="empty">אין צוות משויך לתצוגה זו.</div></div>';
   }
 
-  const sid = user.id;
   const payload = _teamMatrixBuildPayload(user);
-  const initialTeam = String(p.teamId || teams[0].id).trim();
+  const initialTeam = String((p && p.teamId) || teams[0].id).trim();
   const jsonData = JSON.stringify(payload).replace(/</g, '\\u003c');
 
-  const body = _topbar(user, sid) +
-    '<div class="page team-matrix-page">' + _flash(p) +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0">🪖 תצוגה לפי צוות</div>' +
-    _a('page=dashboard', '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div>' +
-
-    '<script id="teamMatrixData" type="application/json">' + jsonData + '</script>' +
+  return '<script id="teamMatrixData" type="application/json">' + jsonData + '</script>' +
     '<input type="hidden" id="teamMatrixInitialTeam" value="' + _esc(initialTeam) + '">' +
-
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:12px 16px">' +
     '<div class="form-label" style="margin-bottom:8px">בחר צוות:</div>' +
     '<div id="teamMatrixTeamTabs" class="team-matrix-tabs"></div>' +
     '</div></div>' +
-
     '<div id="teamMatrixPanel" class="card">' +
     '<div class="card-header" style="flex-wrap:wrap;gap:10px;align-items:center">' +
     '<span class="card-title" id="teamMatrixTitle">—</span>' +
     '<div style="display:flex;gap:6px;margin-right:auto">' +
     '<button type="button" id="teamMatrixExportCsv" class="btn btn-secondary btn-sm">Excel</button>' +
-    '</div>' +
-    '</div>' +
-
+    '</div></div>' +
     '<div class="card-body" style="padding:12px 16px;border-bottom:1px solid var(--border)">' +
     '<div class="form-label" style="margin-bottom:8px">סנן שבוע:</div>' +
     '<div id="teamMatrixWeekTabs" class="team-matrix-tabs"></div>' +
     '</div>' +
-
     '<div id="teamMatrixStats" class="team-matrix-stats"></div>' +
-
     '<div class="team-matrix-scroll"><table class="tbl team-matrix-tbl" id="teamMatrixTable">' +
     '<thead id="teamMatrixHead"></thead><tbody id="teamMatrixBody"></tbody></table></div>' +
-  '</div>' +
-
-    '<script>' + _teamMatrixJs() + '</script>' +
-    '</div>';
-
-  return _wrapPage(body, 'תצוגה לפי צוות');
+    '</div>' +
+    '<script>' + _teamMatrixJs() + '</script>';
 }
 
 function _teamMatrixJs() {

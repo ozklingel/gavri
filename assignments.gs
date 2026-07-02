@@ -847,3 +847,25 @@ function assignExerciseMatrixCell(sid, exId, role, userId) {
   _cacheInvalidate('Assignments');
   return _assignmentMatrixCellPayload(Assignments_get(keptId));
 }
+
+/** הסרת שיבוץ מתא (תרגיל + תפקיד) מטבלת שליטה לפי תרגיל */
+function clearExerciseMatrixCell(sid, exId, role) {
+  const p = { sid: sid };
+  Auth_requireRole(p, ['admin']);
+  exId = String(exId || '').trim();
+  role = String(role || '').trim();
+  if (!exId || !role) throw new Error('חסר תרגיל או תפקיד.');
+
+  const matches = Assignments_byExercise(exId).filter(function(a) {
+    return String(a.responsibility || '').trim() === role;
+  });
+  if (!matches.length) return { ok: true, cleared: false };
+
+  const sh = _sheet('Assignments');
+  matches.slice().reverse().forEach(function(a) {
+    const r = _findRowIndex('Assignments', a.id);
+    if (r >= 0) sh.deleteRow(r);
+  });
+  _cacheInvalidate('Assignments');
+  return { ok: true, cleared: true };
+}

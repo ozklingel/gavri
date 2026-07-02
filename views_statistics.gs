@@ -5,7 +5,6 @@ function _adminStatisticsContent(sid) {
   let s = '<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
     'סך ההקצאות — לפי שיוך חיילי</p>';
   s += _dashboardCorpsStatsHtml(corpsStats, false);
-  s += _assignmentConflictsDashboardWidget();
   return s;
 }
 
