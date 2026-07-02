@@ -110,37 +110,7 @@ function Views_exercises(p) {
     '</div></div>';
 
   s += '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">📅 בניית סדרה</div></div>' +
-    '<div class="card-body">' +
-    '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">' +
-    'תזמון אוטומטי של תרגילים במערכת בטווח תאריכים — לפי מכסות חיר / חשן / 900. ' +
-    'כל רשומה: תרגיל יום (6 שעות) או תרגיל לילה (9 שעות), ללא ציר זמן פנימי.</p>' +
-    '<ul style="font-size:11px;color:var(--muted);margin:0 0 14px 18px;line-height:1.6">' +
-    '<li>התחלה ביום הראשון בשעה 06:00</li>' +
-    '<li>מרווח 18 שעות בין תרגילים מאותו סוג</li>' +
-    '<li>עד 3 תרגילים במקביל — כל אחד מסוג אחר (כולל קיימים)</li>' +
-    '<li>ללא שבתות וחגים (Hebcal + שבת)</li>' +
-    '<li>ללא התחלה 05:00–06:00</li>' +
-    '<li>בקיץ (יוני–ספט׳) ללא התחלה 12:00–16:00</li>' +
-    '</ul>' +
-    _formOpen() +
-    '<input type="hidden" name="action" value="buildSeries">' +
-    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-    '<div class="form-grid">' +
-    '<div class="form-row"><label class="form-label">מתאריך</label>' +
-    '<input type="text" name="series_start" class="form-input datepicker" required></div>' +
-    '<div class="form-row"><label class="form-label">עד תאריך</label>' +
-    '<input type="text" name="series_end" class="form-input datepicker" required></div>' +
-    '</div>' +
-    '<div class="form-grid" style="margin-top:8px">' +
-    '<div class="form-row"><label class="form-label">חיר</label>' +
-    '<input type="number" name="count_chir" class="form-input" min="0" value="0" required></div>' +
-    '<div class="form-row"><label class="form-label">חשן</label>' +
-    '<input type="number" name="count_chashan" class="form-input" min="0" value="0" required></div>' +
-    '<div class="form-row"><label class="form-label">900</label>' +
-    '<input type="number" name="count_900" class="form-input" min="0" value="0" required></div>' +
-    '</div>' +
-    _submitBtn('בנה סדרה', 'btn btn-primary btn-full') +
-    '</form></div></div>';
+    '<div class="card-body">' + Series_buildFormHtml(sid) + '</div></div>';
 
   s += '</div></div>';
 

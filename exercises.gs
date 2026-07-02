@@ -138,6 +138,78 @@ function _parseRawDate(str) {
   return Date.UTC(+parts[0], +parts[1]-1, +parts[2]);
 }
 
+var EXERCISE_DAY_START_H = 6;
+var EXERCISE_DAY_END_H = 18;
+
+/** 'day' | 'night' | null — לפי "יום" / "לילה" בשם התרגיל (סוג וריאנט לפני סוגריים). */
+function Exercise_slotKindFromName(name) {
+  const s = String(name || '');
+  const dayMarkers = ['יבש רטוב יום', 'התקדמות יום', 'התקפה יום', 'הגנה יום'];
+  const nightMarkers = [
+    'יבש רטוב מועמד לילה', 'יבש רטוב לילה',
+    'התקדמות לילה', 'התקפה לילה', 'הגנה לילה'
+  ];
+  let i;
+  for (i = 0; i < dayMarkers.length; i++) {
+    if (s.indexOf(dayMarkers[i]) !== -1) return 'day';
+  }
+  for (i = 0; i < nightMarkers.length; i++) {
+    if (s.indexOf(nightMarkers[i]) !== -1) return 'night';
+  }
+  if (s.indexOf('לילה') !== -1) return 'night';
+  if (s.indexOf('יום') !== -1) return 'day';
+  return null;
+}
+
+function Exercise_msInSlotKind(ms, kind) {
+  const h = new Date(ms).getHours();
+  if (kind === 'night') {
+    return h >= EXERCISE_DAY_END_H || h < EXERCISE_DAY_START_H;
+  }
+  if (kind === 'day') {
+    return h >= EXERCISE_DAY_START_H && h < EXERCISE_DAY_END_H;
+  }
+  return true;
+}
+
+function Exercise_msFromYmdHm(dateYmd, timeHm) {
+  const parts = String(dateYmd || '').split('-').map(Number);
+  if (parts.length !== 3) return NaN;
+  const tp = String(timeHm || '00:00').trim().split(':').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2], tp[0] || 0, tp[1] || 0, 0, 0).getTime();
+}
+
+/** חיר: חלק יבש/רטוב מתוך יבש־רטוב — נבדק כבלוק בבניית סדרה, לא לפי שעת החלק. */
+function Exercise_isChirSplitPartTitle(title) {
+  const s = String(title || '');
+  return s.indexOf('יבש רטוב') !== -1 &&
+    (s.indexOf('— יבש') !== -1 || s.indexOf('— רטוב') !== -1);
+}
+
+/** null = תקין; אחרת הודעת שגיאה בעברית. */
+function Exercise_validateNameAgainstTimes(title, startMs, endMs) {
+  if (Exercise_isChirSplitPartTitle(title)) return null;
+  const kind = Exercise_slotKindFromName(title);
+  if (!kind || isNaN(startMs) || isNaN(endMs)) return null;
+
+  if (!Exercise_msInSlotKind(startMs, kind)) {
+    if (kind === 'day') {
+      return 'תרגיל עם "יום" בשם חייב להתחיל בשעות היום (06:00–18:00).';
+    }
+    return 'תרגיל עם "לילה" בשם חייב להתחיל בשעות הלילה (18:00–06:00).';
+  }
+
+  if (kind === 'day') {
+    const endH = new Date(endMs).getHours();
+    const endM = new Date(endMs).getMinutes();
+    if (endH > EXERCISE_DAY_END_H || (endH === EXERCISE_DAY_END_H && endM > 0)) {
+      return 'תרגיל עם "יום" בשם לא יכול להימשך לשעות הלילה (סיום עד 18:00).';
+    }
+  }
+
+  return null;
+}
+
 function Exercises_all() {
   return _rows('Exercises').data.map(r => ({
     id:          String(r[0]),
@@ -273,6 +345,11 @@ function Exercises_create(p) {
   const startTime = String(p.start_time || '').trim();
   const endTime   = String(p.end_time   || '').trim();
 
+  const startMs = Exercise_msFromYmdHm(startDate, startTime);
+  const endMs = Exercise_msFromYmdHm(endDate, endTime);
+  const slotErr = Exercise_validateNameAgainstTimes(title, startMs, endMs);
+  if (slotErr) throw new Error(slotErr);
+
   _append('Exercises', [
     id, title, description, u.id,
     startDate, endDate,
@@ -298,6 +375,12 @@ function Exercises_edit(p) {
   Auth_requireRole(p, ['admin']);
   const row = _findRowIndex('Exercises', p.id);
   if (row < 0) throw new Error('התרגיל לא נמצא.');
+
+  const title = String(p.title || '').trim();
+  const startMs = Exercise_msFromYmdHm(p.start_date, p.start_time);
+  const endMs = Exercise_msFromYmdHm(p.end_date, p.end_time);
+  const slotErr = Exercise_validateNameAgainstTimes(title, startMs, endMs);
+  if (slotErr) throw new Error(slotErr);
 
   const validated = Exercises_validateCampAndPartner(p);
 
@@ -331,6 +414,12 @@ function Exercises_updateTimes(p) {
   if (!id) throw new Error('חסר מזהה תרגיל.');
   const row = _findRowIndex('Exercises', id);
   if (row < 0) throw new Error('התרגיל לא נמצא.');
+
+  const ex = Exercises_get(id);
+  const startMs = Exercise_msFromYmdHm(p.start_date, p.start_time);
+  const endMs = Exercise_msFromYmdHm(p.end_date, p.end_time);
+  const slotErr = Exercise_validateNameAgainstTimes(ex ? ex.title : '', startMs, endMs);
+  if (slotErr) throw new Error(slotErr);
 
   const sh = _sheet('Exercises');
   sh.getRange(row, 5).setValue(String(p.start_date || '').trim());
