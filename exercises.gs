@@ -481,6 +481,21 @@ function Exercises_addDetail(p) {
   _exerciseDetailsInsertSorted(exId, [did, exId, timeStored, location, description]);
   return Views_exercise({ sid: p.sid, id: exId, info: 'רישום ציר הזמן נוסף וסודר לפי תאריך ושעה.' });
 }
+
+/** מוחק את כל התרגילים + הקצאות + פרטי ציר זמן (לא נוגע ב-TimelineBlocks). */
+function Exercises_clearAllBeforeSeries() {
+  const removedExercises = _rows('Exercises').data.length;
+
+  ['Assignments', 'ExerciseDetails', 'Exercises'].forEach(function(name) {
+    const sh = _sheet(name);
+    const last = sh.getLastRow();
+    if (last > 1) sh.deleteRows(2, last - 1);
+    _cacheInvalidate(name);
+  });
+
+  return removedExercises;
+}
+
 // (החלף את הפונקציה Exercises_delete בקובץ exercises.gs בגרסה הזו)
 
 function Exercises_delete(p) {

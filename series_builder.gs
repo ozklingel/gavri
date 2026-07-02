@@ -566,7 +566,8 @@ function _seriesSlotLabel(plan, parentVariantLabel) {
   return label ? (label + ' (' + base + ')') : ('תרגיל ' + base);
 }
 
-function Series_schedule(startYmd, endYmd, queue, locations) {
+function Series_schedule(startYmd, endYmd, queue, locations, opts) {
+  opts = opts || {};
   const rangeEndMs = _seriesYmdToMs(endYmd, 23, 59) + 60000;
   if (isNaN(_parseRawDate(startYmd)) || isNaN(_parseRawDate(endYmd))) {
     throw new Error('טווח תאריכים לא תקין.');
@@ -583,7 +584,9 @@ function Series_schedule(startYmd, endYmd, queue, locations) {
     throw new Error('טווח תאריכים לא תקין.');
   }
 
-  const ranges = _seriesExistingRanges(rangeStartMs, rangeEndMs);
+  const ranges = opts.ignoreExisting
+    ? []
+    : _seriesExistingRanges(rangeStartMs, rangeEndMs);
   const workQueue = _seriesBuildQueue(queue);
   const placed = [];
   const forceSlotLastEnd = {};
@@ -735,6 +738,8 @@ function Series_buildFormHtml(sid) {
   let s = '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">' +
     'תזמון אוטומטי: בוחרים 3 כוחות (מותרות כפילויות), סה״כ תרגילים, ומיקומים. ' +
     'התרגילים מתחלקים בערך שווה בין שלושת הכוחות.</p>';
+  s += '<p style="font-size:12px;color:#d97706;margin:0 0 12px;font-weight:600">' +
+    '⚠ בניית סדרה מוחקת את כל התרגילים, השיבוצים וצירי הזמן הקיימים במערכת.</p>';
   s += '<ul style="font-size:11px;color:var(--muted);margin:0 0 14px 18px;line-height:1.6">';
   s += '<li>התחלה ביום שני הראשון בטווח, בשעה 06:00</li>';
   s += '<li>מרווח 18 שעות בין תרגילים באותו כוח (מסלול)</li>';
@@ -765,8 +770,10 @@ function Series_buildFormHtml(sid) {
   s += '<div class="form-row" style="margin-top:12px"><label class="form-label">מיקומים לשיבוץ</label>';
   s += Series_locationCheckboxesHtml() + '</div>';
   s += '<p style="font-size:11px;color:var(--muted);margin-top:8px">' +
-    'דוגמה: 10 תרגילים, כוחות 900 + 900 + חשן → 4 + 3 + 3 תרגילים.</p>';
-  s += _submitBtn('בנה סדרה', 'btn btn-primary btn-full');
+    'דוגמה: 10 תרגילים, כוחות 900 + 900 + חשן → 4 + 3 + 3 מקומות בלוז.</p>';
+  s += '<button type="submit" class="btn btn-primary btn-full" ' +
+    'onclick="return confirm(\'בניית סדרה תמחק את כל התרגילים, השיבוצים וצירי הזמן הקיימים. להמשיך?\')">' +
+    '► בנה סדרה</button>';
   s += '</form>';
   return s;
 }
@@ -788,13 +795,15 @@ function Exercises_buildSeries(p) {
     throw new Error('טווח תאריכים לא תקין.');
   }
 
-  const result = Series_schedule(startYmd, endYmd, queue, locations);
+  const result = Series_schedule(startYmd, endYmd, queue, locations, { ignoreExisting: true });
   if (!result.placed.length) {
     return Views_exercises({
       sid: p.sid,
       error: 'לא נמצא מקום לתרגילים בטווח הנתון. נסה להרחיב טווח או להפחית כמות.'
     });
   }
+
+  const removedCount = Exercises_clearAllBeforeSeries();
 
   const exRows = [];
   const baseTs = Date.now();
@@ -833,7 +842,13 @@ function Exercises_buildSeries(p) {
   if (exRows.length) _appendBatch('Exercises', exRows);
 
   const createdCount = exRows.length;
-  let info = '✅ ביקשת ' + result.requestedCount + ' מקומות בלוז · נוצרו ' + createdCount + ' תרגילים';
+  const scheduledCount = result.requestedCount - result.skippedCount;
+  let info = '✅';
+  if (removedCount) info += ' נוקו ' + removedCount + ' תרגילים קיימים ·';
+  info += ' שובצו ' + scheduledCount + ' מקומות בלוז · נוצרו ' + createdCount + ' רשומות תרגיל';
+  if (createdCount > scheduledCount) {
+    info += ' (פיצולי יבש/רטוב לחיר · זוגות התקדמות+יבש־רטוב לחשן)';
+  }
   const byType = {};
   exRows.forEach(function(row) {
     const t = row[7];
