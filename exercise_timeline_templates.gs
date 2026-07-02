@@ -1,4 +1,5 @@
 // exercise_timeline_templates.gs — תבנית נוה"ק לציר זמן תרגיל
+// טווח נוה"ק: יום לפני התרגיל (start-1) עד יום אחרי (end+1)
 
 function ExerciseTimeline_profile(ex) {
   const act  = String(ex && ex.act || '').replace(/״/g, '"');
@@ -27,207 +28,189 @@ function ExerciseTimeline_profileLabel(profile) {
   return map[profile] || profile;
 }
 
+/** phase: dayBefore | startDay | during | atEnd | dayAfter */
 function ExerciseTimeline_templateRows() {
   return [
     {
-      location: 'מחנה צאלים', duration: '60 דק\'',
+      location: 'מחנה צאלים', duration: '60 דק\'', phase: 'dayBefore',
       title: 'קפ"ק 1 תאום ציפיות ומתן דגשים ולקחים למג"ד בראשות מנהל התרגיל',
       participants: 'מנהל התרגיל, מג"ד, מטה גדוד, קמב"ץ גדוד (קמ"פ)',
-      times: {
-        magnet: '21.1 19:00|עם סיום אקט ראשון',
-        dry_wet_day: '25.1 11:00|עם סיום אקט ראשון',
-        dutz: '26.1 08:00|ע"פ לו"ז מרכז דרומי',
-        dry_wet_night_organic: '27.1 08:00|ע"פ לו"ז מרכז דרומי'
+      clocks: {
+        magnet: '19:00|עם סיום אקט ראשון',
+        dry_wet_day: '11:00|עם סיום אקט ראשון',
+        dutz: '08:00|ע"פ לו"ז מרכז דרומי',
+        dry_wet_night_organic: '08:00|ע"פ לו"ז מרכז דרומי'
       }
     },
     {
-      location: 'מחנה צאלים', duration: '60 דק\'',
+      location: 'מחנה צאלים', duration: '60 דק\'', phase: 'dayBefore',
       title: 'א.ת. חטיבתי למג"ד',
       participants: 'מנהל התרגיל, מג"ד, מטה גדוד',
-      times: {
-        magnet: '22.1 13:00|מיד לאחר מכן הגעה לתצוגת האש',
-        dry_wet_day: '25.1 08:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '26.1 14:00|עם סיום אקט ראשון — במחנה ביל"ו',
-        dry_wet_night_organic: '27.1 08:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '13:00|מיד לאחר מכן הגעה לתצוגת האש',
+        dry_wet_day: '08:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '14:00|עם סיום אקט ראשון — במחנה ביל"ו',
+        dry_wet_night_organic: '08:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'מחנה צאלים', duration: '60 דק\'',
+      location: 'מחנה צאלים', duration: '60 דק\'', phase: 'dayBefore',
       title: 'קפ"ק 1 גדודי למ"פים',
       participants: 'מנהל התרגיל, ק\' הבטיחות הראשי, מג"ד, מטה גדוד, מ"פים',
-      times: {
-        magnet: '25.1 09:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_day: '25.1 10:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '26.1 11:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_night_organic: '27.1 09:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '09:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_day: '10:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '11:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_night_organic: '09:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'מחנה צאלים', duration: '2 שעות',
+      location: 'מחנה צאלים', duration: '2 שעות', phase: 'dayBefore',
       title: 'חל"ז לא.ת. גדודי למ"פים — יש לקבוע דירוג בין המ"פים',
       participants: 'מג"ד, מטה גדוד, מ"פים',
-      times: {
-        magnet: '25.1 14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_day: '25.1 14:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '26.1 21:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_night_organic: '27.1 14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_day: '14:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '21:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_night_organic: '14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'מחנה צק"ג', duration: '60 דק\'',
+      location: 'מחנה צק"ג', duration: '60 דק\'', phase: 'dayBefore',
       title: 'תדריך מ"פ למ"מים (קפ"ק 1)',
       participants: 'מ"פים, מ"פים אורגניים, מ"מים, ק\' בטיחות פלוגתי',
-      times: {
-        magnet: '25.1 17:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_day: '25.1 17:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '25.1 19:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_night_organic: '27.1 09:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '17:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_day: '17:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '19:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_night_organic: '09:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'שטח אש', duration: '2 שעות',
+      location: 'שטח אש', duration: '2 שעות', phase: 'dayBefore',
       title: 'סיו"ש בטיחות בראשות מנהל התרגיל — מוכוון תרגיל',
       participants: 'מנהל התרגיל, ק\' הבטיחות הראשי, ק\' בטיחות ארטילריה, מ\' אחראי, ק\' הבטיחות בכל המסגרות',
-      times: {
-        magnet: '25.1 14:00',
-        dry_wet_day: '25.1 14:00',
-        dutz: '26.1 08:00',
-        dry_wet_night_organic: '27.1 11:00'
-      }
+      clocks: { magnet: '14:00', dry_wet_day: '14:00', dutz: '08:00', dry_wet_night_organic: '11:00' }
     },
     {
-      location: 'לשכת מפקד', duration: '30 דק\'',
+      location: 'לשכת מפקד', duration: '30 דק\'', phase: 'dayBefore',
       title: 'שולחן עגול בראשות מ\' המלפ"ק — עד 24 שעות לפני התרגיל | אחרי א.ת. למג"ד',
       participants: 'מנהל התרגיל, קצין הבטיחות הראשי, מפקד אחראי, מפקד מרכז דרומי, ק\' אג"ם מרכז דרומי, קבט"א',
-      times: {
-        magnet: '25.1 13:30',
-        dry_wet_day: '25.1 14:00',
-        dutz: '27.1 13:00',
-        dry_wet_night_organic: '27.1 09:00'
-      }
+      clocks: { magnet: '13:30', dry_wet_day: '14:00', dutz: '13:00', dry_wet_night_organic: '09:00' }
     },
     {
-      location: 'מחנה צק"ג', duration: '90 דק\'',
+      location: 'מחנה צק"ג', duration: '90 דק\'', phase: 'dayBefore',
       title: 'קפ"ק 2',
       participants: 'מנהל התרגיל, מג"ד, מטה גדוד, מ"פים, מ"מים עם משימה גדודית, מפקדים אחראיים, מעטה חטיבתי בהובלת ארזים, כל מערך הבטיחות',
-      times: {
-        magnet: '25.1 20:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_day: '25.1 20:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '26.1 15:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_night_organic: '27.1 14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '20:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_day: '20:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '15:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_night_organic: '14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'מחנה צק"ג', duration: '90 דק\'',
+      location: 'מחנה צק"ג', duration: '90 דק\'', phase: 'dayBefore',
       title: 'תחקיר רמה ממונה בראשות המג"ד — או מפקד שיוגדר על ידי מנהל התרגיל',
       participants: 'מג"ד, מטה גדוד, מ"פים',
-      times: {
-        magnet: '25.1 22:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_day: '25.1 22:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '26.1 13:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_night_organic: '27.1 16:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '22:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_day: '22:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '13:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_night_organic: '16:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'מחנה צק"ג', duration: '45 דק\'',
+      location: 'מחנה צק"ג', duration: '45 דק\'', phase: 'dayBefore',
       title: 'קפ"ק 3 + תדריך מנהלת + אישור תיק ירי ארטילרי — לתרג"ד באש',
       participants: 'מנהל התרגיל, ק\' הבטיחות, ק\' בטיחות ארט\' ראש מעטה החטיבה, מפקד אחראי',
-      times: {
-        magnet: '25.1 21:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_day: '26.1 07:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '26.1 16:45|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_night_organic: '27.1 17:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '21:30|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_day: '07:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '16:45|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_night_organic: '17:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'מחנה צק"ג / שטח כינוס', duration: '60 דק\'',
+      location: 'מחנה צק"ג / שטח כינוס', duration: '60 דק\'', phase: 'startDay',
       title: 'מודל ומסדר מערכות — שו"ב, מגנט, קשר, דרוריות, מיקום רק"ש, מפתוחים בהובלת מפקד אחראי',
       participants: 'כלל הכוחות הרלוונטיים כולל רכבי מתב"ת',
-      times: {
-        magnet: '26.1 06:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_day: '26.1 07:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dutz: '26.1 14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
-        dry_wet_night_organic: '27.1 18:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
+      clocks: {
+        magnet: '06:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_day: '07:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dutz: '14:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל',
+        dry_wet_night_organic: '18:00|לו"ז נוה"ק חפוז שיקבע ע"י מנהל התרגיל'
       }
     },
     {
-      location: 'מרחב התרגיל', duration: '120 דק\'',
+      location: 'מרחב התרגיל', duration: '120 דק\'', phase: 'skip',
       title: 'שלדי מפקדים',
       participants: 'מנהל התרגיל, מפקד אחראי, קציני בטיחות, חפ"קים, מפקדים מרמת מ"כ, דגלנים, קשרים',
-      times: {
-        magnet: 'ללא', dry_wet_day: 'ללא', dutz: 'ללא', dry_wet_night_organic: 'ללא'
-      }
+      clocks: { magnet: 'skip', dry_wet_day: 'skip', dutz: 'skip', dry_wet_night_organic: 'skip' }
     },
     {
-      location: 'מרחב התרגיל', duration: 'משתנה',
+      location: 'מרחב התרגיל', duration: 'משתנה', phase: 'during',
       title: 'זמן תרגיל (כולל שלדי מפקדים יום ע"פ צורך)',
       participants: 'כלל הכוחות המתורגלים',
-      times: {
-        magnet: '26.1 08:00-15:00',
-        dry_wet_day: '26.1 20:00-01:00',
-        dutz: '27.1 08:00-14:00',
-        dry_wet_night_organic: '28.1 22:00 עד 29.1 06:00'
+      clocks: {
+        magnet: 'exercise',
+        dry_wet_day: '20:00-01:00|overnight',
+        dutz: 'exercise',
+        dry_wet_night_organic: '22:00-06:00|overnight'
       }
     },
     {
-      location: 'נק\' סיום תרגיל', duration: '30 דק\'',
+      location: 'נק\' סיום תרגיל', duration: '30 דק\'', phase: 'atEnd',
       title: 'סיכום פלוגתי',
       participants: 'מרמת מ"מ',
-      times: {
-        magnet: 'בסיום התרגיל',
-        dry_wet_day: 'בסיום התרגיל',
-        dutz: 'בסיום התרגיל',
-        dry_wet_night_organic: 'בסיום התרגיל'
-      }
+      clocks: { magnet: 'atEnd', dry_wet_day: 'atEnd', dutz: 'atEnd', dry_wet_night_organic: 'atEnd' }
     },
     {
-      location: 'מחנה צאלים', duration: '60 דק\' לשני התרגילים',
+      location: 'מחנה צאלים', duration: '60 דק\' לשני התרגילים', phase: 'dayAfter',
       title: 'מגירת פתיחה — קביעת מוקדי התחקיר',
       participants: 'מנהל התרגיל, ארזים, מג"דים מתרגלים',
-      times: {
-        magnet: '27.1 09:00',
-        dry_wet_day: '27.1 15:00',
-        dutz: '28.1 14:00',
-        dry_wet_night_organic: '29.1 18:00'
-      }
+      clocks: { magnet: '09:00', dry_wet_day: '15:00', dutz: '14:00', dry_wet_night_organic: '18:00' }
     },
     {
-      location: 'מחנה צאלים', duration: '3 שעות לשני התחקירים',
+      location: 'מחנה צאלים', duration: '3 שעות לשני התחקירים', phase: 'dayAfter',
       title: 'סיכום גדודי',
       participants: 'מג"דים, מטה גדוד, מ"פים',
-      times: {
-        magnet: '27.1 10:00-13:00',
-        dry_wet_day: '27.1 15:00-18:00',
-        dutz: '28.1 14:00-17:00',
-        dry_wet_night_organic: '29.1 19:00-22:00'
+      clocks: {
+        magnet: '10:00-13:00',
+        dry_wet_day: '15:00-18:00',
+        dutz: '14:00-17:00',
+        dry_wet_night_organic: '19:00-22:00'
       }
     },
     {
-      location: 'מחנה צאלים', duration: '60 דק\'',
+      location: 'מחנה צאלים', duration: '60 דק\'', phase: 'dayAfter',
       title: 'משוב חונך — מתרגל',
       participants: 'חונך ומתרגל (אישי)',
-      times: {
-        magnet: '27.1 13:00',
-        dry_wet_day: '27.1 18:00',
-        dutz: '28.1 17:00',
-        dry_wet_night_organic: '29.1 22:00'
-      }
+      clocks: { magnet: '13:00', dry_wet_day: '18:00', dutz: '17:00', dry_wet_night_organic: '22:00' }
     }
   ];
 }
 
-function ExerciseTimeline_parseDayMonth(str, year) {
-  const m = String(str || '').trim().match(/^(\d{1,2})\.(\d{1,2})$/);
-  if (!m) return null;
-  const dd = String(m[1]).padStart(2, '0');
-  const mm = String(m[2]).padStart(2, '0');
-  return year + '-' + mm + '-' + dd;
+function ExerciseTimeline_addDays(ymd, days) {
+  if (!ymd) return '';
+  const ms = _parseRawDate(ymd);
+  if (isNaN(ms)) return ymd;
+  const d = new Date(ms + days * 86400000);
+  return d.getUTCFullYear() + '-' +
+    String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getUTCDate()).padStart(2, '0');
 }
 
-function ExerciseTimeline_anchorYear(ex) {
-  if (ex && ex.rawStartDate) return parseInt(String(ex.rawStartDate).slice(0, 4), 10);
-  if (ex && ex.rawEndDate) return parseInt(String(ex.rawEndDate).slice(0, 4), 10);
-  return new Date().getFullYear();
+function ExerciseTimeline_window(ex) {
+  const startYmd = ex.rawStartDate;
+  const endYmd   = ex.rawEndDate || ex.rawStartDate;
+  if (!startYmd) throw new Error('חובה להגדיר תאריך התחלה לתרגיל.');
+  return {
+    dayBefore: ExerciseTimeline_addDays(startYmd, -1),
+    startYmd:  startYmd,
+    endYmd:    endYmd,
+    dayAfter:  ExerciseTimeline_addDays(endYmd, 1)
+  };
 }
 
 function ExerciseTimeline_msFromYmdHm(ymd, hm) {
@@ -243,93 +226,95 @@ function ExerciseTimeline_msFromYmdHm(ymd, hm) {
   return new Date(parts[0], parts[1] - 1, parts[2], h, m, 0, 0).getTime();
 }
 
-function ExerciseTimeline_formatResolved(ymd, hm, endHm, endYmd) {
-  const start = _fmtDateTimeFull(ymd, hm);
-  if (!endHm) return start;
-  if (endYmd && endYmd !== ymd) return start + ' — ' + _fmtDateTimeFull(endYmd, endHm);
-  return start + ' — ' + endHm;
+function ExerciseTimeline_formatRange(ymdStart, hmStart, ymdEnd, hmEnd) {
+  const start = _fmtDateTimeFull(ymdStart, hmStart);
+  if (!hmEnd) return start;
+  const endYmd = ymdEnd || ymdStart;
+  if (endYmd !== ymdStart) return start + ' — ' + _fmtDateTimeFull(endYmd, hmEnd);
+  return start + ' — ' + hmEnd;
 }
 
-function ExerciseTimeline_resolveSpec(spec, ex) {
-  if (!spec || spec === 'ללא') return null;
+function ExerciseTimeline_parseClockSpec(spec) {
+  if (!spec || spec === 'skip' || spec === 'ללא') return null;
 
   const raw = String(spec).trim();
   const parts = raw.split('|');
-  const timePart = parts[0].trim();
-  const note = parts.length > 1 ? parts.slice(1).join('|').trim() : '';
+  const clock = parts[0].trim();
+  const note  = parts.length > 1 ? parts.slice(1).join('|').trim() : '';
+  const overnight = note === 'overnight' || clock.indexOf('overnight') !== -1;
 
-  if (timePart === 'בסיום התרגיל') {
-    const ymd = ex.rawEndDate || ex.rawStartDate;
-    const hm  = ex.rawEndTime || '';
-    return {
-      time: _fmtDateTimeFull(ymd, hm) + (note ? ' (' + note + ')' : ''),
-      sortMs: ExerciseTimeline_msFromYmdHm(ymd, hm || '23:59')
-    };
+  if (clock === 'exercise' || clock === 'atEnd') {
+    return { kind: clock, note: note === 'overnight' ? '' : note };
   }
 
-  if (/לו"ז נוה"ק|ע"פ לו"ז|אורגני/i.test(timePart) && !/\d{1,2}\.\d{1,2}/.test(timePart)) {
-    return {
-      time: timePart + (note ? ' — ' + note : ''),
-      sortMs: ExerciseTimeline_msFromYmdHm(ex.rawStartDate, ex.rawStartTime || '12:00') + 1
-    };
-  }
-
-  const year = ExerciseTimeline_anchorYear(ex);
-
-  // Cross-day range: 28.1 22:00 עד 29.1 06:00
-  let cross = timePart.match(/^(\d{1,2}\.\d{1,2})\s+(\d{1,2}:\d{2})\s+עד\s+(\d{1,2}\.\d{1,2})\s+(\d{1,2}:\d{2})$/);
-  if (cross) {
-    const ymd1 = ExerciseTimeline_parseDayMonth(cross[1], year);
-    const ymd2 = ExerciseTimeline_parseDayMonth(cross[3], year);
-    return {
-      time: ExerciseTimeline_formatResolved(ymd1, cross[2], cross[4], ymd2) + (note ? ' (' + note + ')' : ''),
-      sortMs: ExerciseTimeline_msFromYmdHm(ymd1, cross[2])
-    };
-  }
-
-  // Same-day range: 26.1 08:00-15:00 or 27.1 10:00-13:00
-  let range = timePart.match(/^(\d{1,2}\.\d{1,2})\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+  let range = clock.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
   if (range) {
-    const ymd = ExerciseTimeline_parseDayMonth(range[1], year);
     return {
-      time: ExerciseTimeline_formatResolved(ymd, range[2], range[3]) + (note ? ' (' + note + ')' : ''),
-      sortMs: ExerciseTimeline_msFromYmdHm(ymd, range[2])
+      kind: 'range',
+      startHm: range[1],
+      endHm: range[2],
+      overnight: overnight || parseInt(range[2].split(':')[0], 10) < parseInt(range[1].split(':')[0], 10),
+      note: note
     };
   }
 
-  // Date | time: 22.1 | 13:00
-  let pipe = timePart.match(/^(\d{1,2}\.\d{1,2})\s*\|\s*(\d{1,2}:\d{2})$/);
-  if (pipe) {
-    const ymd = ExerciseTimeline_parseDayMonth(pipe[1], year);
+  let hm = clock.match(/^(\d{1,2}:\d{2})$/);
+  if (hm) return { kind: 'point', startHm: hm[1], note: note };
+
+  return { kind: 'text', text: raw, note: note };
+}
+
+function ExerciseTimeline_resolveRow(row, clockSpec, ex, win) {
+  if (row.phase === 'skip') return null;
+
+  const parsed = ExerciseTimeline_parseClockSpec(clockSpec);
+  if (!parsed) return null;
+
+  let ymd = win.startYmd;
+  let note = parsed.note || '';
+
+  if (parsed.kind === 'exercise') {
+    const startHm = ex.rawStartTime || '';
+    const endHm   = ex.rawEndTime || '';
     return {
-      time: ExerciseTimeline_formatResolved(ymd, pipe[2]) + (note ? ' (' + note + ')' : ''),
-      sortMs: ExerciseTimeline_msFromYmdHm(ymd, pipe[2])
+      time: ExerciseTimeline_formatRange(win.startYmd, startHm, win.endYmd, endHm) + (note ? ' (' + note + ')' : ''),
+      sortMs: ExerciseTimeline_msFromYmdHm(win.startYmd, startHm || '00:00')
     };
   }
 
-  // Date time: 21.1 19:00
-  let dt = timePart.match(/^(\d{1,2}\.\d{1,2})\s+(\d{1,2}:\d{2})$/);
-  if (dt) {
-    const ymd = ExerciseTimeline_parseDayMonth(dt[1], year);
+  if (parsed.kind === 'atEnd') {
+    const endYmd = win.endYmd;
+    const endHm  = ex.rawEndTime || '23:59';
     return {
-      time: ExerciseTimeline_formatResolved(ymd, dt[2]) + (note ? ' (' + note + ')' : ''),
-      sortMs: ExerciseTimeline_msFromYmdHm(ymd, dt[2])
+      time: _fmtDateTimeFull(endYmd, endHm) + (note ? ' (' + note + ')' : ''),
+      sortMs: ExerciseTimeline_msFromYmdHm(endYmd, endHm)
     };
   }
 
-  // Date only with note in timePart
-  let dOnly = timePart.match(/^(\d{1,2}\.\d{1,2})$/);
-  if (dOnly) {
-    const ymd = ExerciseTimeline_parseDayMonth(dOnly[1], year);
+  if (parsed.kind === 'text') {
     return {
-      time: _fmtDate(ymd) + (note ? ' — ' + note : ''),
-      sortMs: ExerciseTimeline_msFromYmdHm(ymd, '12:00')
+      time: parsed.text + (note ? ' — ' + note : ''),
+      sortMs: ExerciseTimeline_msFromYmdHm(win.dayBefore, '12:00')
+    };
+  }
+
+  if (row.phase === 'dayBefore') ymd = win.dayBefore;
+  else if (row.phase === 'startDay') ymd = win.startYmd;
+  else if (row.phase === 'dayAfter') ymd = win.dayAfter;
+  else if (row.phase === 'during') ymd = win.startYmd;
+
+  if (parsed.kind === 'range') {
+    let endYmd = ymd;
+    if (parsed.overnight) endYmd = ExerciseTimeline_addDays(ymd, 1);
+    return {
+      time: ExerciseTimeline_formatRange(ymd, parsed.startHm, endYmd, parsed.endHm) + (note ? ' (' + note + ')' : ''),
+      sortMs: ExerciseTimeline_msFromYmdHm(ymd, parsed.startHm)
     };
   }
 
   return {
-    time: raw,
-    sortMs: ExerciseTimeline_msFromYmdHm(ex.rawStartDate, ex.rawStartTime || '12:00') + 2
+    time: _fmtDateTimeFull(ymd, parsed.startHm) + (note ? ' (' + note + ')' : ''),
+    sortMs: ExerciseTimeline_msFromYmdHm(ymd, parsed.startHm)
   };
 }
 
@@ -340,12 +325,13 @@ function ExerciseTimeline_buildDescription(row) {
 }
 
 function ExerciseTimeline_rowsForExercise(ex, profile) {
+  const win = ExerciseTimeline_window(ex);
   const template = ExerciseTimeline_templateRows();
   const out = [];
 
   template.forEach(function(row) {
-    const spec = row.times && row.times[profile];
-    const resolved = ExerciseTimeline_resolveSpec(spec, ex);
+    const clockSpec = row.clocks && row.clocks[profile];
+    const resolved = ExerciseTimeline_resolveRow(row, clockSpec, ex, win);
     if (!resolved) return;
     out.push({
       time: resolved.time,
@@ -356,9 +342,7 @@ function ExerciseTimeline_rowsForExercise(ex, profile) {
   });
 
   out.sort(function(a, b) {
-    const sa = isNaN(a.sortMs) ? 0 : a.sortMs;
-    const sb = isNaN(b.sortMs) ? 0 : b.sortMs;
-    return sa - sb;
+    return (isNaN(a.sortMs) ? 0 : a.sortMs) - (isNaN(b.sortMs) ? 0 : b.sortMs);
   });
   return out;
 }
@@ -377,9 +361,11 @@ function Exercises_generateTimeline(p) {
   const exId = String(p.id || p.exerciseId || '').trim();
   const ex = Exercises_get(exId);
   if (!ex) throw new Error('התרגיל לא נמצא.');
+  if (!ex.rawStartDate) throw new Error('חובה להגדיר תאריך התחלה לתרגיל.');
 
   const profile = ExerciseTimeline_profile(ex);
   const profileLabel = ExerciseTimeline_profileLabel(profile);
+  const win = ExerciseTimeline_window(ex);
   const rows = ExerciseTimeline_rowsForExercise(ex, profile);
   if (!rows.length) {
     throw new Error('לא נמצאה תבנית ציר זמן לסוג תרגיל זה.');
@@ -398,9 +384,11 @@ function Exercises_generateTimeline(p) {
   });
   _appendBatch('ExerciseDetails', detailRows);
 
+  const rangeLabel = _fmtDate(win.dayBefore) + ' — ' + _fmtDate(win.dayAfter);
   return Views_exercise({
     sid: p.sid,
     id: exId,
-    info: 'נוצר ציר זמן (' + profileLabel + ') — ' + detailRows.length + ' רשומות.'
+    info: 'נוצר ציר זמן (' + profileLabel + ') — ' + detailRows.length +
+      ' רשומות. טווח נוה"ק: ' + rangeLabel + '.'
   });
 }
