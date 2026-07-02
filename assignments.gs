@@ -779,3 +779,71 @@ function updateAssignmentRespFromBoard(sid, assignId, exerciseId, responsibility
   _cacheInvalidate('Assignments');
   return { ok: true, responsibility: resp };
 }
+
+function _assignmentMatrixCellPayload(assignment) {
+  const u = Users_get(assignment.user_id);
+  return {
+    assignmentId: assignment.id,
+    userId: assignment.user_id,
+    name: u ? u.name : assignment.user_id,
+    phone: u ? (u.phone || '') : ''
+  };
+}
+
+/** שיבוץ משתמש לתא (תרגיל + תפקיד) מטבלת שליטה לפי תרגיל */
+function assignExerciseMatrixCell(sid, exId, role, userId) {
+  const p = { sid: sid };
+  Auth_requireRole(p, ['admin']);
+  exId = String(exId || '').trim();
+  role = String(role || '').trim();
+  userId = String(userId || '').trim();
+  if (!exId || !role || !userId) throw new Error('חסר תרגיל, תפקיד או משתמש.');
+
+  if (!Users_get(userId)) throw new Error('משתמש לא נמצא.');
+
+  HomeConstraints_assertCanAssign(userId, exId);
+
+  const onEx = Assignments_byExercise(exId);
+  const roleRows = onEx.filter(function(a) {
+    return String(a.responsibility || '').trim() === role;
+  });
+  const userRows = onEx.filter(function(a) { return a.user_id === userId; });
+
+  const exact = roleRows.find(function(a) { return a.user_id === userId; });
+  if (exact) return _assignmentMatrixCellPayload(exact);
+
+  if (!userRows.length) {
+    AssignmentConflicts_checkNewAssignment(userId, exId).forEach(function(w) {
+      if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+    });
+  }
+
+  const sh = _sheet('Assignments');
+  let keptId = null;
+
+  function deleteAssign(a) {
+    const r = _findRowIndex('Assignments', a.id);
+    if (r >= 0) sh.deleteRow(r);
+  }
+
+  if (userRows.length) {
+    keptId = userRows[0].id;
+    const row = _findRowIndex('Assignments', keptId);
+    sh.getRange(row, 6).setValue(role);
+    userRows.slice(1).forEach(deleteAssign);
+    roleRows.forEach(function(a) {
+      if (a.id !== keptId) deleteAssign(a);
+    });
+  } else if (roleRows.length) {
+    keptId = roleRows[0].id;
+    const row = _findRowIndex('Assignments', keptId);
+    sh.getRange(row, 3).setValue(userId);
+    roleRows.slice(1).forEach(deleteAssign);
+  } else {
+    keptId = 'A' + new Date().getTime();
+    _append('Assignments', _assignmentRow(keptId, exId, userId, 'pending', '', role, '', ''));
+  }
+
+  _cacheInvalidate('Assignments');
+  return _assignmentMatrixCellPayload(Assignments_get(keptId));
+}

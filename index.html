@@ -738,6 +738,51 @@ body {
     .ex-matrix-role-cell { font-size: 12px; font-weight: 600; line-height: 1.35; }
     .ex-matrix-assign-cell { vertical-align: middle !important; min-width: 110px; }
     .ex-matrix-assign-cell.filled { background: var(--bg3); }
+    .ex-matrix-assign-cell.editable {
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .ex-matrix-assign-cell.editable:hover {
+      background: var(--bg4);
+      box-shadow: inset 0 0 0 1px var(--green-dim);
+    }
+    .ex-matrix-assign-cell.ex-matrix-cell-saving { opacity: 0.55; pointer-events: none; }
+    .ex-matrix-cell-empty {
+      color: var(--muted);
+      font-size: 11px;
+      font-family: var(--mono);
+    }
+    .ex-matrix-cell-editor {
+      position: fixed;
+      z-index: 300;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 10px;
+      box-shadow: var(--shadow);
+    }
+    .ex-matrix-cell-editor-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .ex-matrix-cell-editor-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text2);
+      line-height: 1.4;
+    }
+    .ex-matrix-cell-editor-results {
+      position: relative;
+      top: auto;
+      left: auto;
+      right: auto;
+      width: 100%;
+      margin-top: 6px;
+      max-height: 220px;
+    }
     .ex-matrix-person { text-align: center; padding: 4px 2px; }
     .ex-matrix-person-name { font-weight: bold; font-size: 12px; line-height: 1.3; }
     .ex-matrix-person-phone { font-size: 10px; color: var(--muted); margin-top: 3px; direction: ltr; }

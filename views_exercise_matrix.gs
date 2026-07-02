@@ -117,6 +117,8 @@ function _exerciseMatrixBuildPayload() {
     const u = Users_get(a.user_id);
     const key = a.exercise_id + '\x1f' + resp;
     cells[key] = {
+      assignmentId: a.id,
+      userId: a.user_id,
       name: u ? u.name : a.user_id,
       phone: u ? (u.phone || '') : ''
     };
@@ -153,8 +155,27 @@ function Views_exerciseMatrix(p) {
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
 
   const sid = user.id;
+  const canEdit = Roles_hasAdminAccess(user.role);
   const payload = _exerciseMatrixBuildPayload();
+  payload.canEdit = canEdit;
+  if (canEdit) {
+    payload.users = Users_all().map(function(u) {
+      return { id: u.id, name: u.name, role: Roles_label(u.role) };
+    });
+  }
   const jsonData = JSON.stringify(payload).replace(/</g, '\\u003c');
+
+  const editorHtml = canEdit
+    ? '<div id="exMatrixCellEditor" class="ex-matrix-cell-editor" hidden>' +
+      '<div class="ex-matrix-cell-editor-head">' +
+      '<span id="exMatrixCellEditorTitle" class="ex-matrix-cell-editor-title"></span>' +
+      '<button type="button" id="exMatrixCellEditorClose" class="btn btn-ghost btn-sm">✕</button>' +
+      '</div>' +
+      '<input type="text" id="exMatrixCellEditorInput" class="form-input" ' +
+      'placeholder="חיפוש לפי שם או מספר אישי..." autocomplete="off">' +
+      '<div id="exMatrixCellEditorResults" class="user-search-results ex-matrix-cell-editor-results"></div>' +
+      '</div>'
+    : '';
 
   const body = _topbar(user, sid) +
     '<div class="page ex-matrix-page">' + _flash(p) +
@@ -176,6 +197,7 @@ function Views_exerciseMatrix(p) {
     '</div></div>' +
 
     '<div id="exMatrixAccordions"></div>' +
+    editorHtml +
     '<script>' + _exerciseMatrixJs() + '</script>' +
     '</div>';
 
@@ -189,6 +211,192 @@ function _exerciseMatrixJs() {
   var roleFilter = 'all';
   var weekFilter = 'all';
   var openTiers = { brigade: false, battalion: false, company: true };
+  var canEdit = !!data.canEdit;
+  var users = data.users || [];
+  var activeCell = null;
+  var editorActiveIdx = -1;
+
+  function cellHtml(exId, role, c) {
+    var cls = 'ex-matrix-assign-cell' + (c ? ' filled' : '') + (canEdit ? ' editable' : '');
+    var attrs = ' class="' + cls + '" data-ex-id="' + esc(exId) + '" data-role="' + esc(role) + '"';
+    if (canEdit) attrs += ' title="לחץ לשיבוץ משתמש" tabindex="0"';
+    var inner = '';
+    if (c) {
+      inner += '<div class="ex-matrix-person"><div class="ex-matrix-person-name">' + esc(c.name) + '</div>';
+      if (c.phone) inner += '<div class="ex-matrix-person-phone">' + esc(c.phone) + '</div>';
+      inner += '</div>';
+    } else if (canEdit) {
+      inner += '<span class="ex-matrix-cell-empty">+ שיבוץ</span>';
+    } else {
+      inner += '<span style="color:var(--muted)">—</span>';
+    }
+    return '<td' + attrs + '>' + inner + '</td>';
+  }
+
+  function setCellData(exId, role, cell) {
+    data.cells[exId + '\\x1f' + role] = cell;
+  }
+
+  function closeCellEditor() {
+    var editor = document.getElementById('exMatrixCellEditor');
+    if (editor) editor.hidden = true;
+    activeCell = null;
+    editorActiveIdx = -1;
+  }
+
+  function positionCellEditor(td) {
+    var editor = document.getElementById('exMatrixCellEditor');
+    if (!editor || !td) return;
+    var rect = td.getBoundingClientRect();
+    var top = rect.bottom + 6;
+    var left = Math.max(8, rect.left);
+    var width = Math.max(rect.width, 260);
+    if (top + 220 > window.innerHeight) top = Math.max(8, rect.top - 220);
+    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+    editor.style.top = top + 'px';
+    editor.style.left = left + 'px';
+    editor.style.width = width + 'px';
+    editor.hidden = false;
+  }
+
+  function renderEditorMatches(q) {
+    var results = document.getElementById('exMatrixCellEditorResults');
+    if (!results) return;
+    var query = String(q || '').trim().toLowerCase();
+    if (!query) {
+      results.innerHTML = '';
+      results.hidden = true;
+      editorActiveIdx = -1;
+      return;
+    }
+    var matches = users.filter(function(u) {
+      return String(u.id || '').toLowerCase().indexOf(query) !== -1 ||
+        String(u.name || '').toLowerCase().indexOf(query) !== -1;
+    }).slice(0, 12);
+    if (!matches.length) {
+      results.innerHTML = '<div style="padding:10px 12px;color:var(--muted);font-size:12px">לא נמצאו משתמשים</div>';
+      results.hidden = false;
+      return;
+    }
+    results.innerHTML = matches.map(function(u, i) {
+      return '<button type="button" class="user-search-item' + (i === editorActiveIdx ? ' active' : '') +
+        '" data-user-id="' + esc(u.id) + '">' +
+        '<span>' + esc(u.name) + '</span>' +
+        '<small>' + esc(u.id) + ' · ' + esc(u.role || '') + '</small></button>';
+    }).join('');
+    results.hidden = false;
+  }
+
+  function saveCellUser(userId) {
+    if (!activeCell || !userId) return;
+    var exId = activeCell.getAttribute('data-ex-id');
+    var role = activeCell.getAttribute('data-role');
+    var sid = window.MapimSpa && MapimSpa.getSid ? MapimSpa.getSid() : '';
+    if (!sid) { alert('נדרשת התחברות'); return; }
+
+    var td = activeCell;
+    closeCellEditor();
+    td.classList.add('ex-matrix-cell-saving');
+
+    google.script.run
+      .withSuccessHandler(function(cell) {
+        td.classList.remove('ex-matrix-cell-saving');
+        setCellData(exId, role, cell);
+        td.outerHTML = cellHtml(exId, role, cell);
+        updateTitle();
+      })
+      .withFailureHandler(function(err) {
+        td.classList.remove('ex-matrix-cell-saving');
+        alert(err && err.message ? err.message : String(err));
+      })
+      .assignExerciseMatrixCell(sid, exId, role, userId);
+  }
+
+  function openCellEditor(td) {
+    if (!canEdit) return;
+    var editor = document.getElementById('exMatrixCellEditor');
+    var input = document.getElementById('exMatrixCellEditorInput');
+    var title = document.getElementById('exMatrixCellEditorTitle');
+    if (!editor || !input) return;
+
+    activeCell = td;
+    var exId = td.getAttribute('data-ex-id');
+    var role = td.getAttribute('data-role');
+    var exLabel = (data.exMeta[exId] && data.exMeta[exId].label) || exId;
+    if (title) title.textContent = exLabel + ' · ' + role;
+
+    input.value = '';
+    renderEditorMatches('');
+    positionCellEditor(td);
+    input.focus();
+  }
+
+  function initCellEditor() {
+    if (!canEdit) return;
+    var editor = document.getElementById('exMatrixCellEditor');
+    var input = document.getElementById('exMatrixCellEditorInput');
+    var results = document.getElementById('exMatrixCellEditorResults');
+    var closeBtn = document.getElementById('exMatrixCellEditorClose');
+    if (!editor || !input) return;
+
+    document.getElementById('exMatrixAccordions').addEventListener('click', function(e) {
+      var td = e.target.closest('.ex-matrix-assign-cell.editable');
+      if (!td) return;
+      e.stopPropagation();
+      openCellEditor(td);
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', closeCellEditor);
+
+    input.addEventListener('input', function() {
+      editorActiveIdx = -1;
+      renderEditorMatches(input.value);
+    });
+
+    input.addEventListener('keydown', function(e) {
+      var items = results ? results.querySelectorAll('.user-search-item') : [];
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (results && results.hidden) renderEditorMatches(input.value);
+        items = results ? results.querySelectorAll('.user-search-item') : [];
+        editorActiveIdx = Math.min(editorActiveIdx + 1, items.length - 1);
+        items.forEach(function(el, i) { el.classList.toggle('active', i === editorActiveIdx); });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        editorActiveIdx = Math.max(editorActiveIdx - 1, 0);
+        items.forEach(function(el, i) { el.classList.toggle('active', i === editorActiveIdx); });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (items.length && editorActiveIdx >= 0 && items[editorActiveIdx]) {
+          saveCellUser(items[editorActiveIdx].getAttribute('data-user-id'));
+        } else if (items.length === 1) {
+          saveCellUser(items[0].getAttribute('data-user-id'));
+        }
+      } else if (e.key === 'Escape') {
+        closeCellEditor();
+      }
+    });
+
+    if (results) {
+      results.addEventListener('mousedown', function(e) {
+        var btn = e.target.closest('.user-search-item');
+        if (!btn) return;
+        e.preventDefault();
+        saveCellUser(btn.getAttribute('data-user-id'));
+      });
+    }
+
+    document.addEventListener('click', function(e) {
+      if (!editor.hidden && !e.target.closest('#exMatrixCellEditor') &&
+          !e.target.closest('.ex-matrix-assign-cell.editable')) {
+        closeCellEditor();
+      }
+    });
+
+    window.addEventListener('scroll', function() {
+      if (!editor.hidden && activeCell) positionCellEditor(activeCell);
+    }, true);
+  }
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -308,16 +516,7 @@ function _exerciseMatrixJs() {
     roles.forEach(function(role) {
       body += '<tr><td class="team-matrix-sticky ex-matrix-role-cell">' + esc(role) + '</td>';
       exs.forEach(function(ex) {
-        var c = cellData(ex.id, role);
-        body += '<td class="ex-matrix-assign-cell' + (c ? ' filled' : '') + '">';
-        if (c) {
-          body += '<div class="ex-matrix-person"><div class="ex-matrix-person-name">' + esc(c.name) + '</div>';
-          if (c.phone) body += '<div class="ex-matrix-person-phone">' + esc(c.phone) + '</div>';
-          body += '</div>';
-        } else {
-          body += '<span style="color:var(--muted)">—</span>';
-        }
-        body += '</td>';
+        body += cellHtml(ex.id, role, cellData(ex.id, role));
       });
       body += '</tr>';
     });
@@ -397,6 +596,7 @@ function _exerciseMatrixJs() {
   }
 
   document.getElementById('exMatrixExportCsv').addEventListener('click', exportCsv);
+  initCellEditor();
   render();
 })();
 `;
