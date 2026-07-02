@@ -4,6 +4,7 @@ function Views_exercises(p) {
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
   const exs = Exercises_all();
+  const mpCounts = Assignments_mpCountByExercise();
 
   let s = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
 
@@ -15,16 +16,20 @@ function Views_exercises(p) {
     s += '<div class="empty">אין תרגילים במערכת</div>';
   } else {
     s += '<table class="tbl"><thead><tr>' +
-      '<th>שם</th><th>סוג</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
+      '<th>שם</th><th>סוג</th><th>מפים</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
       '</tr></thead><tbody>';
 
     exs.forEach(function(e) {
+      const mpN = mpCounts[e.id] || 0;
       s += '<tr>' +
         '<td>' +
           '<div class="ex-title">' + _esc(e.title) + '</div>' +
           '<div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div>' +
         '</td>' +
         '<td>' + (e.exercise_type ? _badge(e.exercise_type, 'muted') : '—') + '</td>' +
+        '<td style="text-align:center">' +
+          (mpN ? '<span class="badge badge-green">' + mpN + '</span>' : '<span style="color:var(--muted)">0</span>') +
+        '</td>' +
         '<td>' + _esc(e.start_date || '—') + '</td>' +
         '<td>' + _esc(e.end_date || '—') + '</td>' +
         '<td style="text-align:left;white-space:nowrap">' +

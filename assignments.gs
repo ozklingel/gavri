@@ -32,6 +32,21 @@ function Assignments_get(id) {
   return Assignments_all().find(function(a) { return a.id === String(id); }) || null;
 }
 
+/** תפקיד מ״פ בתרגיל (מפ חיר, מפ חשן וכו׳) */
+function Assignments_isMpRole(resp) {
+  const r = String(resp || '').trim();
+  return /^מפ /.test(r);
+}
+
+function Assignments_mpCountByExercise() {
+  const counts = {};
+  Assignments_all().forEach(function(a) {
+    if (!Assignments_isMpRole(a.responsibility)) return;
+    counts[a.exercise_id] = (counts[a.exercise_id] || 0) + 1;
+  });
+  return counts;
+}
+
 function Assignments_isTuteeOf(user, assignment) {
   if (!user || !assignment || !Roles_isTutor(user.role)) return false;
   if (String(assignment.tutor) !== String(user.id)) return false;
