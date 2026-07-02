@@ -649,6 +649,35 @@ body {
     .team-matrix-cell.filled { background: var(--bg3); }
     .team-matrix-role { font-size: 11px; line-height: 1.3; display: block; }
 
+    .ex-matrix-tier-toggle {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border: none;
+      background: var(--bg3);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: right;
+      border-bottom: 1px solid var(--border);
+    }
+    .ex-matrix-tier-toggle.open { border-bottom: none; }
+    .ex-matrix-tier-brigade { border-right: 4px solid #60a5fa; }
+    .ex-matrix-tier-battalion { border-right: 4px solid #f59e0b; }
+    .ex-matrix-tier-company { border-right: 4px solid var(--green); }
+    .ex-matrix-tier-body { padding: 0; }
+    .ex-matrix-role-cell { font-size: 12px; font-weight: 600; line-height: 1.35; }
+    .ex-matrix-assign-cell { vertical-align: middle !important; min-width: 110px; }
+    .ex-matrix-assign-cell.filled { background: var(--bg3); }
+    .ex-matrix-person { text-align: center; padding: 4px 2px; }
+    .ex-matrix-person-name { font-weight: bold; font-size: 12px; line-height: 1.3; }
+    .ex-matrix-person-phone { font-size: 10px; color: var(--muted); margin-top: 3px; direction: ltr; }
+    .ex-matrix-tbl th.ex-matrix-col { min-width: 120px; }
+
     /* ── TABS (simulated via hash) ── */
     .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 14px; }
     .tab-link {
@@ -1052,6 +1081,7 @@ body {
       'page=fireZones': '// LOADING FIRE ZONES...',
       'page=fireZone': '// LOADING...',
       'page=teamMatrix': '// LOADING TEAM VIEW...',
+      'page=exerciseMatrix': '// LOADING EXERCISE VIEW...',
       'page=feedback': '// LOADING FEEDBACK...'
     };
     function labelFor(key) {

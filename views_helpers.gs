@@ -293,6 +293,7 @@ function _drawerNavItems(user) {
   const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
   items.push(
     { page: 'teamMatrix', label: 'תצוגת צוות', icon: '🪖' },
+    { page: 'exerciseMatrix', label: 'תצוגה לפי תרגיל', icon: '🎯' },
     { page: 'fieldForces', label: 'כוחות בשטח', icon: '⚔' },
     { page: 'fireZones', label: 'שטחי אש', icon: '🔥' }
   );
