@@ -213,14 +213,16 @@ function _fireZoneSelectOptions(selected) {
 }
 
 function _fieldForceSelectOptions(selected) {
-  const opts = FieldForces_all().map(function(f) {
-    const label = FieldForces_displayLabel(f);
-    return [label, label];
-  });
+  const opts = FieldForces_all()
+    .map(function(f) {
+      const name = FieldForces_displayLabel(f);
+      return name ? [name, name] : null;
+    })
+    .filter(Boolean);
   if (selected && !opts.some(function(o) { return o[0] === selected; })) {
     opts.unshift([selected, selected + ' (לא ברשימה — בחר מחדש)']);
   }
-  return [['', '— בחר כוח בשטח —']].concat(opts);
+  return [['', '— בחר גדוד שת״פ —']].concat(opts);
 }
 
 function _extraProfileFields(target) {

@@ -20,13 +20,14 @@ function Views_fieldForces(p) {
     s += '<div class="empty">אין כוחות בשטח</div>';
   } else {
     s += '<div class="card-body" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr>' +
-      '<th>תפקיד</th><th>שם מפקד</th><th>מקום מחנה</th><th>סוג כוח</th>' +
+      '<th>שם הכוח</th><th>תפקיד</th><th>שם מפקד</th><th>מקום מחנה</th><th>סוג כוח</th>' +
       (isAdmin ? '<th>פעולות</th>' : '') +
       '</tr></thead><tbody>';
     items.forEach(function(item) {
       s += '<tr>' +
         '<td><a href="#" data-spa-page="fieldForce"' + _spaParamsAttr({ id: item.id }) +
-          ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(item.role) + '</b></a></td>' +
+          ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(item.force_name || item.role) + '</b></a></td>' +
+        '<td>' + _esc(item.role) + '</td>' +
         '<td>' + _esc(item.commander_name) + '</td>' +
         '<td>' + _esc(item.camp_location) + '</td>' +
         '<td>' + (item.force_type ? _badge(item.force_type, 'muted') : '—') + '</td>';
@@ -34,7 +35,7 @@ function Views_fieldForces(p) {
         s += '<td style="white-space:nowrap">' +
           _a('page=fieldForce&id=' + encodeURIComponent(item.id), '✎', 'btn btn-ghost btn-sm') + ' ' +
           _confirmDelete('action=deleteFieldForce&id=' + encodeURIComponent(item.id),
-            'למחוק את ' + item.role + '?') +
+            'למחוק את ' + (item.force_name || item.role) + '?') +
           '</td>';
       }
       s += '</tr>';
@@ -47,6 +48,8 @@ function Views_fieldForces(p) {
     s += '<div class="card"><div class="card-header"><div class="card-title">➕ כוח חדש</div></div><div class="card-body">' +
       _formOpen() +
       '<input type="hidden" name="action" value="createFieldForce">' +
+      '<div class="form-row"><label class="form-label">שם הכוח</label>' +
+      _input('force_name', 'שם הכוח', '', 'text', 'required') + '</div>' +
       '<div class="form-row"><label class="form-label">תפקיד</label>' +
       _input('role', 'תפקיד', '', 'text', 'required') + '</div>' +
       '<div class="form-row"><label class="form-label">שם מפקד</label>' +
@@ -74,7 +77,7 @@ function Views_fieldForce(p) {
 
   let s = _topbar(user, sid) + '<div class="page">' + _flash(p);
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0">⚔ ' + _esc(item.role) + '</div>' +
+    '<div class="page-title" style="margin:0">⚔ ' + _esc(item.force_name || item.role) + '</div>' +
     '<div style="display:flex;gap:6px">' +
     _a('page=fieldForces', '← רשימה', 'btn btn-ghost btn-sm') +
     _a('page=dashboard', '← לוח בקרה', 'btn btn-ghost btn-sm') +
@@ -83,7 +86,8 @@ function Views_fieldForce(p) {
   s += '<div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">פרטים</span></div>' +
     '<div class="card-body"><table class="tbl"><tbody>' +
     '<tr><td style="width:140px;color:var(--muted)">מזהה</td><td class="mono">' + _esc(item.id) + '</td></tr>' +
-    '<tr><td style="color:var(--muted)">תפקיד</td><td><b>' + _esc(item.role) + '</b></td></tr>' +
+    '<tr><td style="color:var(--muted)">שם הכוח</td><td><b>' + _esc(item.force_name) + '</b></td></tr>' +
+    '<tr><td style="color:var(--muted)">תפקיד</td><td>' + _esc(item.role) + '</td></tr>' +
     '<tr><td style="color:var(--muted)">שם מפקד</td><td>' + _esc(item.commander_name) + '</td></tr>' +
     '<tr><td style="color:var(--muted)">מקום מחנה</td><td>' + _esc(item.camp_location) + '</td></tr>' +
     '<tr><td style="color:var(--muted)">סוג כוח</td><td>' + _esc(item.force_type) + '</td></tr>' +
@@ -94,6 +98,8 @@ function Views_fieldForce(p) {
       _formOpen() +
       '<input type="hidden" name="action" value="updateFieldForce">' +
       '<input type="hidden" name="id" value="' + _esc(item.id) + '">' +
+      '<div class="form-row"><label class="form-label">שם הכוח</label>' +
+      _input('force_name', '', item.force_name, 'text', 'required') + '</div>' +
       '<div class="form-grid">' +
       '<div class="form-row"><label class="form-label">תפקיד</label>' +
       _input('role', '', item.role, 'text', 'required') + '</div>' +
@@ -111,5 +117,5 @@ function Views_fieldForce(p) {
   }
 
   s += '</div>';
-  return _wrapPage(s, item.role + ' — כוח בשטח');
+  return _wrapPage(s, (item.force_name || item.role) + ' — כוח בשטח');
 }

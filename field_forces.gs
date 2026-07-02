@@ -7,7 +7,8 @@ function FieldForces_all() {
       role:           String(r[1] || ''),
       commander_name: String(r[2] || ''),
       camp_location:  String(r[3] || ''),
-      force_type:     String(r[4] || '')
+      force_type:     String(r[4] || ''),
+      force_name:     String(r[5] || '')
     };
   });
 }
@@ -16,14 +17,10 @@ function FieldForces_get(id) {
   return FieldForces_all().find(function(x) { return x.id === String(id); }) || null;
 }
 
-/** תווית לבחירה בתרגיל — גדוד שת״פ */
+/** שם הכוח — לבחירה בתרגיל כגדוד שת״פ */
 function FieldForces_displayLabel(f) {
   if (!f) return '';
-  const parts = [String(f.role || '').trim(), String(f.commander_name || '').trim()];
-  const base = parts.filter(Boolean).join(' — ');
-  const type = String(f.force_type || '').trim();
-  if (base && type) return base + ' (' + type + ')';
-  return base || type || String(f.id || '');
+  return String(f.force_name || '').trim();
 }
 
 function FieldForces_displayLabels() {
@@ -36,14 +33,16 @@ function FieldForces_create(p) {
   const commanderName = String(p.commander_name || '').trim();
   const campLocation  = String(p.camp_location || '').trim();
   const forceType     = String(p.force_type || '').trim();
+  const forceName     = String(p.force_name || '').trim();
 
   if (!role)          throw new Error('חובה להזין תפקיד.');
   if (!commanderName) throw new Error('חובה להזין שם מפקד.');
   if (!campLocation)  throw new Error('חובה להזין מקום מחנה.');
   if (!forceType)     throw new Error('חובה להזין סוג כוח.');
+  if (!forceName)     throw new Error('חובה להזין שם הכוח.');
 
   const id = 'FF' + new Date().getTime();
-  _append('FieldForces', [id, role, commanderName, campLocation, forceType]);
+  _append('FieldForces', [id, role, commanderName, campLocation, forceType, forceName]);
   return Views_fieldForces({ sid: p.sid, info: 'כוח בשטח נוצר (' + id + ').' });
 }
 
@@ -59,13 +58,14 @@ function FieldForces_update(p) {
   const commanderName = String(p.commander_name || '').trim();
   const campLocation  = String(p.camp_location || '').trim();
   const forceType     = String(p.force_type || '').trim();
+  const forceName     = String(p.force_name || '').trim();
 
-  if (!role || !commanderName || !campLocation || !forceType) {
+  if (!role || !commanderName || !campLocation || !forceType || !forceName) {
     throw new Error('כל השדות חובה.');
   }
 
-  _sheet('FieldForces').getRange(row, 2, 1, 4).setValues([[
-    role, commanderName, campLocation, forceType
+  _sheet('FieldForces').getRange(row, 2, 1, 5).setValues([[
+    role, commanderName, campLocation, forceType, forceName
   ]]);
   _cacheInvalidate('FieldForces');
   return Views_fieldForce({ sid: p.sid, id: id, info: 'הרשומה עודכנה.' });

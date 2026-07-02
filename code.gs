@@ -124,7 +124,8 @@ function setupSheets() {
   ensureColumn('Assignments', 'responsibility');
   ensureColumn('Assignments', 'feedback');
   ensureColumn('Assignments', 'tutor');
-  ensure('FieldForces', ['id','role','commander_name','camp_location','force_type']);
+  ensure('FieldForces', ['id','role','commander_name','camp_location','force_type','force_name']);
+  ensureColumn('FieldForces', 'force_name');
   ensure('FireZones', ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night']);
   ensureColumn('Users', 'unit_affiliation');
   ensureColumn('Users', 'service_type');
@@ -155,7 +156,7 @@ function resetTrainingTables() {
     Exercises: ['id','title','description','created_by','start_date','end_date','act','exercise_type','partner_battalion','camp','battalion_commander'],
     ExerciseDetails: ['id','exercise_id','time','location','description'],
     Assignments: ['id','exercise_id','user_id','status','score','responsibility','feedback','tutor'],
-    FieldForces: ['id','role','commander_name','camp_location','force_type'],
+    FieldForces: ['id','role','commander_name','camp_location','force_type','force_name'],
     FireZones: ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night']
   };
 
