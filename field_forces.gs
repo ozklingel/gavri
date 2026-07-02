@@ -1,0 +1,71 @@
+// field_forces.gs — כוחות בשטח CRUD
+
+function FieldForces_all() {
+  return _rows('FieldForces').data.map(function(r) {
+    return {
+      id:             String(r[0]),
+      role:           String(r[1] || ''),
+      commander_name: String(r[2] || ''),
+      camp_location:  String(r[3] || ''),
+      force_type:     String(r[4] || '')
+    };
+  });
+}
+
+function FieldForces_get(id) {
+  return FieldForces_all().find(function(x) { return x.id === String(id); }) || null;
+}
+
+function FieldForces_create(p) {
+  Auth_requireRole(p, ['admin']);
+  const role          = String(p.role || '').trim();
+  const commanderName = String(p.commander_name || '').trim();
+  const campLocation  = String(p.camp_location || '').trim();
+  const forceType     = String(p.force_type || '').trim();
+
+  if (!role)          throw new Error('חובה להזין תפקיד.');
+  if (!commanderName) throw new Error('חובה להזין שם מפקד.');
+  if (!campLocation)  throw new Error('חובה להזין מקום מחנה.');
+  if (!forceType)     throw new Error('חובה להזין סוג כוח.');
+
+  const id = 'FF' + new Date().getTime();
+  _append('FieldForces', [id, role, commanderName, campLocation, forceType]);
+  return Views_fieldForces({ sid: p.sid, info: 'כוח בשטח נוצר (' + id + ').' });
+}
+
+function FieldForces_update(p) {
+  Auth_requireRole(p, ['admin']);
+  const id = String(p.id || '').trim();
+  if (!id) throw new Error('חסר מזהה.');
+
+  const row = _findRowIndex('FieldForces', id);
+  if (row < 0) throw new Error('הרשומה לא נמצאה.');
+
+  const role          = String(p.role || '').trim();
+  const commanderName = String(p.commander_name || '').trim();
+  const campLocation  = String(p.camp_location || '').trim();
+  const forceType     = String(p.force_type || '').trim();
+
+  if (!role || !commanderName || !campLocation || !forceType) {
+    throw new Error('כל השדות חובה.');
+  }
+
+  _sheet('FieldForces').getRange(row, 2, 1, 4).setValues([[
+    role, commanderName, campLocation, forceType
+  ]]);
+  _cacheInvalidate('FieldForces');
+  return Views_fieldForce({ sid: p.sid, id: id, info: 'הרשומה עודכנה.' });
+}
+
+function FieldForces_delete(p) {
+  Auth_requireRole(p, ['admin']);
+  const id = String(p.id || '').trim();
+  if (!id) throw new Error('חסר מזהה.');
+
+  const row = _findRowIndex('FieldForces', id);
+  if (row < 0) throw new Error('הרשומה לא נמצאה.');
+
+  _sheet('FieldForces').deleteRow(row);
+  _cacheInvalidate('FieldForces');
+  return Views_fieldForces({ sid: p.sid, info: 'הרשומה נמחקה.' });
+}

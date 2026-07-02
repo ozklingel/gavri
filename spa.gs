@@ -89,6 +89,10 @@ function _spaDispatchPage(page, p) {
     case 'user':      return Views_user(p);
     case 'assign':    return Views_assign(p);
     case 'feedback':  return Views_feedback(p);
+    case 'fieldForces': return Views_fieldForces(p);
+    case 'fieldForce':  return Views_fieldForce(p);
+    case 'fireZones':   return Views_fireZones(p);
+    case 'fireZone':    return Views_fireZone(p);
     default:          return Views_login(p);
   }
 }
@@ -126,6 +130,12 @@ function _spaDispatchAction(action, p) {
     case 'removeMember':       return Teams_removeMember(p);
     case 'saveFeedback':       return Assignments_saveFeedback(p);
     case 'updateExerciseTimes':return Exercises_updateTimes(p);
+    case 'createFieldForce':   return FieldForces_create(p);
+    case 'updateFieldForce':   return FieldForces_update(p);
+    case 'deleteFieldForce':   return FieldForces_delete(p);
+    case 'createFireZone':     return FireZones_create(p);
+    case 'updateFireZone':     return FireZones_update(p);
+    case 'deleteFireZone':     return FireZones_delete(p);
     default:
       throw new Error('פעולה לא מוכרת: ' + action);
   }

@@ -259,8 +259,32 @@ function _statusBadge(s) {
   return _badge('◌ ממתין', 'yellow');
 }
 
+function _parseBool(val) {
+  if (val === true || val === 1) return true;
+  const s = String(val == null ? '' : val).trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes' || s === 'כן' || s === 'on';
+}
+
+function _boolToSheet(val) {
+  return _parseBool(val) ? 'true' : 'false';
+}
+
+function _boolBadge(val) {
+  return _parseBool(val) ? _badge('✓ כן', 'green') : _badge('לא', 'muted');
+}
+
+function _checkboxRow(name, label, checked) {
+  return '<label class="form-check" style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer">' +
+    '<input type="checkbox" name="' + name + '" value="true"' + (_parseBool(checked) ? ' checked' : '') + '>' +
+    '<span>' + _esc(label) + '</span></label>';
+}
+
 function _drawerNavItems(user) {
   const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
+  items.push(
+    { page: 'fieldForces', label: 'כוחות בשטח', icon: '⚔' },
+    { page: 'fireZones', label: 'שטחי אש', icon: '🔥' }
+  );
   if (Roles_hasAdminAccess(user.role)) {
     items.push(
       { page: 'exercises', label: 'תרגילים', icon: '🎯' },

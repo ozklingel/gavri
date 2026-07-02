@@ -206,9 +206,11 @@ function _adminDashboard(sid) {
 
   // ── תפריט פעולות ראשי במרכז המסך ──
   s += '<div style="display:flex;justify-content:center;margin:40px 0">';
-s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;width:100%;max-width:600px">';
+s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;width:100%;max-width:720px">';
   s += _spaNavCard('exercises', {}, '🎯', 'תרגילים');
   s += _spaNavCard('users', {}, '👤', 'משתמשים');
+  s += _spaNavCard('fieldForces', {}, '⚔', 'כוחות בשטח');
+  s += _spaNavCard('fireZones', {}, '🔥', 'שטחי אש');
   s += _spaNavCard('timeline', {}, '📅', 'ציר זמן');
   s += _spaNavCard('assign', {}, '🔀', 'שיבוץ');
 
