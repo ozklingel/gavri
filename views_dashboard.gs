@@ -206,7 +206,9 @@ function _adminDashboard(sid) {
     s += '<div class="stat-box"><div class="stat-num">' + corpsStats.other +
       '</div><div class="stat-label">אחר / ללא שיוך</div></div>';
   }
-  s += '</div></div>';
+  s += '</div>';
+  s += _assignmentConflictsDashboardWidget();
+  s += '</div>';
 
   return s;
 }

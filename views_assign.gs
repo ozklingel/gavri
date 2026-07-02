@@ -56,6 +56,7 @@ function Views_assign(p) {
 
   const approvedHome = HomeConstraints_allApproved();
   const homeBlocked = HomeConstraints_blockedPairsForAssign();
+  const assignConflicts = AssignmentConflicts_scan();
 
   const jsonData = JSON.stringify({
     exercises: exData,
@@ -64,6 +65,7 @@ function Views_assign(p) {
     unassigned: unassigned.map(function(u) { return { id: u.id, name: u.name, role: u.role }; }),
     homeBlocked: homeBlocked,
     approvedHomeCount: approvedHome.length,
+    assignConflicts: assignConflicts,
     corpsList: [
       { key: 'חיר', label: 'חי״ר' },
       { key: 'חשן', label: 'חשן' },
@@ -92,6 +94,7 @@ function Views_assign(p) {
         _a('page=homeConstraints', 'צפה ברשימה', 'btn btn-ghost btn-sm') +
         '</div>'
       : '') +
+    _assignmentConflictsPanel(assignConflicts) +
     '<div style="display:flex;gap:8px;margin-bottom:14px">' +
     _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
       'לבצע שיבוץ אוטומטי? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
@@ -685,7 +688,11 @@ function _assignBoardJs() {
 
           render();
 
-          setStatus('✓ שובץ בהצלחה', '#4ade80');
+          if (result.warnings && result.warnings.length) {
+            setStatus('⚠ שובץ — ' + result.warnings[0].message, '#fbbf24');
+          } else {
+            setStatus('✓ שובץ בהצלחה', '#4ade80');
+          }
         }
       })
       .withFailureHandler(function(err) {

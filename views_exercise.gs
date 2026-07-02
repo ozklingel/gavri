@@ -39,6 +39,9 @@ function Views_exercise(p) {
 
   let s = _topbar(user, sid) + '<div class="page">';
   s += _flash(p);
+  if (Roles_hasAdminAccess(user.role)) {
+    s += _assignmentConflictsExerciseBanner(ex.id);
+  }
 
   // Page header with action buttons
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +

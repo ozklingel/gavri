@@ -100,9 +100,17 @@ function Assignments_assign(p) {
 
   HomeConstraints_assertCanAssign(userId, exId);
 
+  const conflictWarnings = AssignmentConflicts_checkNewAssignment(userId, exId);
+  conflictWarnings.forEach(function(w) {
+    if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+  });
+
   const id = 'A' + new Date().getTime();
   _append('Assignments', _assignmentRow(id, exId, userId, 'pending', '', resp, '', ''));
-  return Views_exercise({ sid: p.sid, id: exId, info: 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.' });
+  let info = 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.';
+  const procWarn = conflictWarnings.filter(function(w) { return w.type === 'procedure'; });
+  if (procWarn.length) info += ' ⚠ ' + procWarn[0].message;
+  return Views_exercise({ sid: p.sid, id: exId, info: info });
 }
 
 // Remove a single assignment (admin only)
@@ -706,9 +714,17 @@ function assignFromBoard(sid, exId, userId, resp) {
 
   HomeConstraints_assertCanAssign(userId, exId);
 
+  const conflictWarnings = AssignmentConflicts_checkNewAssignment(userId, exId);
+  conflictWarnings.forEach(function(w) {
+    if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+  });
+
   var id = 'A' + new Date().getTime();
   _append('Assignments', _assignmentRow(id, exId, userId, 'pending', '', resp || '', '', ''));
-  return { id: id, exercise_id: exId, user_id: userId, status: 'pending', responsibility: resp || '' };
+  var out = { id: id, exercise_id: exId, user_id: userId, status: 'pending', responsibility: resp || '' };
+  var procWarn = conflictWarnings.filter(function(w) { return w.type === 'procedure'; });
+  if (procWarn.length) out.warnings = procWarn;
+  return out;
 }
 
 // Remove a single assignment by ID
@@ -733,6 +749,10 @@ function moveAssignmentById(sid, assignId, toExId) {
   var sh = _sheet('Assignments');
   var userId = String(sh.getRange(row, 3).getValue());
   HomeConstraints_assertCanAssign(userId, toExId);
+  var conflictWarnings = AssignmentConflicts_checkNewAssignment(userId, toExId);
+  conflictWarnings.forEach(function(w) {
+    if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+  });
   sh.getRange(row, 2).setValue(toExId);
   _cacheInvalidate('Assignments');
   return { ok: true };
