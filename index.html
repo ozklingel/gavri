@@ -1322,8 +1322,8 @@ body {
   function initDashboardUserSearch() {
     var input = document.getElementById('dashboardUserSearch');
     var results = document.getElementById('dashboardUserSearchResults');
-    if (!input || !results || input._searchInit) return;
-    input._searchInit = true;
+    var btn = document.getElementById('dashboardUserSearchBtn');
+    if (!input || !results) return;
 
     var users = [];
     try {
@@ -1331,6 +1331,9 @@ body {
     } catch (e) {
       users = [];
     }
+
+    var selectedId = input.getAttribute('data-selected-id') || '';
+    if (selectedId) input.dataset.selectedUserId = selectedId;
 
     var activeIdx = -1;
 
@@ -1340,15 +1343,44 @@ body {
       activeIdx = -1;
     }
 
-    function openUser(id) {
-      if (!id || !window.MapimSpa) return;
+    function selectUser(id, label) {
+      if (!id) return;
+      input.dataset.selectedUserId = id;
+      if (label) input.value = label;
       hideResults();
-      input.value = '';
-      MapimSpa.navigate('user', { id: id });
+    }
+
+    function resolveUserId() {
+      var userId = input.dataset.selectedUserId || '';
+      if (userId) return userId;
+      var q = String(input.value || '').trim().toLowerCase();
+      if (!q) return '';
+      var exact = users.find(function(u) {
+        return String(u.id || '').toLowerCase() === q ||
+          String(u.name || '').toLowerCase() === q;
+      });
+      if (exact) return exact.id;
+      var matches = users.filter(function(u) {
+        return String(u.id || '').toLowerCase().indexOf(q) !== -1 ||
+          String(u.name || '').toLowerCase().indexOf(q) !== -1;
+      });
+      if (matches.length === 1) return matches[0].id;
+      return '';
+    }
+
+    function runUserExerciseSearch() {
+      var userId = resolveUserId();
+      if (!userId) {
+        alert('בחר משתמש מהרשימה או הזן שם / מספר אישי מדויק');
+        return;
+      }
+      if (!window.MapimSpa) return;
+      MapimSpa.navigate('dashboard', { searchUserId: userId });
     }
 
     function renderMatches(q) {
       var query = String(q || '').trim().toLowerCase();
+      input.dataset.selectedUserId = '';
       if (!query) {
         hideResults();
         return;
@@ -1366,54 +1398,64 @@ body {
 
       results.innerHTML = matches.map(function(u, i) {
         return '<button type="button" class="user-search-item' + (i === activeIdx ? ' active' : '') + '" data-user-id="' +
-          String(u.id).replace(/"/g, '&quot;') + '">' +
+          String(u.id).replace(/"/g, '&quot;') + '" data-user-label="' +
+          String(u.name + ' (' + u.id + ')').replace(/"/g, '&quot;') + '">' +
           '<span>' + String(u.name).replace(/</g, '&lt;') + '</span>' +
           '<small>' + String(u.id).replace(/</g, '&lt;') + ' · ' + String(u.role || '').replace(/</g, '&lt;') + '</small>' +
           '</button>';
       }).join('');
       results.hidden = false;
 
-      results.querySelectorAll('.user-search-item').forEach(function(btn) {
-        btn.addEventListener('mousedown', function(e) {
+      results.querySelectorAll('.user-search-item').forEach(function(el) {
+        el.addEventListener('mousedown', function(e) {
           e.preventDefault();
-          openUser(btn.getAttribute('data-user-id'));
+          selectUser(el.getAttribute('data-user-id'), el.getAttribute('data-user-label'));
         });
       });
     }
 
-    input.addEventListener('input', function() {
-      activeIdx = -1;
-      renderMatches(input.value);
-    });
-
-    input.addEventListener('keydown', function(e) {
-      var items = results.querySelectorAll('.user-search-item');
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (results.hidden) renderMatches(input.value);
-        items = results.querySelectorAll('.user-search-item');
-        activeIdx = Math.min(activeIdx + 1, items.length - 1);
-        items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        activeIdx = Math.max(activeIdx - 1, 0);
-        items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
-      } else if (e.key === 'Enter') {
-        if (!results.hidden && activeIdx >= 0 && items[activeIdx]) {
+    if (!input._searchBound) {
+      input._searchBound = true;
+      input.addEventListener('input', function() {
+        activeIdx = -1;
+        renderMatches(input.value);
+      });
+      input.addEventListener('keydown', function(e) {
+        var items = results.querySelectorAll('.user-search-item');
+        if (e.key === 'ArrowDown') {
           e.preventDefault();
-          openUser(items[activeIdx].getAttribute('data-user-id'));
-        } else if (!results.hidden && items.length === 1) {
+          if (results.hidden) renderMatches(input.value);
+          items = results.querySelectorAll('.user-search-item');
+          activeIdx = Math.min(activeIdx + 1, items.length - 1);
+          items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
+        } else if (e.key === 'ArrowUp') {
           e.preventDefault();
-          openUser(items[0].getAttribute('data-user-id'));
+          activeIdx = Math.max(activeIdx - 1, 0);
+          items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
+        } else if (e.key === 'Enter') {
+          if (!results.hidden && activeIdx >= 0 && items[activeIdx]) {
+            e.preventDefault();
+            selectUser(items[activeIdx].getAttribute('data-user-id'), items[activeIdx].getAttribute('data-user-label'));
+          } else if (!results.hidden && items.length === 1) {
+            e.preventDefault();
+            selectUser(items[0].getAttribute('data-user-id'), items[0].getAttribute('data-user-label'));
+          } else {
+            e.preventDefault();
+            runUserExerciseSearch();
+          }
+        } else if (e.key === 'Escape') {
+          hideResults();
         }
-      } else if (e.key === 'Escape') {
-        hideResults();
-      }
-    });
+      });
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('.user-search-wrap')) hideResults();
+      });
+    }
 
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.user-search-wrap')) hideResults();
-    });
+    if (btn && !btn._searchBound) {
+      btn._searchBound = true;
+      btn.addEventListener('click', runUserExerciseSearch);
+    }
   }
   window.initDashboardUserSearch = initDashboardUserSearch;
 

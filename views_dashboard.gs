@@ -185,7 +185,6 @@ function _dashboardCorpsAssignedCounts() {
 }
 
 function _adminDashboard(sid) {
-  const sidQ = encodeURIComponent(sid);
   const corpsStats = _dashboardCorpsAssignedCounts();
 
   let s = '<div class="page">';
@@ -202,20 +201,7 @@ function _adminDashboard(sid) {
     s += '<div class="stat-box"><div class="stat-num">' + corpsStats.other +
       '</div><div class="stat-label">אחר / ללא שיוך</div></div>';
   }
-  s += '</div>';
-
-  // ── תפריט פעולות ראשי במרכז המסך ──
-  s += '<div style="display:flex;justify-content:center;margin:40px 0">';
-s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;width:100%;max-width:720px">';
-  s += _spaNavCard('exercises', {}, '🎯', 'תרגילים');
-  s += _spaNavCard('users', {}, '👤', 'משתמשים');
-  s += _spaNavCard('fieldForces', {}, '⚔', 'כוחות בשטח');
-  s += _spaNavCard('fireZones', {}, '🔥', 'שטחי אש');
-  s += _spaNavCard('timeline', {}, '📅', 'ציר זמן');
-  s += _spaNavCard('assign', {}, '🔀', 'שיבוץ');
-
   s += '</div></div>';
-  s += '</div>';
 
   return s;
 }
@@ -229,24 +215,102 @@ function _unitCommanderDashboard(sid) {
     s += '<div class="stat-box"><div class="stat-num">' + corpsStats.counts[c.key] +
       '</div><div class="stat-label">' + c.label + '</div></div>';
   });
-  s += '</div>';
-  s += '<div style="display:flex;justify-content:center;margin:24px 0">';
-  s += _spaNavCard('timeline', {}, '📅', 'ציר זמן');
   s += '</div></div>';
   return s;
 }
 
 function _departmentCommanderDashboard(user, sid) {
-  let s = '<div class="page-title">⊞ לוח בקרה — ממ</div>';
-  s += '<div class="card"><div class="card-body">' +
-    '<p style="font-size:13px;color:var(--muted);margin:0;line-height:1.6">' +
-    'חפש משתמשים למעלה לצפייה בפרטים. ציונים נגישים רק לסגל, מגד ומפקד הצוות.</p>' +
-    '</div></div>';
-  s += '<div style="display:flex;justify-content:center;margin:24px 0">';
-  s += _spaNavCard('timeline', {}, '📅', 'ציר זמן');
+  return '<div class="page-title">⊞ לוח בקרה — ממ</div>';
+}
+function _dashExerciseLocation(ex) {
+  if (!ex) return '—';
+  const details = Exercises_details(ex.id);
+  for (let i = 0; i < details.length; i++) {
+    if (details[i].location) return details[i].location;
+  }
+  return ex.camp || ex.partner_battalion || '—';
+}
+
+function _dashExerciseTime(ex) {
+  if (!ex) return '—';
+  const start = ex.start_date || '';
+  const end = ex.end_date || '';
+  if (start && end && start !== end) return start + ' — ' + end;
+  return start || end || '—';
+}
+
+function _dashboardUserExerciseResults(viewer, targetUserId) {
+  const target = Users_get(targetUserId);
+  if (!target) {
+    return '<div class="flash flash-error" style="margin-bottom:16px">משתמש לא נמצא</div>';
+  }
+
+  const assigns = Assignments_byUser(targetUserId).slice();
+  assigns.sort(function(a, b) {
+    const ea = Exercises_get(a.exercise_id);
+    const eb = Exercises_get(b.exercise_id);
+    const da = ea && ea.rawStartDate ? ea.rawStartDate : '9999';
+    const db = eb && eb.rawStartDate ? eb.rawStartDate : '9999';
+    return String(da).localeCompare(String(db));
+  });
+
+  const respCounts = {};
+  assigns.forEach(function(a) {
+    const key = String(a.responsibility || '').trim() || 'ללא תפקיד';
+    respCounts[key] = (respCounts[key] || 0) + 1;
+  });
+
+  let s = '<div class="card" style="margin-bottom:16px" id="dashboardUserExerciseResults">';
+  s += '<div class="card-header" style="flex-wrap:wrap;gap:8px">' +
+    '<span class="card-title">🎯 תרגילים — ' + _esc(target.name) + '</span>' +
+    '<a href="#" data-spa-page="user"' + _spaParamsAttr({ id: target.id }) +
+    ' class="btn btn-ghost btn-sm">פרופיל מלא</a>' +
+    '</div>';
+
+  s += '<div class="card-body" style="padding:14px 16px;border-bottom:1px solid var(--border)">' +
+    '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px">' +
+    '<div class="stat-box" style="min-width:120px;margin:0"><div class="stat-num">' + assigns.length +
+    '</div><div class="stat-label">סה״כ תרגילים</div></div>';
+
+  const respKeys = Object.keys(respCounts).sort();
+  if (respKeys.length) {
+    s += '<div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">לפי תפקיד בתרגיל</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    respKeys.forEach(function(key) {
+      s += '<span class="badge badge-muted" style="font-size:11px">' +
+        _esc(key) + ' <b style="color:var(--green)">' + respCounts[key] + '</b></span>';
+    });
+    s += '</div></div>';
+  }
+  s += '</div></div>';
+
+  if (!assigns.length) {
+    s += '<div class="empty">אין תרגילים משויכים למשתמש זה</div>';
+  } else {
+    s += '<div class="card-body" style="padding:0;overflow-x:auto">' +
+      '<table class="tbl"><thead><tr>' +
+      '<th>תרגיל</th><th>מיקום</th><th>זמן</th><th>תפקיד בתרגיל</th><th>סוג תרגיל</th><th>סטטוס</th>' +
+      '</tr></thead><tbody>';
+    assigns.forEach(function(a) {
+      const ex = Exercises_get(a.exercise_id);
+      const title = ex ? ex.title : a.exercise_id;
+      s += '<tr>' +
+        '<td style="white-space:nowrap">' +
+        (ex ? _exerciseLink(ex.id, title) : _esc(title)) + '</td>' +
+        '<td>' + _dashCell(_dashExerciseLocation(ex)) + '</td>' +
+        '<td style="font-size:12px;white-space:nowrap">' + _dashCell(_dashExerciseTime(ex)) + '</td>' +
+        '<td>' + _dashCell(a.responsibility) + '</td>' +
+        '<td>' + (ex && ex.exercise_type ? _badge(ex.exercise_type, 'muted') : _dashCell('')) + '</td>' +
+        '<td>' + _statusBadge(a.status) + '</td>' +
+        '</tr>';
+    });
+    s += '</tbody></table></div>';
+  }
+
   s += '</div>';
   return s;
 }
+
 function _dashCell(val) {
   return val ? _esc(val) : '<span style="color:var(--muted)">—</span>';
 }

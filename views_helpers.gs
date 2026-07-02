@@ -231,22 +231,32 @@ function _roleBadgeType(r) {
   return Roles_badgeType(r);
 }
 
-function _dashboardUserSearchBar() {
+function _dashboardUserSearchBar(selectedUserId) {
   const users = Users_all().map(function(u) {
     return { id: u.id, name: u.name, role: Roles_label(u.role) };
   });
   const json = JSON.stringify(users).replace(/</g, '\\u003c');
+  let prefill = '';
+  const uid = String(selectedUserId || '').trim();
+  if (uid) {
+    const u = Users_get(uid);
+    if (u) prefill = u.name + ' (' + u.id + ')';
+  }
   return '<div class="card user-search-bar" style="margin-bottom:16px">' +
     '<div class="card-body" style="padding:12px 16px">' +
     '<label class="form-label" style="margin-bottom:6px">🔍 חיפוש משתמש</label>' +
-    '<div class="user-search-wrap">' +
+    '<div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">' +
+    '<div class="user-search-wrap" style="flex:1;min-width:200px">' +
     '<input type="text" id="dashboardUserSearch" class="form-input" ' +
     'placeholder="הקלד שם או מספר אישי..." autocomplete="off" ' +
+    'value="' + _esc(prefill) + '" ' +
+    'data-selected-id="' + _esc(uid) + '" ' +
     'data-users="' + json.replace(/"/g, '&quot;') + '">' +
     '<div id="dashboardUserSearchResults" class="user-search-results" hidden></div>' +
     '</div>' +
-    '<p style="font-size:11px;color:var(--muted);margin:8px 0 0">ציונים נראים רק לסגל, מגד ומפקד הצוות של החניך</p>' +
-    '</div></div>';
+    '<button type="button" id="dashboardUserSearchBtn" class="btn btn-primary" style="min-width:80px">חפש</button>' +
+    '</div>' +
+  '</div></div>';
 }
 
 function _statusHe(s) {
@@ -434,6 +444,7 @@ function Views_dashboard(p) {
   const sid = user.id;
 
   const role = Roles_normalize(user.role);
+  const searchUserId = String(p.searchUserId || '').trim();
   let content = '';
   if (Roles_isAdmin(role))                 content = _adminDashboard(sid);
   else if (Roles_isUnitCommander(role))     content = _unitCommanderDashboard(sid);
@@ -442,8 +453,16 @@ function Views_dashboard(p) {
   else if (Roles_isTutor(role))             content = _tutorDashboard(user, sid);
   else                                      content = _traineeDashboard(user, sid);
 
+  let searchResults = '';
+  if (searchUserId) {
+    searchResults = _dashboardUserExerciseResults(user, searchUserId);
+  }
+
   const body = _topbar(user, sid) +
-    '<div class="page">' + _flash(p) + _dashboardUserSearchBar() + content + '</div>';
+    '<div class="page">' + _flash(p) +
+    _dashboardUserSearchBar(searchUserId) +
+    searchResults +
+    content + '</div>';
   return _wrapPage(body, 'לוח בקרה');
 }
 
