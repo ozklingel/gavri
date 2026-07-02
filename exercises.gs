@@ -41,12 +41,68 @@ function _fmtDetailTime(val) {
   if (val instanceof Date) return _fmtDateTimeFull(val, val);
   const s = String(val).trim();
   if (!s) return '—';
+
+  const canon = s.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})$/);
+  if (canon) return _fmtDateTimeFull(canon[1], canon[2]);
+
   const d = new Date(s);
   if (!isNaN(d.getTime()) && (/[-/T]/.test(s) || s.length > 10)) {
     return _fmtDateTimeFull(d, d);
   }
   const tp = _rawTime(s);
   return tp || s;
+}
+
+function _exerciseDetailSortMs(val) {
+  if (val == null || val === '') return Number.MAX_SAFE_INTEGER;
+  if (val instanceof Date) return val.getTime();
+
+  const s = String(val).trim();
+  if (!s) return Number.MAX_SAFE_INTEGER;
+
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?/);
+  if (iso) {
+    const parts = iso[1].split('-').map(Number);
+    let h = 0;
+    let m = 0;
+    if (iso[2]) {
+      const tp = iso[2].split(':').map(Number);
+      h = tp[0];
+      m = tp[1] || 0;
+    }
+    return new Date(parts[0], parts[1] - 1, parts[2], h, m, 0, 0).getTime();
+  }
+
+  const months = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+  let hmMatch = s.match(/(\d{1,2}:\d{2})/);
+  const hm = hmMatch ? hmMatch[1] : '';
+  for (let mi = 0; mi < months.length; mi++) {
+    const re = new RegExp('(\\d{1,2})\\s+ב?' + months[mi] + '\\s+(\\d{4})');
+    const m = s.match(re);
+    if (m) {
+      const tp = hm ? hm.split(':').map(Number) : [0, 0];
+      return new Date(+m[2], mi, +m[1], tp[0], tp[1] || 0, 0, 0).getTime();
+    }
+  }
+
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) return parsed.getTime();
+
+  if (/^\d{1,2}:\d{2}$/.test(s)) {
+    const tp = s.split(':').map(Number);
+    return tp[0] * 3600000 + (tp[1] || 0) * 60000;
+  }
+
+  return Number.MAX_SAFE_INTEGER - 1;
+}
+
+function _composeDetailTime(dateYmd, timeHm) {
+  const date = String(dateYmd || '').trim();
+  const hm   = String(timeHm || '').trim();
+  if (!date) return '';
+  if (!hm) return date;
+  return date + ' ' + hm;
 }
 
 // Returns "HH:MM" from a time string or empty
@@ -110,14 +166,52 @@ function Exercises_get(id) {
 }
 
 function Exercises_details(exerciseId) {
-  return _rows('ExerciseDetails').data
-    .filter(r => String(r[1]) === String(exerciseId))
-    .map(r => ({
-      id: String(r[0]),
-      time: _fmtDetailTime(r[2]),
-      location: String(r[3] || ''),
-      description: String(r[4] || '')
-    }));
+  const items = _rows('ExerciseDetails').data
+    .filter(function(r) { return String(r[1]) === String(exerciseId); })
+    .map(function(r) {
+      return {
+        id: String(r[0]),
+        rawTime: r[2],
+        time: _fmtDetailTime(r[2]),
+        location: String(r[3] || ''),
+        description: String(r[4] || '')
+      };
+    });
+  items.sort(function(a, b) {
+    return _exerciseDetailSortMs(a.rawTime) - _exerciseDetailSortMs(b.rawTime);
+  });
+  return items;
+}
+
+function _exerciseDetailsInsertSorted(exId, row) {
+  const sh = _sheet('ExerciseDetails');
+  const data = _rows('ExerciseDetails').data;
+  const newMs = _exerciseDetailSortMs(row[2]);
+  let insertRow = null;
+
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][1]) !== String(exId)) continue;
+    if (_exerciseDetailSortMs(data[i][2]) > newMs) {
+      insertRow = i + 2;
+      break;
+    }
+  }
+
+  if (insertRow === null) {
+    let last = null;
+    for (let i = 0; i < data.length; i++) {
+      if (String(data[i][1]) === String(exId)) last = i + 2;
+    }
+    insertRow = last ? last + 1 : sh.getLastRow() + 1;
+  }
+
+  if (insertRow > sh.getLastRow()) {
+    sh.appendRow(row);
+  } else {
+    sh.insertRowBefore(insertRow);
+    sh.getRange(insertRow, 1, 1, row.length).setValues([row]);
+  }
+  _cacheInvalidate('ExerciseDetails');
 }
 
 function Exercises_validateCampAndPartner(p) {
@@ -282,9 +376,21 @@ function Exercises_addDetail(p) {
   Auth_requireRole(p, ['admin']);
   const exId = p.exerciseId;
   if (!Exercises_get(exId)) throw new Error('התרגיל לא נמצא.');
+
+  const dateYmd = String(p.detail_date || p.date || '').trim();
+  const timeHm  = String(p.detail_time || p.time || '').trim();
+  const location = String(p.location || '').trim();
+  const description = String(p.detailDescription || p.description || '').trim();
+
+  if (!dateYmd) throw new Error('חובה לבחור תאריך.');
+  if (isNaN(_parseRawDate(dateYmd))) throw new Error('תאריך לא תקין.');
+  if (!timeHm) throw new Error('חובה לבחור שעה.');
+  if (!/^\d{1,2}:\d{2}$/.test(timeHm)) throw new Error('שעה לא תקינה.');
+
+  const timeStored = _composeDetailTime(dateYmd, timeHm);
   const did = 'D' + new Date().getTime();
-  _append('ExerciseDetails', [did, exId, p.time || '', p.location || '', p.detailDescription || '']);
-  return Views_exercise({ sid: p.sid, id: exId, info: 'רישום ציר הזמן נוסף בהצלחה.' });
+  _exerciseDetailsInsertSorted(exId, [did, exId, timeStored, location, description]);
+  return Views_exercise({ sid: p.sid, id: exId, info: 'רישום ציר הזמן נוסף וסודר לפי תאריך ושעה.' });
 }
 // (החלף את הפונקציה Exercises_delete בקובץ exercises.gs בגרסה הזו)
 

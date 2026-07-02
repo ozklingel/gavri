@@ -126,9 +126,13 @@ s += _confirmDelete(
       '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
       '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
       '<div class="form-grid">' +
-      '<div class="form-row"><label class="form-label">שעה</label>' + _input('time', '08:00') + '</div>' +
-      '<div class="form-row"><label class="form-label">מיקום</label>' + _input('location', 'שם מיקום') + '</div>' +
+      '<div class="form-row"><label class="form-label">תאריך</label>' +
+      _dateInput('detail_date', ex.rawStartDate || ex.rawDate || '') + '</div>' +
+      '<div class="form-row"><label class="form-label">שעה</label>' +
+      _input('detail_time', '', ex.rawStartTime || '08:00', 'time', 'required') + '</div>' +
       '</div>' +
+      '<div class="form-row"><label class="form-label">מיקום</label>' +
+      _input('location', 'שם מיקום', '', 'text') + '</div>' +
       '<div class="form-row"><label class="form-label">תיאור</label>' + _input('detailDescription', 'תיאור הפעילות', '', 'text') + '</div>' +
       _submitBtn('➕ הוסף רישום', 'btn btn-primary btn-sm') +
       '</form></div></div>';
