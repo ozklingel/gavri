@@ -413,7 +413,7 @@ function Views_login(p) {
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">// משתמשי דמו</div>' +
     '<div class="demo-grid">' +
     '<div class="demo-item"><div class="demo-role">סגל</div><div class="demo-cred">1<br>111</div></div>' +
-    '<div class="demo-item"><div class="demo-role">מפ</div><div class="demo-cred">222<br>222</div></div>' +
+    '<div class="demo-item"><div class="demo-role">מפקצ</div><div class="demo-cred">222<br>222</div></div>' +
     '<div class="demo-item"><div class="demo-role">חניך</div><div class="demo-cred">3332<br>3332</div></div>' +
     '</div>' +
     '</div></div></div>';

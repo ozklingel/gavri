@@ -123,8 +123,8 @@ function _assignBoardJs() {
   var leastPanel = document.getElementById('assignLeastPanel');
 
   var ROLE_LABELS = {
-    admin: 'סגל', unitCommander: 'מגד', companyCommander: 'מפ',
-    departmentCommander: 'ממ', tutor: 'חונך', trainee: 'חניך', commander: 'מפ'
+    admin: 'סגל', unitCommander: 'מגד', companyCommander: 'מפקצ',
+    departmentCommander: 'ממ', tutor: 'חונך', trainee: 'חניך', commander: 'מפקצ'
   };
   var ROLE_COLORS = {
     admin: '#4ade80', unitCommander: '#4ade80', companyCommander: '#60a5fa',

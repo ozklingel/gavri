@@ -11,7 +11,7 @@ function Roles_label(role) {
   const map = {
     admin: 'סגל',
     unitCommander: 'מגד',
-    companyCommander: 'מפ',
+    companyCommander: 'מפקצ',
     departmentCommander: 'ממ',
     tutor: 'חונך',
     trainee: 'חניך'
@@ -24,14 +24,8 @@ function Roles_allValid() {
 }
 
 function Roles_selectOptions() {
-  return [
-    ['trainee', 'חניך'],
-    ['tutor', 'חונך'],
-    ['departmentCommander', 'ממ'],
-    ['companyCommander', 'מפ'],
-    ['unitCommander', 'מגד'],
-    ['admin', 'סגל']
-  ];
+  return ['trainee', 'tutor', 'departmentCommander', 'companyCommander', 'unitCommander', 'admin']
+    .map(function(code) { return [code, Roles_label(code)]; });
 }
 
 function Roles_badgeType(role) {

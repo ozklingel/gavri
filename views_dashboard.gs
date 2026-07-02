@@ -340,7 +340,7 @@ function _commanderTraineeExercisesHtml(assigns) {
 function _commanderDashboard(user, sid) {
   const trainees = Users_traineesOfCommander(user.id);
 
-  let s = '<div class="page-title">⊞ לוח בקרה — מפ</div>';
+  let s = '<div class="page-title">⊞ לוח בקרה — ' + Roles_label(user.role) + '</div>';
 
   if (!trainees.length) {
     return s + '<div class="card"><div class="empty">אין חיילים מוקצים לצוות שלך עדיין</div></div>';
