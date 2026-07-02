@@ -95,6 +95,7 @@ function _spaDispatchPage(page, p) {
     case 'fireZone':    return Views_fireZone(p);
     case 'teamMatrix':  return Views_teamMatrix(p);
     case 'exerciseMatrix': return Views_exerciseMatrix(p);
+    case 'homeConstraints': return Views_homeConstraints(p);
     default:          return Views_login(p);
   }
 }
@@ -138,6 +139,9 @@ function _spaDispatchAction(action, p) {
     case 'createFireZone':     return FireZones_create(p);
     case 'updateFireZone':     return FireZones_update(p);
     case 'deleteFireZone':     return FireZones_delete(p);
+    case 'createHomeConstraint':  return HomeConstraints_create(p);
+    case 'approveHomeConstraint': return HomeConstraints_approve(p);
+    case 'rejectHomeConstraint':  return HomeConstraints_reject(p);
     default:
       throw new Error('פעולה לא מוכרת: ' + action);
   }

@@ -98,6 +98,8 @@ function Assignments_assign(p) {
   const exists = Assignments_all().some(a => a.exercise_id === exId && a.user_id === userId);
   if (exists) return Views_exercise({ sid: p.sid, id: exId, info: 'החייל כבר משתתף בתרגיל.' });
 
+  HomeConstraints_assertCanAssign(userId, exId);
+
   const id = 'A' + new Date().getTime();
   _append('Assignments', _assignmentRow(id, exId, userId, 'pending', '', resp, '', ''));
   return Views_exercise({ sid: p.sid, id: exId, info: 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.' });
@@ -167,6 +169,7 @@ function Assignments_assignTeam(exerciseId, teamId, sid) {
   const newRows = [];
   toAssign.forEach(function(item){
     if (existing.indexOf(item.user.id) !== -1) { skipped++; return; }
+    if (HomeConstraints_checkAssignment(item.user.id, exerciseId)) { skipped++; return; }
     const aid = 'A' + new Date().getTime() + '_' + added;
     newRows.push(_assignmentRow(aid, exerciseId, item.user.id, 'pending', '', item.resp, '', ''));
     added++;
@@ -546,6 +549,10 @@ function Assignments_autoAssignAll(p) {
           stats.slotsMissing++;
           continue;
         }
+        if (HomeConstraints_checkAssignment(user.id, ex.id)) {
+          stats.slotsMissing++;
+          continue;
+        }
 
         const row = _assignmentRow(
           'A' + Date.now() + '_' + exIdx + '_' + stats.added,
@@ -566,6 +573,10 @@ function Assignments_autoAssignAll(p) {
         const user = pickCommander(ex.id, exIdx, onEx, dominantTeam);
 
         if (!user) {
+          stats.slotsMissing++;
+          continue;
+        }
+        if (HomeConstraints_checkAssignment(user.id, ex.id)) {
           stats.slotsMissing++;
           continue;
         }
@@ -693,6 +704,8 @@ function assignFromBoard(sid, exId, userId, resp) {
   var existing = Assignments_byExercise(exId).filter(function(a) { return a.user_id === userId; });
   if (existing.length) throw new Error('החייל כבר משובץ לתרגיל זה.');
 
+  HomeConstraints_assertCanAssign(userId, exId);
+
   var id = 'A' + new Date().getTime();
   _append('Assignments', _assignmentRow(id, exId, userId, 'pending', '', resp || '', '', ''));
   return { id: id, exercise_id: exId, user_id: userId, status: 'pending', responsibility: resp || '' };
@@ -717,7 +730,10 @@ function moveAssignmentById(sid, assignId, toExId) {
   if (!assignId || !toExId) throw new Error('חסר מזהה הקצאה או תרגיל יעד.');
   var row = _findRowIndex('Assignments', assignId);
   if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
-  _sheet('Assignments').getRange(row, 2).setValue(toExId);
+  var sh = _sheet('Assignments');
+  var userId = String(sh.getRange(row, 3).getValue());
+  HomeConstraints_assertCanAssign(userId, toExId);
+  sh.getRange(row, 2).setValue(toExId);
   _cacheInvalidate('Assignments');
   return { ok: true };
 }

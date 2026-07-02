@@ -36,6 +36,13 @@ function Users_isTeamCommanderOf(commanderId, userId) {
   return !!(team && String(team.commander_id) === String(commanderId));
 }
 
+function Users_teamCommanderId(userId) {
+  const target = Users_get(userId);
+  if (!target || !target.team_id) return '';
+  const team = Teams_get(target.team_id);
+  return team && team.commander_id ? String(team.commander_id) : '';
+}
+
 function Users_canViewScores(viewer, targetUserId) {
   if (!viewer || !targetUserId) return false;
   if (String(viewer.id) === String(targetUserId)) return true;

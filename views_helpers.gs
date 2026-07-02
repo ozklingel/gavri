@@ -315,6 +315,7 @@ function _drawerNavItems(user) {
   items.push(
     { page: 'teamMatrix', label: 'תצוגת צוות', icon: '🪖' },
     { page: 'exerciseMatrix', label: 'תצוגה לפי תרגיל', icon: '🎯' },
+    { page: 'homeConstraints', label: 'אילוצי בית', icon: '🏠' },
     { page: 'fieldForces', label: 'כוחות בשטח', icon: '⚔' },
     { page: 'fireZones', label: 'שטחי אש', icon: '🔥' }
   );
@@ -483,6 +484,7 @@ function Views_dashboard(p) {
 
   const body = _topbar(user, sid) +
     '<div class="page">' + _flash(p) +
+    _homeConstraintsDashboardWidget(user, sid) +
     _dashboardUserSearchBar(searchUserId) +
     searchResults +
     content + '</div>';

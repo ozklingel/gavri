@@ -127,6 +127,7 @@ function setupSheets() {
   ensure('FieldForces', ['id','role','commander_name','camp_location','force_type','force_name']);
   ensureColumn('FieldForces', 'force_name');
   ensure('FireZones', ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night']);
+  ensure('HomeConstraints', ['id','user_id','start_date','start_time','end_date','end_time','notes','status','approval_tier','supervisor_id','approved_by','approved_at','rejection_note','created_at']);
   ensureColumn('Users', 'unit_affiliation');
   ensureColumn('Users', 'service_type');
   ensureColumn('Users', 'military_affiliation');
@@ -157,7 +158,8 @@ function resetTrainingTables() {
     ExerciseDetails: ['id','exercise_id','time','location','description'],
     Assignments: ['id','exercise_id','user_id','status','score','responsibility','feedback','tutor'],
     FieldForces: ['id','role','commander_name','camp_location','force_type','force_name'],
-    FireZones: ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night']
+    FireZones: ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night'],
+    HomeConstraints: ['id','user_id','start_date','start_time','end_date','end_time','notes','status','approval_tier','supervisor_id','approved_by','approved_at','rejection_note','created_at']
   };
 
   Object.keys(schemas).forEach(name => {

@@ -54,11 +54,16 @@ function Views_assign(p) {
     return !assignedUserIds[String(u.id).trim()];
   });
 
+  const approvedHome = HomeConstraints_allApproved();
+  const homeBlocked = HomeConstraints_blockedPairsForAssign();
+
   const jsonData = JSON.stringify({
     exercises: exData,
     userMap:   userMap,
     exMap:     exMap,
     unassigned: unassigned.map(function(u) { return { id: u.id, name: u.name, role: u.role }; }),
+    homeBlocked: homeBlocked,
+    approvedHomeCount: approvedHome.length,
     corpsList: [
       { key: 'חיר', label: 'חי״ר' },
       { key: 'חשן', label: 'חשן' },
@@ -81,6 +86,12 @@ function Views_assign(p) {
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
     '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד · ריחוף או לחיצה ארוכה לפרטים אישיים' +
     '</div>' +
+    (approvedHome.length
+      ? '<div class="flash flash-error" style="margin-bottom:12px;font-size:12px;line-height:1.5">' +
+        '🏠 <b>' + approvedHome.length + ' אילוצי בית מאושרים</b> — לא ניתן לשבץ חניך לתרגיל החופף לטווח. ' +
+        _a('page=homeConstraints', 'צפה ברשימה', 'btn btn-ghost btn-sm') +
+        '</div>'
+      : '') +
     '<div style="display:flex;gap:8px;margin-bottom:14px">' +
     _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
       'לבצע שיבוץ אוטומטי? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
@@ -642,7 +653,20 @@ function _assignBoardJs() {
     if (window.MapimSpaShowLoader) window.MapimSpaShowLoader(msg || '// ASSIGNING...');
   }
 
+  function homeBlockMsg(userId, exId) {
+    var key = userId + '\\x1f' + exId;
+    if (data.homeBlocked && data.homeBlocked[key]) {
+      return 'אילוץ בית מאושר (' + data.homeBlocked[key] + ')';
+    }
+    return '';
+  }
+
   function addAssignment(exId, userId, resp, zone) {
+    var block = homeBlockMsg(userId, exId);
+    if (block) {
+      setStatus('✗ לא ניתן לשבץ: ' + block, '#f87171');
+      return;
+    }
     setStatus('⏳ משבץ...', '#fbbf24');
     showPageLoader('// ASSIGNING...');
 
@@ -704,6 +728,11 @@ function _assignBoardJs() {
   }
 
   function moveAssignment(assignId, toExId, userId, resp, zone, fromExId) {
+    var block = homeBlockMsg(userId, toExId);
+    if (block) {
+      setStatus('✗ לא ניתן להעביר: ' + block, '#f87171');
+      return;
+    }
     setStatus('⏳ מעביר...', '#fbbf24');
     showPageLoader('// MOVING...');
 
