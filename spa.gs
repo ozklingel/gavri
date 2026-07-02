@@ -93,6 +93,7 @@ function _spaDispatchPage(page, p) {
     case 'fieldForce':  return Views_fieldForce(p);
     case 'fireZones':   return Views_fireZones(p);
     case 'fireZone':    return Views_fireZone(p);
+    case 'teamMatrix':  return Views_teamMatrix(p);
     default:          return Views_login(p);
   }
 }
