@@ -96,6 +96,8 @@ function _spaDispatchPage(page, p) {
 function _spaDispatchAction(action, p) {
   switch (action) {
     case 'login':              return Auth_login(p);
+    case 'verifyMfa':          return Auth_verifyMfa(p);
+    case 'resendMfa':          return Auth_resendMfa(p);
     case 'logout':             return Auth_logout(p);
     case 'createExercise':     return Exercises_create(p);
     case 'buildSeries':        return Exercises_buildSeries(p);

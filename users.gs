@@ -15,7 +15,8 @@ function Users_all() {
     military_affiliation:  String(r[6] || ''),
     unit_classification:   String(r[7] || ''),
     target_role:           String(r[8] || ''),
-    phone:                 r[9] == null ? '' : String(r[9])
+    phone:                 r[9] == null ? '' : String(r[9]),
+    email:                 r[10] == null ? '' : String(r[10])
   }));
 }
 
@@ -58,7 +59,8 @@ function Users_create(p) {
     (p.military_affiliation || '').trim(),
     (p.unit_classification  || '').trim(),
     (p.target_role          || '').trim(),
-    (p.phone                || '').trim()
+    (p.phone                || '').trim(),
+    (p.email                || '').trim()
   ]);
   _append('Credentials', [newId, pass]);
 
@@ -325,14 +327,15 @@ function Users_updateProfile(p) {
   if (row < 0) throw new Error('המשתמש לא נמצא.');
   const sh = _sheet('Users');
 
-  // Batch-write columns 5-10 (unit_affiliation … phone) in one call
-  sh.getRange(row, 5, 1, 6).setValues([[
+  // Batch-write columns 5-11 (unit_affiliation … email) in one call
+  sh.getRange(row, 5, 1, 7).setValues([[
     (p.unit_affiliation     || '').trim(),
     (p.service_type         || '').trim(),
     (p.military_affiliation || '').trim(),
     (p.unit_classification  || '').trim(),
     (p.target_role          || '').trim(),
-    (p.phone                || '').trim()
+    (p.phone                || '').trim(),
+    (p.email                || '').trim()
   ]]);
 
   // Update team if provided
@@ -394,7 +397,7 @@ function Users_importBulk(p) {
 
     if (existing.has(id)) { skipped++; return; }
 
-    newUserRows.push([id, name, finalRole, teamId, '', '', '', '', '', '']);
+    newUserRows.push([id, name, finalRole, teamId, '', '', '', '', '', '', String(row.email || '').trim()]);
     newCredRows.push([id, password]);
     existing.add(id);
     added++;

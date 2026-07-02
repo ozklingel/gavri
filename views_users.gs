@@ -58,6 +58,8 @@ function _usersTab(sid) {
     '<div class="form-row"><label class="form-label">מספר אישי</label>' + _input('newUserId', 'U005', '', 'text', 'required') + '</div>' +
     '<div class="form-row"><label class="form-label">שם מלא</label>' + _input('newName', 'שם מלא', '', 'text', 'required') + '</div>' +
     '<div class="form-row"><label class="form-label">סיסמה</label>' + _input('newPassword', '', '', 'password', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">דוא"ל (ל-MFA)</label>' +
+    _input('email', 'user@example.com', '', 'email') + '</div>' +
     '<div class="form-grid">' +
     '<div class="form-row"><label class="form-label">תפקיד</label>' +
     _select('newRole', [['trainee','חניך'],['commander','מפקד צוות'],['tutor','חונך'],['admin','מפקד קורס']], 'trainee') + '</div>' +

@@ -108,8 +108,9 @@ function setupSheets() {
     const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
     if (headers.indexOf(columnName) === -1) sh.getRange(1, lastCol + 1).setValue(columnName);
   };
-  ensure('Users',            ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role','phone']);
+  ensure('Users',            ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role','phone','email']);
   ensureColumn('Users', 'phone');
+  ensureColumn('Users', 'email');
   ensure('Credentials',      ['user_id','password']);
   ensure('Teams',            ['id','name','commander_id']);
   ensure('Exercises',        ['id','title','description','created_by','start_date','end_date','act','exercise_type','partner_battalion','camp','battalion_commander']);
@@ -146,7 +147,7 @@ function setupSheets() {
 function resetTrainingTables() {
   const ss = SS();
   const schemas = {
-    Users: ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role','phone'],
+    Users: ['id','name','role','team_id','unit_affiliation','service_type','military_affiliation','unit_classification','target_role','phone','email'],
     Credentials: ['user_id','password'],
     Teams: ['id','name','commander_id'],
     Exercises: ['id','title','description','created_by','start_date','end_date','act','exercise_type','partner_battalion','camp','battalion_commander'],

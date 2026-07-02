@@ -218,6 +218,8 @@ function _extraProfileFields(target) {
     _input('target_role', '', target.target_role || '') + '</div>' +
     '<div class="form-row"><label class="form-label">טלפון</label>' +
     _input('phone', '', target.phone || '', 'tel') + '</div>' +
+    '<div class="form-row"><label class="form-label">דוא"ל (MFA)</label>' +
+    _input('email', 'user@example.com', target.email || '', 'email') + '</div>' +
     '</div>';
 }
 
@@ -341,6 +343,46 @@ function Views_login(p) {
     '</div>' +
     '</div></div></div>';
   return _wrapPage(body, 'התחברות');
+}
+
+function Views_login_mfa(p) {
+  const token = String((p && p.mfaToken) || '').trim();
+  const verifyForm =
+    _formOpen() +
+    '<input type="hidden" name="action" value="verifyMfa">' +
+    '<input type="hidden" name="mfaToken" value="' + _esc(token) + '">' +
+    '<div class="form-row"><label class="form-label">קוד אימות (6 ספרות)</label>' +
+    _input('mfaCode', '000000', '', 'text', 'required maxlength="6" inputmode="numeric" autocomplete="one-time-code"') +
+    '</div>' +
+    _submitBtn('אימות והמשך', 'btn btn-primary btn-full btn-lg') +
+    '</form>';
+
+  const resendForm =
+    '<div style="margin-top:12px">' +
+    _formOpen() +
+    '<input type="hidden" name="action" value="resendMfa">' +
+    '<input type="hidden" name="mfaToken" value="' + _esc(token) + '">' +
+    _submitBtn('שלח קוד מחדש', 'btn btn-ghost btn-full') +
+    '</form></div>';
+
+  const body =
+    '<div class="login-wrap">' +
+    '<div class="login-box">' +
+    '<div class="login-head">' +
+    '<div class="login-star">✉</div>' +
+    '<div class="login-title">אימות דוא"ל</div>' +
+    '<div class="login-sub">// TWO-FACTOR AUTH //</div>' +
+    '</div>' +
+    '<div class="login-body">' +
+    _flash(p) +
+    '<p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5">' +
+    'הזן את הקוד שנשלח לדוא"ל שלך.</p>' +
+    verifyForm +
+    resendForm +
+    '<hr class="divider">' +
+    '<a href="#" class="btn btn-secondary btn-full" data-spa-page="login">← חזרה להתחברות</a>' +
+    '</div></div></div>';
+  return _wrapPage(body, 'אימות דוא"ל');
 }
 
 // ─────────── DASHBOARD ───────────

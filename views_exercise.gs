@@ -379,6 +379,8 @@ function Views_user(p) {
     '<td>' + _esc(teamName) + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">מספר טלפון</td>' +
     '<td>' + (target.phone ? _esc(target.phone) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">דוא"ל</td>' +
+    '<td>' + (target.email ? _esc(target.email) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">שיוך יחידתי</td>' +
     '<td>' + (target.unit_affiliation ? _esc(target.unit_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">סוג שירות</td>' +
