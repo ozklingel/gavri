@@ -13,9 +13,7 @@ function _exerciseMatrixRoleTiers() {
         'מטיס רחפן תחקור (ארזים)',
         'מפעיל מגנט (בגירה)',
         'מנהל לחימה (ארזים)',
-        'מסח (מרהש - מלי)',
         'קלח (ארזים)',
-        'ע קלח (השלמה חיילית לוגיסטיקה)',
         'קמן (ארזים)',
         'מדריכת שוב (מח שוב מלפק)'
       ]
@@ -53,9 +51,16 @@ function _exerciseMatrixRoleTiers() {
   };
 }
 
+function _exerciseMatrixExcludedRoles() {
+  return [
+    'ע קלח (השלמה חיילית לוגיסטיקה)',
+    'מסח (מרהש - מלי)'
+  ];
+}
+
 function _exerciseMatrixClassifyRole(resp) {
   const r = String(resp || '').trim();
-  if (!r) return '';
+  if (!r || _exerciseMatrixExcludedRoles().indexOf(r) !== -1) return '';
   const tiers = _exerciseMatrixRoleTiers();
   if (tiers.brigade.roles.indexOf(r) !== -1) return 'brigade';
   if (tiers.battalion.roles.indexOf(r) !== -1) return 'battalion';
@@ -107,6 +112,7 @@ function _exerciseMatrixBuildPayload() {
   Assignments_all().forEach(function(a) {
     const resp = String(a.responsibility || '').trim();
     if (!resp || exIds.indexOf(a.exercise_id) === -1) return;
+    if (_exerciseMatrixExcludedRoles().indexOf(resp) !== -1) return;
 
     const u = Users_get(a.user_id);
     const key = a.exercise_id + '\x1f' + resp;
