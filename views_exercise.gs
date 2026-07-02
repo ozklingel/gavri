@@ -90,10 +90,20 @@ s += _confirmDelete(
 
   // Timeline
   const details = Exercises_details(ex.id);
+  const tlProfile = ExerciseTimeline_profile(ex);
+  const tlProfileLabel = ExerciseTimeline_profileLabel(tlProfile);
   let tlHtml = '<div class="card">' +
-    '<div class="card-header"><span class="card-title">🕐 ציר זמן (' + details.length + ')</span>';
+    '<div class="card-header" style="flex-wrap:wrap;gap:8px">' +
+    '<span class="card-title">🕐 ציר זמן (' + details.length + ')</span>' +
+    '<span style="font-size:11px;color:var(--muted)">תבנית: ' + _esc(tlProfileLabel) + '</span>';
 
   if (Roles_hasAdminAccess(user.role)) {
+    const genMsg = details.length
+      ? 'ליצור מחדש ציר זמן נוה"ק לפי תבנית "' + tlProfileLabel + '"? הרשומות הקיימות (' + details.length + ') יימחקו.'
+      : 'ליצור ציר זמן נוה"ק לפי תבנית "' + tlProfileLabel + '"? (17 אירועי נוה"ק)';
+    const genAction = 'action=generateTimeline&id=' + encodeURIComponent(ex.id) +
+      '&exerciseId=' + encodeURIComponent(ex.id) + (details.length ? '&replace=true' : '');
+    tlHtml += _confirmAction(genAction, '📅 צור תבנית נוה"ק', genMsg, 'btn btn-secondary btn-sm');
     tlHtml += '<button class="btn btn-ghost btn-sm" onclick="toggleCollapsible(\'add-detail\')">➕ הוסף</button>';
   }
   tlHtml += '</div>';

@@ -112,6 +112,7 @@ function _spaDispatchAction(action, p) {
     case 'duplicateExercise':  return Exercises_duplicate(p);
     case 'deleteExercise':     return Exercises_delete(p);
     case 'addDetail':          return Exercises_addDetail(p);
+    case 'generateTimeline':   return Exercises_generateTimeline(p);
     case 'assign':             return Assignments_assign(p);
     case 'assignTeam':         return Assignments_assignTeamAction(p);
     case 'removeAssignment':   return Assignments_remove(p);
