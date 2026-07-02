@@ -129,9 +129,9 @@ function _dateInput(name, value) {
     '</div>';
 }
 
-function _select(name, options, selected) {
+function _select(name, options, selected, extraAttrs) {
   // options: array of [value, label]
-  let s = '<select name="' + name + '" class="form-select">';
+  let s = '<select name="' + name + '" class="form-select"' + (extraAttrs ? ' ' + extraAttrs : '') + '>';
   options.forEach(function(o) {
     s += '<option value="' + _esc(o[0]) + '"' + (o[0] === selected ? ' selected' : '') + '>' + _esc(o[1]) + '</option>';
   });
@@ -202,6 +202,25 @@ function _respDatalistHtml(listId) {
       return '<option value="' + _esc(r) + '">';
     }).join('') +
     '</datalist>';
+}
+
+function _fireZoneSelectOptions(selected) {
+  const opts = FireZones_names().map(function(name) { return [name, name]; });
+  if (selected && !opts.some(function(o) { return o[0] === selected; })) {
+    opts.unshift([selected, selected + ' (לא ברשימה — בחר מחדש)']);
+  }
+  return [['', '— בחר שטח אש —']].concat(opts);
+}
+
+function _fieldForceSelectOptions(selected) {
+  const opts = FieldForces_all().map(function(f) {
+    const label = FieldForces_displayLabel(f);
+    return [label, label];
+  });
+  if (selected && !opts.some(function(o) { return o[0] === selected; })) {
+    opts.unshift([selected, selected + ' (לא ברשימה — בחר מחדש)']);
+  }
+  return [['', '— בחר כוח בשטח —']].concat(opts);
 }
 
 function _extraProfileFields(target) {

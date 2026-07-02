@@ -16,6 +16,20 @@ function FieldForces_get(id) {
   return FieldForces_all().find(function(x) { return x.id === String(id); }) || null;
 }
 
+/** תווית לבחירה בתרגיל — גדוד שת״פ */
+function FieldForces_displayLabel(f) {
+  if (!f) return '';
+  const parts = [String(f.role || '').trim(), String(f.commander_name || '').trim()];
+  const base = parts.filter(Boolean).join(' — ');
+  const type = String(f.force_type || '').trim();
+  if (base && type) return base + ' (' + type + ')';
+  return base || type || String(f.id || '');
+}
+
+function FieldForces_displayLabels() {
+  return FieldForces_all().map(FieldForces_displayLabel).filter(Boolean);
+}
+
 function FieldForces_create(p) {
   Auth_requireRole(p, ['admin']);
   const role          = String(p.role || '').trim();

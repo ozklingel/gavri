@@ -18,6 +18,10 @@ function FireZones_get(id) {
   return FireZones_all().find(function(x) { return x.id === String(id); }) || null;
 }
 
+function FireZones_names() {
+  return FireZones_all().map(function(z) { return String(z.name || '').trim(); }).filter(Boolean);
+}
+
 function _fireZoneFromParams(p) {
   return {
     name:          String(p.name || '').trim(),

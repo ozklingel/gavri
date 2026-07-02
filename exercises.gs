@@ -120,6 +120,34 @@ function Exercises_details(exerciseId) {
     }));
 }
 
+function Exercises_validateCampAndPartner(p) {
+  const camp = String(p.camp || '').trim();
+  const partner = String(p.partner_battalion || '').trim();
+
+  const zoneNames = FireZones_names();
+  const forceLabels = FieldForces_displayLabels();
+
+  if (!zoneNames.length) {
+    throw new Error('אין שטחי אש במערכת. הוסף שטחי אש לפני שמירת תרגיל.');
+  }
+  if (!forceLabels.length) {
+    throw new Error('אין כוחות בשטח במערכת. הוסף כוחות בשטח לפני שמירת תרגיל.');
+  }
+  if (!camp) {
+    throw new Error('חובה לבחור מחנה / מגנן משטחי האש.');
+  }
+  if (!partner) {
+    throw new Error('חובה לבחור גדוד שת״פ מכוחות בשטח.');
+  }
+  if (zoneNames.indexOf(camp) === -1) {
+    throw new Error('מחנה / מגנן חייב להיות אחד משטחי האש שהוזנו.');
+  }
+  if (forceLabels.indexOf(partner) === -1) {
+    throw new Error('גדוד שת״פ חייב להיות אחד מכוחות בשטח שהוזנו.');
+  }
+  return { camp: camp, partner_battalion: partner };
+}
+
 function Exercises_create(p) {
   const u = Auth_requireRole(p, ['admin']);
 
@@ -143,8 +171,9 @@ function Exercises_create(p) {
   const teamId = (p.teamId || '').trim();
   const act               = String(p.act || '').trim();
   const exerciseType      = String(p.exercise_type || '').trim();
-  const partnerBattalion  = String(p.partner_battalion || '').trim();
-  const camp              = String(p.camp || '').trim();
+  const validated         = Exercises_validateCampAndPartner(p);
+  const partnerBattalion  = validated.partner_battalion;
+  const camp              = validated.camp;
   const battalionCommander = String(p.battalion_commander || '').trim();
 
   const startTime = String(p.start_time || '').trim();
@@ -175,6 +204,9 @@ function Exercises_edit(p) {
   Auth_requireRole(p, ['admin']);
   const row = _findRowIndex('Exercises', p.id);
   if (row < 0) throw new Error('התרגיל לא נמצא.');
+
+  const validated = Exercises_validateCampAndPartner(p);
+
   const sh = _sheet('Exercises');
   // Columns 2-11 (title, description, -, start_date, end_date, act, exercise_type, partner_battalion, camp, battalion_commander)
   // We skip col 4 (created_by). Write cols 2,3 then 5-11 individually isn't much worse,
@@ -188,8 +220,8 @@ function Exercises_edit(p) {
     p.end_date            || '',
     p.act                 || '',
     p.exercise_type       || '',
-    p.partner_battalion   || '',
-    p.camp                || '',
+    validated.partner_battalion,
+    validated.camp,
     p.battalion_commander || '',
     p.start_time          || '',
     p.end_time            || ''

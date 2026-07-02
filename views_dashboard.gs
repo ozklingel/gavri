@@ -87,12 +87,12 @@ function Views_exercises(p) {
 
       '<div class="form-row">' +
         '<label class="form-label">גדוד שת״פ</label>' +
-        '<input type="text" name="partner_battalion" class="form-input" placeholder="גדוד שת״פ">' +
+        _select('partner_battalion', _fieldForceSelectOptions(''), '', 'required') +
       '</div>' +
 
       '<div class="form-row">' +
         '<label class="form-label">מחנה / מגנן</label>' +
-        '<input type="text" name="camp" class="form-input" placeholder="מחנה / מגנן">' +
+        _select('camp', _fireZoneSelectOptions(''), '', 'required') +
       '</div>' +
 
       '<div class="form-row">' +

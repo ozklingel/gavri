@@ -269,8 +269,10 @@ s += _confirmDelete(
       '<div class="form-row"><label class="form-label">סוג תרגיל</label>' + _input('exercise_type', 'סוג תרגיל', ex.exercise_type) + '</div>' +
       '</div>' +
       '<div class="form-grid">' +
-      '<div class="form-row"><label class="form-label">גדוד שת״פ</label>' + _input('partner_battalion', 'גדוד שת״פ', ex.partner_battalion) + '</div>' +
-      '<div class="form-row"><label class="form-label">מחנה / מגנן</label>' + _input('camp', 'מחנה / מגנן', ex.camp) + '</div>' +
+      '<div class="form-row"><label class="form-label">גדוד שת״פ</label>' +
+        _select('partner_battalion', _fieldForceSelectOptions(ex.partner_battalion), ex.partner_battalion, 'required') + '</div>' +
+      '<div class="form-row"><label class="form-label">מחנה / מגנן</label>' +
+        _select('camp', _fireZoneSelectOptions(ex.camp), ex.camp, 'required') + '</div>' +
       '</div>' +
       '<div class="form-row"><label class="form-label">מפקד אחראי גדוד</label>' + _input('battalion_commander', 'מפקד אחראי גדוד', ex.battalion_commander) + '</div>' +
       _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
