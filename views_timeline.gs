@@ -278,7 +278,7 @@ function Views_timeline(p) {
   // Timeline card
   // ─────────────────────────────────────
 
-  s += '<div class="card" style="overflow:hidden;margin-bottom:20px" id="timelineWeekCard">';
+  s += '<div class="card" style="margin-bottom:20px" id="timelineWeekCard">';
 
   const wStartFmt =
     weekStart.getDate() +
@@ -305,15 +305,28 @@ function Views_timeline(p) {
 
   s += '</div>';
 
+  s += '<div style="padding:6px 14px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">' +
+    'גלול ימינה ושמאלה לצפייה בכל השבוע · משבצות של 4 שעות · קו מפריד בין ימים ב-00:00</div>';
+
   // ─────────────────────────────────────
   // Timeline
   // ─────────────────────────────────────
 
-  const rowCount = maxLane + 1;
-  const trackH = Math.max(200, 52 + rowCount * 44 + 12);
+  const TIMELINE_SLOTS_PER_DAY = 6;
+  const TIMELINE_SLOT_LABELS = ['00', '04', '08', '12', '16', '20'];
+  const TIMELINE_TOTAL_SLOTS = 7 * TIMELINE_SLOTS_PER_DAY;
+  const TIMELINE_DAY_WIDTH = 400;
+  const TIMELINE_MIN_WIDTH = 7 * TIMELINE_DAY_WIDTH;
+  const timelineHeaderH = 54;
+  const laneHeight = 58;
+  const rowTopPx = timelineHeaderH;
+  const barMinH = 48;
+  const trackH = Math.max(280, rowTopPx + (maxLane + 1) * laneHeight + 12);
 
+  s += '<div class="timeline-scroll" id="timelineScroll">';
   s += '<div id="timelineTrack" class="timeline-track" style="position:relative;height:' +
-       trackH + 'px;background:var(--bg2);padding-right:36px' +
+       trackH + 'px;min-width:' + TIMELINE_MIN_WIDTH + 'px;padding-right:48px;' +
+       '--tl-lane-h:' + laneHeight + 'px;--tl-bar-min-h:' + barMinH + 'px"' +
        ' data-week-start="' + weekStartMs + '"' +
        ' data-week-end="' + weekEndMs + '"' +
        ' data-week-offset="' + weekOffset + '"' +
@@ -327,90 +340,59 @@ function Views_timeline(p) {
   ];
   rowLabels.forEach(function(row) {
     s += '<div class="timeline-row-label" style="position:absolute;right:4px;top:' +
-      (52 + row.lane * 44 + 8) + 'px;font-family:var(--mono);font-size:10px;color:var(--muted);' +
-      'z-index:5;pointer-events:none">' + row.label + '</div>';
+      (rowTopPx + row.lane * laneHeight + 8) + 'px;font-family:var(--mono);font-size:10px;color:var(--muted);' +
+      'z-index:15;pointer-events:none">' + row.label + '</div>';
   });
 
-  // vertical day lines RTL
-
-  for (let d = 0; d <= 7; d++) {
-
-    const rightPct = (d / 7) * 100;
-
-    s += '<div style="' +
-         'position:absolute;' +
-         'top:0;' +
-         'bottom:0;' +
-         'right:' + rightPct + '%;' +
-         'width:1px;' +
-         'background:var(--border)">' +
-         '</div>';
+  for (let i = 0; i <= TIMELINE_TOTAL_SLOTS; i++) {
+    const rightPct = (i / TIMELINE_TOTAL_SLOTS) * 100;
+    const isDayLine = (i % TIMELINE_SLOTS_PER_DAY === 0);
+    s += '<div class="timeline-grid-line' + (isDayLine ? ' timeline-grid-day' : '') + '" style="' +
+         'position:absolute;top:' + timelineHeaderH + 'px;bottom:0;right:' + rightPct + '%;width:1px;' +
+         (isDayLine ? 'background:var(--border);opacity:1' : 'background:var(--border2);opacity:0.55') +
+         ';z-index:1;pointer-events:none"></div>';
   }
 
-  // day headers RTL
-
   for (let d = 0; d < 7; d++) {
-
-    const dayStart =
-      weekStartMs + d * DAY_MS;
-
-    const dayDate =
-      new Date(dayStart);
-
+    const dayStart = weekStartMs + d * DAY_MS;
+    const dayDate = new Date(dayStart);
     const dayMs = weekStartMs + d * DAY_MS;
     const isTodayDay =
       weekOffset === 0 &&
       nowMs >= dayMs &&
       nowMs < dayMs + DAY_MS;
+    const dayRight = (d / 7) * 100;
+    const dayWidth = (100 / 7);
 
-    s += '<div style="' +
-         'position:absolute;' +
-         'top:0;' +
-         'right:' + ((d / 7) * 100) + '%;' +
-         'width:' + (100 / 7) + '%;' +
-         'height:42px;' +
-         'border-bottom:1px solid var(--border);' +
-         'display:flex;' +
-         'flex-direction:column;' +
-         'align-items:center;' +
-         'justify-content:center;' +
-
-         (isTodayDay
-           ? 'background:rgba(74,222,128,0.06);'
-           : '') +
-
-         '">' +
-
+    s += '<div class="timeline-day-head" style="' +
+         'position:absolute;top:0;right:' + dayRight + '%;width:' + dayWidth + '%;height:' + timelineHeaderH + 'px;' +
+         'border-bottom:1px solid var(--border);box-sizing:border-box;' +
+         (isTodayDay ? 'background:rgba(74,222,128,0.06);' : '') + '">' +
+         '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 0 0">' +
          '<div style="font-family:var(--mono);font-size:12px;font-weight:bold;color:' +
-         (isTodayDay ? 'var(--green)' : 'var(--text2)') +
-         '">' +
-
-         DAY_LABELS[d] +
-
-         '</div>' +
-
+         (isTodayDay ? 'var(--green)' : 'var(--text2)') + '">' + DAY_LABELS[d] + '</div>' +
          '<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">' +
+         dayDate.getDate() + '/' + (dayDate.getMonth() + 1) + '</div></div>' +
+         '<div class="timeline-day-slots" style="display:flex;width:100%;margin-top:2px;border-top:1px solid var(--border2)">';
 
-         dayDate.getDate() +
-         '/' +
-         (dayDate.getMonth()+1) +
-
-         '</div>' +
-
-         '</div>';
+    for (let sl = 0; sl < TIMELINE_SLOTS_PER_DAY; sl++) {
+      s += '<span style="flex:1;text-align:center;font-family:var(--mono);font-size:8px;color:var(--muted);' +
+           'line-height:1.1;padding:1px 0">' + TIMELINE_SLOT_LABELS[sl] + '</span>';
+    }
+    s += '</div></div>';
   }
 
   if (weekOffset === 0 && nowMs >= weekStartMs && nowMs < weekEndMs) {
     const nowOffset = ((nowMs - weekStartMs) / (7 * DAY_MS)) * 100;
     s += '<div class="timeline-now" style="' +
-         'position:absolute;top:42px;bottom:0;right:' + nowOffset + '%;width:2px;' +
+         'position:absolute;top:' + timelineHeaderH + 'px;bottom:0;right:' + nowOffset + '%;width:2px;' +
          'background:var(--green);z-index:30"></div>';
   }
 
   weekItems.forEach(function(item, idx) {
     const startPct = ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
     const widthPct = ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
-    const topPx = 52 + (item.lane || 0) * 44;
+    const topPx = rowTopPx + (item.lane || 0) * laneHeight + 4;
     const color = TIMELINE_TYPE_COLORS[item.typeKey] || COLORS[idx % COLORS.length];
     const isPast = item.endMs < nowMs;
     const exId = String(item.ex.id);
@@ -418,10 +400,10 @@ function Views_timeline(p) {
 
     const barStyle =
       'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;' +
-      'width:' + Math.max(widthPct, 1.5) + '%;height:32px;' +
+      'width:' + Math.max(widthPct, 1.5) + '%;' +
       'background:' + color + '22;border:1px solid ' + color + ';border-radius:8px;' +
-      'padding:0 6px;overflow:hidden;color:var(--text);opacity:' + (isPast ? '0.55' : '1') + ';' +
-      'z-index:' + (10 + (item.lane || 0)) + ';display:flex;align-items:center;box-sizing:border-box';
+      'padding:4px 6px;overflow:hidden;color:var(--text);opacity:' + (isPast ? '0.55' : '1') + ';' +
+      'z-index:' + (10 + (item.lane || 0)) + ';display:flex;align-items:stretch;box-sizing:border-box';
 
     const dataAttrs =
       ' id="' + _timelineAttrEsc(barDomId) + '"' +
@@ -433,19 +415,19 @@ function Views_timeline(p) {
     if (canEdit) {
       s += '<div class="tl-bar"' + dataAttrs + ' style="' + barStyle + '">' +
         '<span class="tl-handle tl-handle-start" title="שינוי התחלה"></span>' +
-        '<span class="tl-bar-label" style="flex:1;font-size:11px;font-weight:bold;white-space:nowrap;' +
-        'overflow:hidden;text-overflow:ellipsis;text-align:center">' + _esc(item.ex.title) + '</span>' +
+        '<span class="tl-bar-label" title="' + _timelineAttrEsc(item.ex.title) + '">' +
+        _esc(item.ex.title) + '</span>' +
         '<span class="tl-handle tl-handle-end" title="שינוי סיום"></span>' +
         '</div>';
     } else {
       s += '<a class="tl-bar tl-bar-link"' + dataAttrs + ' ' + _spaBarLink('exercise', { id: item.ex.id }) +
         ' style="' + barStyle + 'text-decoration:none">' +
-        '<span class="tl-bar-label" style="font-size:11px;font-weight:bold;white-space:nowrap;' +
-        'overflow:hidden;text-overflow:ellipsis">' + _esc(item.ex.title) + '</span></a>';
+        '<span class="tl-bar-label" title="' + _timelineAttrEsc(item.ex.title) + '">' +
+        _esc(item.ex.title) + '</span></a>';
     }
   });
 
-  s += '</div>';
+  s += '</div></div>';
 
   if (canEdit) {
     s += '<div id="timelineEditHint" style="display:none;padding:8px 14px;border-top:1px solid var(--border);' +
