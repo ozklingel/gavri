@@ -182,6 +182,7 @@ function _exerciseMatrixEmbedHtml(user, p) {
     : '';
 
   return '<script id="exerciseMatrixData" type="application/json">' + jsonData + '</script>' +
+    '<div id="exMatrixPageTitle" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px"></div>' +
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:12px 16px">' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
     '<div id="exMatrixRoleFilters" class="team-matrix-tabs"></div>' +
@@ -487,12 +488,10 @@ function _exerciseMatrixJs() {
   }
 
   function updateTitle() {
+    var titleEl = document.getElementById('exMatrixPageTitle');
+    if (!titleEl) return;
     var exs = getExercises();
-    var roles = 0;
-    ['brigade', 'battalion', 'company'].forEach(function(tk) {
-      roles += tierRoles(tk).length;
-    });
-    document.getElementById('exMatrixPageTitle').textContent =
+    titleEl.textContent =
       'טבלת שליטה לפי תרגיל — ' + data.totalRoles + ' תפקידים, ' + exs.length + ' תרגילים';
   }
 
