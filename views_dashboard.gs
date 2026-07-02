@@ -189,15 +189,11 @@ function _dashboardCorpsAssignedCounts() {
   return { order: order, counts: counts, other: other };
 }
 
-function _adminDashboard(sid) {
-  const corpsStats = _dashboardCorpsAssignedCounts();
-
-  let s = '<div class="page">';
-  s += '<h1 class="page-title">לוח בקרה — סגל</h1>';
-
-  s += '<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px">' +
+function _dashboardCorpsStatsHtml(corpsStats, compact) {
+  const minW = compact ? '90px' : '130px';
+  let s = '<p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:0 0 8px">' +
     'סך ההקצאות — לפי שיוך חיילי</p>';
-  s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:24px">';
+  s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(' + minW + ',1fr));gap:8px;margin-bottom:12px">';
   corpsStats.order.forEach(function(c) {
     s += '<div class="stat-box"><div class="stat-num">' + corpsStats.counts[c.key] +
       '</div><div class="stat-label">' + c.label + '</div></div>';
@@ -206,28 +202,39 @@ function _adminDashboard(sid) {
     s += '<div class="stat-box"><div class="stat-num">' + corpsStats.other +
       '</div><div class="stat-label">אחר / ללא שיוך</div></div>';
   }
-  s += '</div>';
-  s += _assignmentConflictsDashboardWidget();
-  s += '</div>';
-
-  return s;
+  return s + '</div>';
 }
 
-function _unitCommanderDashboard(sid) {
+function _adminDashboardPanels(sid) {
   const corpsStats = _dashboardCorpsAssignedCounts();
-  let s = '<div class="page">';
-  s += '<h1 class="page-title">לוח בקרה — מגד</h1>';
-  s += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:24px">';
-  corpsStats.order.forEach(function(c) {
-    s += '<div class="stat-box"><div class="stat-num">' + corpsStats.counts[c.key] +
-      '</div><div class="stat-label">' + c.label + '</div></div>';
-  });
-  s += '</div></div>';
+  let s = '<div class="drawer-section-title">לוח בקרה — סגל</div>';
+  s += _dashboardCorpsStatsHtml(corpsStats, true);
+  s += _assignmentConflictsDashboardWidget();
   return s;
 }
 
-function _departmentCommanderDashboard(user, sid) {
-  return '<div class="page-title">⊞ לוח בקרה — ממ</div>';
+function _unitCommanderDashboardPanels(sid) {
+  const corpsStats = _dashboardCorpsAssignedCounts();
+  let s = '<div class="drawer-section-title">לוח בקרה — מגד</div>';
+  s += _dashboardCorpsStatsHtml(corpsStats, true);
+  return s;
+}
+
+function _departmentCommanderDashboardPanels(user, sid) {
+  return '<div class="drawer-section-title">לוח בקרה — ממ</div>';
+}
+
+function _drawerDashboardPanels(user, sid) {
+  if (!user) return '';
+  let s = _homeConstraintsDashboardWidget(user, sid);
+  const role = Roles_normalize(user.role);
+  if (Roles_isAdmin(role))                 s += _adminDashboardPanels(sid);
+  else if (Roles_isUnitCommander(role))     s += _unitCommanderDashboardPanels(sid);
+  else if (Roles_isCompanyCommander(role))  s += _commanderDashboardPanels(user, sid);
+  else if (Roles_isDepartmentCommander(role)) s += _departmentCommanderDashboardPanels(user, sid);
+  else if (Roles_isTutor(role))             s += _tutorDashboardPanels(user, sid);
+  else                                      s += _traineeDashboardPanels(user, sid);
+  return s;
 }
 function _dashExerciseLocation(ex) {
   if (!ex) return '—';
@@ -339,10 +346,10 @@ function _commanderTraineeExercisesHtml(assigns) {
 }
 
 // ── Commander Dashboard ──
-function _commanderDashboard(user, sid) {
+function _commanderDashboardPanels(user, sid) {
   const trainees = Users_traineesOfCommander(user.id);
 
-  let s = '<div class="page-title">⊞ לוח בקרה — ' + Roles_label(user.role) + '</div>';
+  let s = '<div class="drawer-section-title">לוח בקרה — ' + Roles_label(user.role) + '</div>';
 
   if (!trainees.length) {
     return s + '<div class="card"><div class="empty">אין חיילים מוקצים לצוות שלך עדיין</div></div>';
@@ -353,7 +360,7 @@ function _commanderDashboard(user, sid) {
     totalAssigns += Assignments_byUser(t.id).length;
   });
 
-  s += '<div class="grid-2" style="margin-bottom:16px">' +
+  s += '<div class="grid-2" style="margin-bottom:12px">' +
     '<div class="stat-box"><div class="stat-num">' + trainees.length + '</div><div class="stat-label">חניכים בצוות</div></div>' +
     '<div class="stat-box"><div class="stat-num">' + totalAssigns + '</div><div class="stat-label">הקצאות לתרגילים</div></div>' +
     '</div>';
@@ -389,7 +396,7 @@ function _commanderDashboard(user, sid) {
 }
 
 // ── Tutor Dashboard ──
-function _tutorDashboard(user, sid) {
+function _tutorDashboardPanels(user, sid) {
   const myAssigns = Assignments_byTutor(user.id);
   const exMap = {};
 
@@ -401,7 +408,7 @@ function _tutorDashboard(user, sid) {
   });
 
   const exIds = Object.keys(exMap);
-  let s = '<div class="page-title">⊞ לוח בקרה — חונך</div>';
+  let s = '<div class="drawer-section-title">לוח בקרה — חונך</div>';
 
   if (!exIds.length) {
     return s + '<div class="card"><div class="empty">אין תרגילים עם חניכים משויכים אליך</div></div>';
@@ -450,11 +457,11 @@ function _tutorDashboard(user, sid) {
 }
 
 // ── Trainee Dashboard ──
-function _traineeDashboard(user, sid) {
+function _traineeDashboardPanels(user, sid) {
   const sidQ = encodeURIComponent(sid);
   const assigns = Assignments_byUser(user.id);
 
-  let s = '<div class="page-title">⊞ התרגילים שלי</div>';
+  let s = '<div class="drawer-section-title">התרגילים שלי</div>';
 
   if (!assigns.length) {
     return s + '<div class="card"><div class="empty">אין תרגילים מוקצים עדיין</div></div>';

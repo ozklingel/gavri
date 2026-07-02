@@ -263,21 +263,20 @@ function _dashboardUserSearchBar(selectedUserId) {
     const u = Users_get(uid);
     if (u) prefill = u.name + ' (' + u.id + ')';
   }
-  return '<div class="card user-search-bar" style="margin-bottom:16px">' +
-    '<div class="card-body" style="padding:12px 16px">' +
-    '<label class="form-label" style="margin-bottom:6px">🔍 חיפוש משתמש</label>' +
-    '<div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">' +
-    '<div class="user-search-wrap" style="flex:1;min-width:200px">' +
-    '<input type="text" id="dashboardUserSearch" class="form-input" ' +
+  return '<div class="dashboard-search-panel">' +
+    '<label class="form-label dashboard-search-label">🔍 חיפוש משתמש</label>' +
+    '<div class="dashboard-search-row">' +
+    '<div class="user-search-wrap">' +
+    '<input type="text" id="dashboardUserSearch" class="form-input dashboard-search-input" ' +
     'placeholder="הקלד שם או מספר אישי..." autocomplete="off" ' +
     'value="' + _esc(prefill) + '" ' +
     'data-selected-id="' + _esc(uid) + '" ' +
     'data-users="' + json.replace(/"/g, '&quot;') + '">' +
-    '<div id="dashboardUserSearchResults" class="user-search-results" hidden></div>' +
     '</div>' +
-    '<button type="button" id="dashboardUserSearchBtn" class="btn btn-primary" style="min-width:80px">חפש</button>' +
+    '<button type="button" id="dashboardUserSearchBtn" class="btn btn-primary dashboard-search-btn">חפש</button>' +
     '</div>' +
-  '</div></div>';
+    '<div id="dashboardUserSearchResults" class="user-search-results dashboard-search-results" hidden></div>' +
+    '</div>';
 }
 
 function _statusHe(s) {
@@ -342,6 +341,11 @@ function _appDrawer(user, sid) {
       '<span>' + _esc(item.label) + '</span></a>';
   });
 
+  const panels = _drawerDashboardPanels(user, sid);
+  const panelsHtml = panels
+    ? '<div class="app-drawer-panels">' + panels + '</div>'
+    : '';
+
   return '<div class="app-drawer-overlay" id="appDrawerOverlay" hidden></div>' +
     '<aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="תפריט ראשי">' +
     '<div class="app-drawer-head">' +
@@ -352,7 +356,10 @@ function _appDrawer(user, sid) {
     '</div>' +
     '<div class="app-drawer-user">👤 <b>' + _esc(user.name) + '</b><br>' +
     '<span style="color:var(--muted)">' + _esc(_roleHe(user.role)) + '</span></div>' +
+    '<div class="app-drawer-scroll">' +
     '<nav class="app-drawer-nav">' + nav + '</nav>' +
+    panelsHtml +
+    '</div>' +
     '<div class="app-drawer-foot">' +
     _a('action=logout', '⏻ יציאה', 'btn btn-danger btn-full') +
     '</div></aside>';
@@ -467,15 +474,7 @@ function Views_dashboard(p) {
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
 
-  const role = Roles_normalize(user.role);
   const searchUserId = String(p.searchUserId || '').trim();
-  let content = '';
-  if (Roles_isAdmin(role))                 content = _adminDashboard(sid);
-  else if (Roles_isUnitCommander(role))     content = _unitCommanderDashboard(sid);
-  else if (Roles_isCompanyCommander(role))  content = _commanderDashboard(user, sid);
-  else if (Roles_isDepartmentCommander(role)) content = _departmentCommanderDashboard(user, sid);
-  else if (Roles_isTutor(role))             content = _tutorDashboard(user, sid);
-  else                                      content = _traineeDashboard(user, sid);
 
   let searchResults = '';
   if (searchUserId) {
@@ -483,11 +482,10 @@ function Views_dashboard(p) {
   }
 
   const body = _topbar(user, sid) +
-    '<div class="page">' + _flash(p) +
-    _homeConstraintsDashboardWidget(user, sid) +
+    '<div class="page page-dashboard">' + _flash(p) +
     _dashboardUserSearchBar(searchUserId) +
     searchResults +
-    content + '</div>';
+    '</div>';
   return _wrapPage(body, 'לוח בקרה');
 }
 

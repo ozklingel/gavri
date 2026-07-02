@@ -139,7 +139,7 @@ body {
       position: fixed;
       top: 0;
       right: 0;
-      width: min(300px, 88vw);
+      width: min(360px, 92vw);
       max-width: 100%;
       height: 100%;
       height: 100dvh;
@@ -209,14 +209,41 @@ body {
       line-height: 1.5;
       flex-shrink: 0;
     }
-    .app-drawer-nav {
+    .app-drawer-scroll {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .app-drawer-nav {
       padding: 10px;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      -webkit-overflow-scrolling: touch;
+    }
+    .app-drawer-panels {
+      padding: 0 10px 12px;
+      border-top: 1px solid var(--border);
+    }
+    .app-drawer-panels .card {
+      margin-bottom: 10px;
+    }
+    .app-drawer-panels .card-body {
+      overflow-x: auto;
+    }
+    .app-drawer-panels .tbl {
+      font-size: 11px;
+    }
+    .app-drawer-panels .stat-num {
+      font-size: 18px;
+    }
+    .drawer-section-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--green);
+      margin: 12px 0 8px;
+      padding-top: 4px;
     }
     .app-drawer-link {
       display: flex;
@@ -306,6 +333,49 @@ body {
 
     /* ── LAYOUT ── */
     .page { padding: 16px 20px 40px; max-width: 1100px; margin: 0 auto; }
+    .page-dashboard {
+      max-width: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .dashboard-search-panel {
+      width: 100%;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .dashboard-search-label {
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .dashboard-search-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      width: 100%;
+    }
+    .dashboard-search-input {
+      width: 100%;
+      font-size: 15px;
+      padding: 12px 14px;
+      min-height: 48px;
+    }
+    .dashboard-search-btn {
+      min-width: 96px;
+      min-height: 48px;
+      flex-shrink: 0;
+    }
+    .dashboard-search-results {
+      position: relative;
+      top: auto;
+      left: auto;
+      right: auto;
+      width: 100%;
+      margin-top: 8px;
+      max-height: min(50vh, 420px);
+    }
+    #dashboardUserExerciseResults {
+      width: 100%;
+    }
     .page-title {
       font-family: var(--mono);
       font-size: 20px;
@@ -551,17 +621,12 @@ body {
     .demo-role { font-family: var(--mono); font-size: 10px; color: var(--muted); }
     .demo-cred { font-family: var(--mono); font-size: 11px; color: var(--green2); margin-top: 3px; }
 
-    .user-search-wrap { position: relative; }
+    .user-search-wrap { position: relative; flex: 1; min-width: 0; }
     .user-search-results {
-      position: absolute;
-      top: calc(100% + 4px);
-      right: 0;
-      left: 0;
       z-index: 50;
       background: var(--bg2);
       border: 1px solid var(--border2);
       border-radius: var(--radius);
-      max-height: 240px;
       overflow-y: auto;
       box-shadow: var(--shadow);
     }
@@ -708,6 +773,18 @@ body {
   .page {
     padding: 10px 12px;
     overflow-x: hidden;
+  }
+
+  .page-dashboard {
+    overflow-x: visible;
+  }
+
+  .dashboard-search-row {
+    flex-direction: column;
+  }
+
+  .dashboard-search-btn {
+    width: 100%;
   }
 
   .topbar {
@@ -1578,7 +1655,7 @@ body {
         }
       });
       document.addEventListener('click', function(e) {
-        if (!e.target.closest('.user-search-wrap')) hideResults();
+        if (!e.target.closest('.dashboard-search-panel')) hideResults();
       });
     }
 
