@@ -3,14 +3,31 @@ function Views_exercises(p) {
   const user = Auth_requireRole(p, ['admin']);
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
+
+  let s = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
+  s += '<div style="flex:2;min-width:300px">' + _exercisesListModuleHtml(user, sid) + '</div>';
+  s += '<div style="flex:1;min-width:260px">' + _exercisesSidebarModuleHtml(user, sid) + '</div>';
+  s += '</div>';
+
+  const body =
+    _topbar(user, sid) +
+    '<div class="page">' + _flash(p) +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+      '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
+      _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+    '</div>' +
+    s +
+    '</div>';
+
+  return _wrapPage(body, 'ניהול תרגילים');
+}
+
+function _exercisesListModuleHtml(user, sid) {
+  const sidQ = encodeURIComponent(sid);
   const exs = Exercises_all();
   const mpCounts = Assignments_mpCountByExercise();
 
-  let s = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
-
-  // ───── רשימת תרגילים ─────
-  s += '<div style="flex:2;min-width:300px">';
-  s += '<div class="card"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
+  let s = '<div class="card"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
 
   if (!exs.length) {
     s += '<div class="empty">אין תרגילים במערכת</div>';
@@ -47,11 +64,12 @@ function Views_exercises(p) {
     s += '</tbody></table>';
   }
 
-  s += '</div></div>';
+  s += '</div>';
+  return s;
+}
 
-  // ───── יצירת תרגיל חדש ─────
-  s += '<div style="flex:1;min-width:260px">';
-  s += '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div>' +
+function _exercisesSidebarModuleHtml(user, sid) {
+  let s = '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div>' +
     '<div class="card-body">' +
     _formOpen() +
       '<input type="hidden" name="action" value="createExercise">' +
@@ -111,20 +129,7 @@ function Views_exercises(p) {
 
   s += '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">📅 בניית סדרה</div></div>' +
     '<div class="card-body">' + Series_buildFormHtml(sid) + '</div></div>';
-
-  s += '</div></div>';
-
-  const body =
-    _topbar(user, sid) +
-    '<div class="page">' + _flash(p) +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-      '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
-      _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div>' +
-    s +
-    '</div>';
-
-  return _wrapPage(body, 'ניהול תרגילים');
+  return s;
 }
 // ── Admin Dashboard ──
 function _normalizeAffiliation(v) {

@@ -1146,6 +1146,31 @@ body {
       color: var(--green);
       background: rgba(74, 222, 128, 0.1);
     }
+    .spa-module-skeleton {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 140px;
+      padding: 24px 16px;
+      border: 1px dashed var(--border2);
+      border-radius: 10px;
+      background: var(--bg3);
+    }
+    .spa-module-skeleton-bar {
+      display: block;
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--green);
+      opacity: 0.7;
+    }
+    .spa-module-skeleton-text {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
     .timeline-page-row {
       display: flex;
       flex-direction: row-reverse;
@@ -1484,6 +1509,43 @@ body {
   window.MapimSpaShowLoader = function(msg) { MapimLoader.show(msg); };
   window.MapimSpaHideLoader = function() { MapimLoader.hide(); };
 
+  // ══ Lazy module slots (exercises page legacy shells) ══
+  var MapimModules = (function() {
+    function loadSlot(slot) {
+      if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return;
+      var moduleId = slot.getAttribute('data-spa-module');
+      if (!moduleId) return;
+      slot.setAttribute('data-spa-module-loaded', 'pending');
+      var params = window.MapimSpa ? MapimSpa.parseSpaParams(slot) : {};
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || res.html == null) {
+            slot.innerHTML = '<div class="flash flash-error">⚠ ' +
+              (res && res.error ? res.error : 'שגיאת טעינת מודול') + '</div>';
+          } else {
+            slot.innerHTML = res.html;
+            if (window.MapimSpa) {
+              MapimSpa.runScripts(slot);
+              MapimSpa.afterRender();
+            }
+          }
+          slot.setAttribute('data-spa-module-loaded', '1');
+        })
+        .withFailureHandler(function(err) {
+          slot.innerHTML = '<div class="flash flash-error">⚠ ' +
+            (err && err.message ? err.message : String(err)) + '</div>';
+          slot.setAttribute('data-spa-module-loaded', '1');
+        })
+        .apiLoadModule(window.MapimSpa ? MapimSpa.getSid() : '', moduleId, JSON.stringify(params || {}));
+    }
+    function load(root) {
+      root = root || document.getElementById('app-content');
+      if (!root) return;
+      root.querySelectorAll('[data-spa-module]:not([data-spa-module-loaded="1"])').forEach(loadSlot);
+    }
+    return { load: load, loadSlot: loadSlot };
+  })();
+
   // ══ SPA router — fixed URL, no full page reloads ══
   var MapimSpa = (function() {
     var SID_KEY = 'mapim_sid';
@@ -1629,6 +1691,7 @@ body {
         app.innerHTML = result.body;
         runScripts(app);
         afterRender();
+        if (window.MapimModules) MapimModules.load(app);
       }
       if (result.title) document.title = result.title;
       MapimLoader.hide();

@@ -159,6 +159,16 @@ function _wrapPage(body, title) {
   };
 }
 
+function _spaModuleSlot(moduleId, params, label) {
+  label = label || 'טוען...';
+  return '<div class="spa-module" data-spa-module="' + _esc(moduleId) + '"' +
+    _spaParamsAttr(params || {}) + '>' +
+    '<div class="spa-module-skeleton" aria-busy="true">' +
+    '<span class="spa-module-skeleton-bar"></span>' +
+    '<span class="spa-module-skeleton-text">' + _esc(label) + '</span>' +
+    '</div></div>';
+}
+
 function _htmlShell() {
   const tpl = HtmlService.createTemplateFromFile('index');
   tpl.pageTitle = 'סדרת השטח — מערכת תרגילים';
