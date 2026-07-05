@@ -128,6 +128,7 @@ function setupSheets() {
   ensureColumn('FieldForces', 'force_name');
   ensure('FireZones', ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night']);
   ensure('HomeConstraints', ['id','user_id','start_date','start_time','end_date','end_time','notes','status','approval_tier','supervisor_id','approved_by','approved_at','rejection_note','created_at']);
+  ensure('TimelineBlocks', ['id','label','start_date','end_date','start_time','end_time','lane','created_by']);
   ensureColumn('Users', 'unit_affiliation');
   ensureColumn('Users', 'service_type');
   ensureColumn('Users', 'military_affiliation');

@@ -1146,6 +1146,155 @@ body {
       color: var(--green);
       background: rgba(74, 222, 128, 0.1);
     }
+    .timeline-page-row {
+      display: flex;
+      flex-direction: row-reverse;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .timeline-main-col {
+      flex: 1;
+      min-width: 0;
+    }
+    .timeline-tools-panel {
+      width: 290px;
+      flex-shrink: 0;
+      position: relative;
+      transition: width 0.2s ease;
+    }
+    .timeline-tools-panel.is-minimized {
+      width: 46px;
+    }
+    .timeline-tools-expand {
+      display: none;
+      width: 46px;
+      min-height: 120px;
+      padding: 10px 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg2);
+      color: var(--text2);
+      cursor: pointer;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 18px;
+    }
+    .timeline-tools-expand-label {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .timeline-tools-panel.is-minimized .timeline-tools-expand {
+      display: flex;
+    }
+    .timeline-tools-panel.is-minimized .timeline-tools-body {
+      display: none;
+    }
+    .timeline-tools-body {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 160px);
+    }
+    .timeline-tools-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg3);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: bold;
+      color: var(--text2);
+    }
+    .timeline-side-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg3);
+    }
+    .timeline-side-tab {
+      flex: 1;
+      padding: 9px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .timeline-side-tab.active {
+      color: var(--green);
+      border-bottom-color: var(--green);
+      background: rgba(74, 222, 128, 0.06);
+    }
+    .timeline-side-panel-body {
+      padding: 12px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .timeline-block-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .timeline-block-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 8px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 11px;
+    }
+    .timeline-block-item-text {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .timeline-block-item-text span {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+    .timeline-track .tl-slot-bar {
+      pointer-events: none;
+    }
+    @media (max-width: 900px) {
+      .timeline-page-row {
+        flex-direction: column;
+      }
+      .timeline-tools-panel,
+      .timeline-tools-panel.is-minimized {
+        width: 100%;
+      }
+      .timeline-tools-panel.is-minimized .timeline-tools-expand {
+        width: 100%;
+        min-height: auto;
+        flex-direction: row;
+        padding: 10px 14px;
+      }
+      .timeline-tools-expand-label {
+        writing-mode: horizontal-tb;
+      }
+    }
 
     /* ── ASSIGNMENTS PAGE ── */
     .user-chip {
@@ -2130,7 +2279,42 @@ body {
     });
   })();
 
+  function initTimelineToolsPanel() {
+    var panel = document.getElementById('timelineToolsPanel');
+    if (!panel || panel._toolsBound) return;
+    panel._toolsBound = true;
+
+    var expandBtn = document.getElementById('timelineToolsExpand');
+    var minBtn = document.getElementById('timelineToolsMinimize');
+
+    function setMinimized(min) {
+      panel.classList.toggle('is-minimized', min);
+      if (expandBtn) expandBtn.setAttribute('aria-expanded', min ? 'false' : 'true');
+    }
+
+    if (expandBtn) {
+      expandBtn.addEventListener('click', function() { setMinimized(false); });
+    }
+    if (minBtn) {
+      minBtn.addEventListener('click', function() { setMinimized(true); });
+    }
+
+    panel.querySelectorAll('[data-timeline-side-tab]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var tab = btn.getAttribute('data-timeline-side-tab');
+        panel.querySelectorAll('.timeline-side-tab').forEach(function(b) {
+          b.classList.toggle('active', b === btn);
+        });
+        panel.querySelectorAll('[data-timeline-side-panel]').forEach(function(p) {
+          p.hidden = p.getAttribute('data-timeline-side-panel') !== tab;
+        });
+      });
+    });
+  }
+
   function initTimelineWeek() {
+    initTimelineToolsPanel();
+
     var weekSel = document.getElementById('timelineWeekSelect');
     if (weekSel && !weekSel._bound) {
       weekSel._bound = true;

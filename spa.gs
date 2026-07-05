@@ -144,6 +144,8 @@ function _spaDispatchAction(action, p) {
     case 'createHomeConstraint':  return HomeConstraints_create(p);
     case 'approveHomeConstraint': return HomeConstraints_approve(p);
     case 'rejectHomeConstraint':  return HomeConstraints_reject(p);
+    case 'createTimelineBlock':   return TimelineBlocks_create(p);
+    case 'deleteTimelineBlock':   return TimelineBlocks_delete(p);
     default:
       throw new Error('פעולה לא מוכרת: ' + action);
   }

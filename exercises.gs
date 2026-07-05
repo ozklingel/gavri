@@ -367,6 +367,11 @@ function Exercises_create(p) {
     if (result.skipped > 0) info += ' (' + result.skipped + ' כבר משתתפים.)';
   }
 
+  if (String(p.from || '').trim() === 'timeline') {
+    const week = p.week != null ? String(p.week) : '0';
+    return Views_timeline({ sid: p.sid, week: week, info: info });
+  }
+
   return Views_exercise({ sid: p.sid, id: id, info: info });
 }
 
