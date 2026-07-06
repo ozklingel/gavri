@@ -298,9 +298,11 @@ function _teamMatrixJs() {
     renderStats(stats);
 
     var head = '<tr><th class="team-matrix-sticky">שם</th>';
-    exIds.forEach(function(exId, idx) {
+    exIds.forEach(function(exId) {
       var m = data.exMeta[exId] || { title: exId };
-      head += '<th class="team-matrix-col-hdr"><div class="team-matrix-ex-title">' + esc(m.title || ('תרגיל ' + (idx + 1))) + '</div>';
+      var fullTitle = String(m.title || m.label || exId || '');
+      head += '<th class="team-matrix-col-hdr team-matrix-ex-col"><div class="team-matrix-ex-title"' +
+        (fullTitle ? ' title="' + esc(fullTitle) + '"' : '') + '>' + esc(fullTitle) + '</div>';
       if (m.week) head += '<div class="team-matrix-ex-sub">שבוע ' + m.week + '</div>';
       if (m.typeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.typeLine) + '</div>';
       if (m.slotLine) head += '<div class="team-matrix-ex-sub">' + esc(m.slotLine) + '</div>';

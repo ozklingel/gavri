@@ -739,6 +739,14 @@ body {
       box-shadow: -4px 0 8px rgba(0,0,0,.15);
     }
     .team-matrix-col-hdr { font-size: 11px; line-height: 1.4; white-space: normal; }
+    .team-matrix-tbl th.team-matrix-ex-col { min-width: 120px; max-width: 150px; }
+    .team-matrix-tbl .team-matrix-ex-title {
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: help;
+    }
     .team-matrix-ex-title { font-weight: bold; margin-bottom: 4px; }
     .team-matrix-ex-sub { color: var(--muted); font-size: 10px; }
     .team-matrix-name { line-height: 1.35; }
@@ -1305,6 +1313,42 @@ body {
       color: var(--muted);
       font-family: var(--mono);
       font-size: 10px;
+    }
+    .timeline-forces-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: min(52vh, 420px);
+      overflow-y: auto;
+    }
+    .timeline-forces-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 8px 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 11px;
+    }
+    .timeline-forces-name {
+      color: var(--green);
+      font-weight: 700;
+      text-decoration: none;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .timeline-forces-name:hover {
+      text-decoration: underline;
+    }
+    .timeline-forces-meta {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.35;
     }
     .timeline-track .tl-slot-bar {
       pointer-events: none;

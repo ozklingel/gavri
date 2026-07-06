@@ -30,6 +30,47 @@ function _timelineWeekBounds(weekOffset) {
   };
 }
 
+function _timelineFieldForcesTabHtml() {
+  const items = FieldForces_all().slice().sort(function(a, b) {
+  const na = String(a.force_name || a.role || '');
+    const nb = String(b.force_name || b.role || '');
+    return na.localeCompare(nb, 'he');
+  });
+
+  let list = '';
+  if (!items.length) {
+    list = '<p style="font-size:11px;color:var(--muted);margin:0">אין כוחות בשטח במערכת</p>';
+  } else {
+    list = '<ul class="timeline-forces-list">';
+    items.forEach(function(item) {
+      const title = item.force_name || item.role || item.id;
+      list += '<li class="timeline-forces-item">' +
+        '<a href="#" class="timeline-forces-name" data-spa-page="fieldForce"' +
+        _spaParamsAttr({ id: item.id }) + ' title="' + _esc(title) + '">' + _esc(title) + '</a>';
+      if (item.role && item.role !== title) {
+        list += '<span class="timeline-forces-meta">' + _esc(item.role) + '</span>';
+      }
+      if (item.commander_name) {
+        list += '<span class="timeline-forces-meta">מפקד: ' + _esc(item.commander_name) + '</span>';
+      }
+      if (item.camp_location) {
+        list += '<span class="timeline-forces-meta">מחנה: ' + _esc(item.camp_location) + '</span>';
+      }
+      if (item.force_type) {
+        list += '<span class="timeline-forces-meta">' + _esc(item.force_type) + '</span>';
+      }
+      list += '</li>';
+    });
+    list += '</ul>';
+  }
+
+  return '<div class="timeline-side-tab-panel" data-timeline-side-panel="forces" hidden>' +
+    '<p style="font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.45">' +
+    'כל הגדודים / כוחות השת״פ הרשומים במערכת.</p>' +
+    '<a href="#" class="btn btn-ghost btn-sm btn-full" style="margin-bottom:10px" data-spa-page="fieldForces">↗ ניהול כוחות בשטח</a>' +
+    list + '</div>';
+}
+
 function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
   const sidQ = encodeURIComponent(sid);
   weekBlocks = weekBlocks || [];
@@ -118,6 +159,8 @@ function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
     _submitBtn('צור תרגיל', 'btn btn-primary btn-full btn-sm') +
     '</form></div>';
 
+  const forcesTab = _timelineFieldForcesTabHtml();
+
   return '<aside id="timelineToolsPanel" class="timeline-tools-panel is-minimized" aria-label="כלים לציר זמן">' +
     '<button type="button" id="timelineToolsExpand" class="timeline-tools-expand" title="פתח כלים">' +
     '<span>➕</span><span class="timeline-tools-expand-label">כלים</span></button>' +
@@ -129,8 +172,9 @@ function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
     '<div class="timeline-side-tabs">' +
     '<button type="button" class="timeline-side-tab active" data-timeline-side-tab="block">📌 משבצת</button>' +
     '<button type="button" class="timeline-side-tab" data-timeline-side-tab="exercise">➕ תרגיל</button>' +
+    '<button type="button" class="timeline-side-tab" data-timeline-side-tab="forces">⚔ בשטח</button>' +
     '</div>' +
-    '<div class="timeline-side-panel-body">' + blockTab + exerciseTab + '</div>' +
+    '<div class="timeline-side-panel-body">' + blockTab + exerciseTab + forcesTab + '</div>' +
     '</div></aside>';
 }
 
