@@ -842,7 +842,14 @@ body {
     .ex-matrix-person { text-align: center; padding: 4px 2px; }
     .ex-matrix-person-name { font-weight: bold; font-size: 12px; line-height: 1.3; }
     .ex-matrix-person-phone { font-size: 10px; color: var(--muted); margin-top: 3px; direction: ltr; }
-    .ex-matrix-tbl th.ex-matrix-col { min-width: 120px; }
+    .ex-matrix-tbl th.ex-matrix-col { min-width: 120px; max-width: 150px; }
+    .ex-matrix-tbl .team-matrix-ex-title {
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: help;
+    }
 
     /* ── TABS (simulated via hash) ── */
     .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 14px; }

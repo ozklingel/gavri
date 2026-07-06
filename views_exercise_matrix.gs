@@ -544,8 +544,10 @@ function _exerciseMatrixJs() {
     var head = '<tr><th class="team-matrix-sticky">תפקיד</th>';
     exs.forEach(function(ex) {
       var m = data.exMeta[ex.id] || {};
-      head += '<th class="team-matrix-col-hdr ex-matrix-col"><div class="team-matrix-ex-title">' +
-        esc(m.label || m.title || ex.label || ex.id) + '</div>';
+      var fullTitle = String(m.label || m.title || ex.label || ex.id || '');
+      head += '<th class="team-matrix-col-hdr ex-matrix-col"><div class="team-matrix-ex-title"' +
+        (fullTitle ? ' title="' + esc(fullTitle) + '"' : '') + '>' +
+        esc(fullTitle) + '</div>';
       if (m.week) head += '<div class="team-matrix-ex-sub">שבוע ' + m.week + '</div>';
       if (m.typeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.typeLine) + '</div>';
       if (m.slotLine) head += '<div class="team-matrix-ex-sub">' + esc(m.slotLine) + '</div>';
