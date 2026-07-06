@@ -7,14 +7,30 @@ function Views_assign(p) {
   const sid  = user.id;
   const sidQ = encodeURIComponent(sid);
 
+  const body = _topbar(user, sid) +
+    '<div class="page">' + _flash(p) +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
+    '<div class="page-title" style="margin:0">🔀 לוח שיבוץ</div>' +
+    '<div style="display:flex;gap:6px;align-items:center">' +
+    '<span id="assignStatus" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></span>' +
+    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
+    '</div></div>' +
+    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
+    '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד · ריחוף או לחיצה ארוכה לפרטים אישיים' +
+    '</div>' +
+    _assignMainModuleHtml(user, sid) +
+    '</div>';
+
+  return _wrapPage(body, 'לוח שיבוץ');
+}
+
+function _assignMainModuleHtml(user, sid) {
+  const sidQ = encodeURIComponent(sid);
+
   const exercises = Exercises_all();
   const allUsers  = Users_all();
   const assigns   = Assignments_all();
 
-  // Build data payload for client-side JS
-  // exercises: [{id, title, start_date, end_date}]
-  // users:     [{id, name, role}]
-  // assigns:   [{id, exercise_id, user_id, responsibility, status}]
   const exData = exercises.map(function(e) {
     return { id: e.id, title: e.title, start: e.start_date || '', end: e.end_date || '' };
   });
@@ -38,13 +54,12 @@ function Views_assign(p) {
     };
   });
 
-  const exMap = {}; // exercise_id → [assignments]
+  const exMap = {};
   assigns.forEach(function(a) {
     if (!exMap[a.exercise_id]) exMap[a.exercise_id] = [];
     exMap[a.exercise_id].push({ id: a.id, userId: a.user_id, resp: a.responsibility, status: a.status });
   });
 
-  // Unassigned = users with no row in Assignments (any exercise)
   const assignedUserIds = {};
   assigns.forEach(function(a) {
     const uid = String(a.user_id || '').trim();
@@ -76,19 +91,7 @@ function Views_assign(p) {
     respOptions: _assignmentRespOptions()
   });
 
-  const body = _topbar(user, sid) +
-    '<div class="page">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0">🔀 לוח שיבוץ</div>' +
-    '<div style="display:flex;gap:6px;align-items:center">' +
-    '<span id="assignStatus" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></span>' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div></div>' +
-
-    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
-    '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד · ריחוף או לחיצה ארוכה לפרטים אישיים' +
-    '</div>' +
-    (approvedHome.length
+  return (approvedHome.length
       ? '<div class="flash flash-error" style="margin-bottom:12px;font-size:12px;line-height:1.5">' +
         '🏠 <b>' + approvedHome.length + ' אילוצי בית מאושרים</b> — לא ניתן לשבץ חניך לתרגיל החופף לטווח. ' +
         _a('page=homeConstraints', 'צפה ברשימה', 'btn btn-ghost btn-sm') +
@@ -101,8 +104,6 @@ function Views_assign(p) {
     _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס שיבוצים',
       'לאפס את כל השיבוצים? פעולה בלתי הפיכה.', 'btn btn-danger btn-sm') +
     '</div>' +
-
-    // Data island
     '<script id="assignData" type="application/json">' + jsonData + '</script>' +
     '<input type="hidden" id="assignSid" value="' + _esc(sid) + '">' +
     _respDatalistHtml('assignRespList') +
@@ -110,23 +111,16 @@ function Views_assign(p) {
     'max-width:280px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border2);' +
     'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-family:var(--mono);font-size:11px;' +
     'color:var(--text1);pointer-events:none;line-height:1.45"></div>' +
-
-    // Board
     '<div id="assignBoard" style="display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:16px">' +
-    // Unassigned column rendered by JS
     '</div>' +
-
     '<div id="assignLeastSection" style="margin-top:8px;border-top:1px solid var(--border);padding-top:16px">' +
     '<div class="card-title" style="margin-bottom:10px;font-size:13px">📊 חניך מועדף לשיבוץ — הכי פחות משובץ לכל חיל</div>' +
     '<div id="assignLeastPanel" style="display:flex;gap:10px;flex-wrap:wrap"></div>' +
     '<p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:8px 0 0">מתעדכן אוטומטית לפי מספר התרגילים הנוכחי · אחד לכל חיל</p>' +
     '</div>' +
-    '</div>' +
-
     '<script>' + _assignBoardJs() + '</script>';
-
-  return _wrapPage(body, 'לוח שיבוץ');
 }
+
 function _assignBoardJs() {
   return `
 (function() {
