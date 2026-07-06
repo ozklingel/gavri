@@ -269,7 +269,7 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
   } else {
     s += '<div class="card-body" style="padding:0;overflow-x:auto">' +
       '<table class="tbl"><thead><tr>' +
-      '<th>תרגיל</th><th>מיקום</th><th>זמן</th><th>תפקיד בתרגיל</th><th>סוג תרגיל</th><th>סטטוס</th>' +
+      '<th>תרגיל</th><th>שבוע לועזי</th><th>מיקום</th><th>זמן</th><th>תפקיד בתרגיל</th><th>סוג תרגיל</th><th>סטטוס</th>' +
       '</tr></thead><tbody>';
     assigns.forEach(function(a) {
       const ex = Exercises_get(a.exercise_id);
@@ -277,6 +277,8 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
       s += '<tr>' +
         '<td style="white-space:nowrap">' +
         (ex ? _exerciseLink(ex.id, title) : _esc(title)) + '</td>' +
+        '<td style="font-size:12px;white-space:nowrap">' +
+        _dashCell(ex && ex.rawStartDate ? _isoWeekLabel(ex.rawStartDate) : '') + '</td>' +
         '<td>' + _dashCell(_dashExerciseLocation(ex)) + '</td>' +
         '<td style="font-size:12px;white-space:nowrap">' + _dashCell(_dashExerciseTime(ex)) + '</td>' +
         '<td>' + _dashCell(a.responsibility) + '</td>' +

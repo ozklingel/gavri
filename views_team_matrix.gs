@@ -1,20 +1,5 @@
 // views_team_matrix.gs — תצוגת מטריצה לפי צוות
 
-function _isoWeekNumber(dateStr) {
-  if (!dateStr) return 0;
-  const d = new Date(String(dateStr) + 'T12:00:00');
-  if (isNaN(d.getTime())) return 0;
-  const target = new Date(d.valueOf());
-  const dayNr = (d.getDay() + 6) % 7;
-  target.setDate(target.getDate() - dayNr + 3);
-  const firstThursday = target.valueOf();
-  target.setMonth(0, 1);
-  if (target.getDay() !== 4) {
-    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
-  }
-  return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
-}
-
 function _teamMatrixIsMpRole(resp) {
   const r = String(resp || '').trim();
   if (!r) return false;
@@ -58,6 +43,8 @@ function _teamMatrixExerciseMeta(ex) {
     id: ex.id,
     title: ex.title,
     week: week,
+    weekYear: week ? _isoWeekYear(ex.rawStartDate) : 0,
+    weekLabel: week ? _isoWeekLabel(ex.rawStartDate) : '',
     typeLine: typeLine,
     slotLine: slotLine,
     timeLine: timeLine,
@@ -169,7 +156,7 @@ function _teamMatrixEmbedHtml(user, p) {
     '<button type="button" id="teamMatrixExportCsv" class="btn btn-secondary btn-sm">Excel</button>' +
     '</div></div>' +
     '<div class="card-body" style="padding:12px 16px;border-bottom:1px solid var(--border)">' +
-    '<div class="form-label" style="margin-bottom:8px">סנן שבוע:</div>' +
+    '<div class="form-label" style="margin-bottom:8px">סנן לפי שבוע לועזי:</div>' +
     '<div id="teamMatrixWeekTabs" class="team-matrix-tabs"></div>' +
     '</div>' +
     '<div id="teamMatrixStats" class="team-matrix-stats"></div>' +
@@ -235,12 +222,23 @@ function _teamMatrixJs() {
     });
   }
 
+  function weekFilterLabel() {
+    if (currentWeek === 'all') return 'כל השבועות';
+    var w = parseInt(currentWeek, 10);
+    var exIds = data.teamExercises[currentTeam] || [];
+    var sampleId = exIds.find(function(exId) {
+      return data.exMeta[exId] && data.exMeta[exId].week === w;
+    });
+    var y = sampleId && data.exMeta[sampleId] ? data.exMeta[sampleId].weekYear : 0;
+    return 'שבוע לועזי ' + w + (y ? ' · ' + y : '');
+  }
+
   function renderWeekTabs() {
     var weeks = collectWeeks();
     var el = document.getElementById('teamMatrixWeekTabs');
     var html = '<button type="button" class="team-matrix-tab' + (currentWeek === 'all' ? ' active' : '') + '" data-week="all">הצג הכל</button>';
     weeks.forEach(function(w) {
-      html += '<button type="button" class="team-matrix-tab' + (String(currentWeek) === String(w) ? ' active' : '') + '" data-week="' + w + '">שבוע ' + w + '</button>';
+      html += '<button type="button" class="team-matrix-tab' + (String(currentWeek) === String(w) ? ' active' : '') + '" data-week="' + w + '">שבוע לועזי ' + w + '</button>';
     });
     el.innerHTML = html;
     el.querySelectorAll('.team-matrix-tab').forEach(function(btn) {
@@ -294,7 +292,8 @@ function _teamMatrixJs() {
     var exIds = getExercises();
     var stats = computeStats(exIds, members);
 
-    document.getElementById('teamMatrixTitle').textContent = team.name + ' — ' + members.length + ' חברים';
+    document.getElementById('teamMatrixTitle').textContent =
+      team.name + ' — ' + members.length + ' חברים · מוצג: ' + weekFilterLabel();
     renderStats(stats);
 
     var head = '<tr><th class="team-matrix-sticky">שם</th>';
@@ -303,7 +302,8 @@ function _teamMatrixJs() {
       var fullTitle = String(m.title || m.label || exId || '');
       head += '<th class="team-matrix-col-hdr team-matrix-ex-col"><div class="team-matrix-ex-title"' +
         (fullTitle ? ' title="' + esc(fullTitle) + '"' : '') + '>' + esc(fullTitle) + '</div>';
-      if (m.week) head += '<div class="team-matrix-ex-sub">שבוע ' + m.week + '</div>';
+      if (m.weekLabel) head += '<div class="team-matrix-ex-sub">' + esc(m.weekLabel) + '</div>';
+      else if (m.week) head += '<div class="team-matrix-ex-sub">שבוע לועזי ' + m.week + '</div>';
       if (m.typeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.typeLine) + '</div>';
       if (m.slotLine) head += '<div class="team-matrix-ex-sub">' + esc(m.slotLine) + '</div>';
       if (m.timeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.timeLine) + '</div>';
@@ -341,7 +341,7 @@ function _teamMatrixJs() {
     var header = ['שם', 'סיכום אישי'];
     exIds.forEach(function(exId) {
       var m = data.exMeta[exId] || {};
-      header.push((m.title || exId) + ' (שבוע ' + (m.week || '') + ')');
+      header.push((m.title || exId) + (m.weekLabel ? ' (' + m.weekLabel + ')' : ''));
     });
     rows.push(header);
     members.forEach(function(u) {

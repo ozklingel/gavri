@@ -479,6 +479,38 @@ function Views_login_mfa(p) {
   return _wrapPage(body, 'אימות דוא"ל');
 }
 
+function _isoWeekNumber(dateStr) {
+  if (!dateStr) return 0;
+  const d = new Date(String(dateStr) + 'T12:00:00');
+  if (isNaN(d.getTime())) return 0;
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  }
+  return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+}
+
+function _isoWeekYear(dateStr) {
+  if (!dateStr) return 0;
+  const d = new Date(String(dateStr) + 'T12:00:00');
+  if (isNaN(d.getTime())) return 0;
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  return target.getFullYear();
+}
+
+function _isoWeekLabel(dateStr) {
+  const w = _isoWeekNumber(dateStr);
+  if (!w) return '';
+  const y = _isoWeekYear(dateStr);
+  return 'שבוע לועזי ' + w + (y ? ' · ' + y : '');
+}
+
 // ─────────── DASHBOARD ───────────
 
 function _dashboardTabItems(user) {

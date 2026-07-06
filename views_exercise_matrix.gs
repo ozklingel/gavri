@@ -189,7 +189,7 @@ function _exerciseMatrixEmbedHtml(user, p) {
     '<div style="margin-right:auto;display:flex;gap:6px">' +
     '<button type="button" id="exMatrixExportCsv" class="btn btn-secondary btn-sm">Excel</button>' +
     '</div></div>' +
-    '<div class="form-label" style="margin-bottom:8px">בחר תרגילים:</div>' +
+    '<div class="form-label" style="margin-bottom:8px">סנן לפי שבוע לועזי:</div>' +
     '<div id="exMatrixWeekTabs" class="team-matrix-tabs"></div>' +
     '</div></div>' +
     '<div id="exMatrixAccordions"></div>' +
@@ -487,12 +487,23 @@ function _exerciseMatrixJs() {
     return tier.roles.filter(passRoleFilter);
   }
 
+  function weekFilterLabel() {
+    if (weekFilter === 'all') return 'מוצג: כל השבועות';
+    var w = parseInt(weekFilter, 10);
+    var sample = data.exercises.find(function(ex) {
+      return data.exMeta[ex.id] && data.exMeta[ex.id].week === w;
+    });
+    var y = sample && data.exMeta[sample.id] ? data.exMeta[sample.id].weekYear : 0;
+    return 'מוצג: שבוע לועזי ' + w + (y ? ' · ' + y : '');
+  }
+
   function updateTitle() {
     var titleEl = document.getElementById('exMatrixPageTitle');
     if (!titleEl) return;
     var exs = getExercises();
     titleEl.textContent =
-      'טבלת שליטה לפי תרגיל — ' + data.totalRoles + ' תפקידים, ' + exs.length + ' תרגילים';
+      'טבלת שליטה לפי תרגיל — ' + data.totalRoles + ' תפקידים, ' + exs.length + ' תרגילים · ' +
+      weekFilterLabel();
   }
 
   function renderRoleFilters() {
@@ -524,7 +535,7 @@ function _exerciseMatrixJs() {
         return data.exMeta[ex.id] && data.exMeta[ex.id].week === w;
       }).length;
       html += '<button type="button" class="team-matrix-tab' + (String(weekFilter) === String(w) ? ' active' : '') +
-        '" data-week="' + w + '">שבוע ' + w + ' <span style="opacity:.7">(' + count + ')</span></button>';
+        '" data-week="' + w + '">שבוע לועזי ' + w + ' <span style="opacity:.7">(' + count + ')</span></button>';
     });
     el.innerHTML = html;
     el.querySelectorAll('[data-week]').forEach(function(btn) {
@@ -548,7 +559,8 @@ function _exerciseMatrixJs() {
       head += '<th class="team-matrix-col-hdr ex-matrix-col"><div class="team-matrix-ex-title"' +
         (fullTitle ? ' title="' + esc(fullTitle) + '"' : '') + '>' +
         esc(fullTitle) + '</div>';
-      if (m.week) head += '<div class="team-matrix-ex-sub">שבוע ' + m.week + '</div>';
+      if (m.weekLabel) head += '<div class="team-matrix-ex-sub">' + esc(m.weekLabel) + '</div>';
+      else if (m.week) head += '<div class="team-matrix-ex-sub">שבוע לועזי ' + m.week + '</div>';
       if (m.typeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.typeLine) + '</div>';
       if (m.slotLine) head += '<div class="team-matrix-ex-sub">' + esc(m.slotLine) + '</div>';
       if (m.location) head += '<div class="team-matrix-ex-sub">' + esc(m.location) + '</div>';
@@ -606,7 +618,7 @@ function _exerciseMatrixJs() {
     var rows = [['תפקיד רמה', 'תפקיד']];
     exs.forEach(function(ex) {
       var m = data.exMeta[ex.id] || {};
-      rows[0].push((m.label || ex.id) + ' (שבוע ' + (m.week || '') + ')');
+      rows[0].push((m.label || ex.id) + (m.weekLabel ? ' (' + m.weekLabel + ')' : ''));
     });
     ['brigade', 'battalion', 'company'].forEach(function(tk) {
       var tier = data.tiers[tk];
