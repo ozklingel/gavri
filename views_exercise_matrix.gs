@@ -96,11 +96,11 @@ function _exerciseMatrixBuildPayload() {
   const exMeta = {};
   const exIds = [];
 
-  exList.forEach(function(ex, idx) {
+  exList.forEach(function(ex) {
     exIds.push(ex.id);
     const meta = _teamMatrixExerciseMeta(ex);
     meta.location = _exerciseMatrixLocation(ex);
-    meta.label = 'תרגיל ' + (idx + 1);
+    meta.label = String(ex.title || ex.id || '').trim();
     exMeta[ex.id] = meta;
     exercises.push({ id: ex.id, label: meta.label });
   });
@@ -542,10 +542,10 @@ function _exerciseMatrixJs() {
       return '<div class="empty" style="padding:16px">אין תפקידים להצגה בסינון הנוכחי</div>';
     }
     var head = '<tr><th class="team-matrix-sticky">תפקיד</th>';
-    exs.forEach(function(ex, idx) {
+    exs.forEach(function(ex) {
       var m = data.exMeta[ex.id] || {};
       head += '<th class="team-matrix-col-hdr ex-matrix-col"><div class="team-matrix-ex-title">' +
-        esc(m.label || ex.label || ('תרגיל ' + (idx + 1))) + '</div>';
+        esc(m.label || m.title || ex.label || ex.id) + '</div>';
       if (m.week) head += '<div class="team-matrix-ex-sub">שבוע ' + m.week + '</div>';
       if (m.typeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.typeLine) + '</div>';
       if (m.slotLine) head += '<div class="team-matrix-ex-sub">' + esc(m.slotLine) + '</div>';
