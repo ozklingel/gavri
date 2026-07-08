@@ -1,7 +1,7 @@
 // statistics.gs — נתוני סטטיסטיקות לדשבורד סגל
 
 function _Statistics_isMpUser(user) {
-  return !!(user && Roles_isCompanyCommander(user.role));
+  return !!(user && Roles_isTrainee(user.role));
 }
 
 function _Statistics_isMagadUser(user) {
@@ -126,14 +126,12 @@ function Statistics_buildPayload() {
       teamName: team ? team.name : '—',
       rank: u.target_role || '—',
       exercises: count,
-      isMp: false,
+      isMp: true,
       isMagad: false
     };
   }).sort(function(a, b) { return b.exercises - a.exercises; });
 
-  const commanderRows = users.filter(function(u) {
-    return _Statistics_isMpUser(u) || _Statistics_isMagadUser(u);
-  }).map(function(u) {
+  const commanderRows = users.filter(_Statistics_isMagadUser).map(function(u) {
     const team = Teams_get(u.team_id);
     const count = (assignsByUser[u.id] || []).length;
     return {
@@ -143,8 +141,8 @@ function Statistics_buildPayload() {
       teamName: team ? team.name : '—',
       rank: Roles_label(u.role),
       exercises: count,
-      isMp: _Statistics_isMpUser(u),
-      isMagad: _Statistics_isMagadUser(u)
+      isMp: false,
+      isMagad: true
     };
   }).sort(function(a, b) { return b.exercises - a.exercises; });
 

@@ -243,7 +243,7 @@ function _statisticsPageJs() {
   function traineeRowsFiltered() {
     var rows;
     if (typeFilter === 'mp') {
-      rows = (data.commanders || []).filter(function(r) { return r.isMp; });
+      rows = data.trainees.slice();
     } else if (typeFilter === 'magad') {
       rows = (data.commanders || []).filter(function(r) { return r.isMagad; });
     } else {
