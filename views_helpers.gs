@@ -379,6 +379,15 @@ function _checkboxRow(name, label, checked) {
 function _drawerNavItems(user) {
   const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
   if (Roles_hasAdminAccess(user.role)) {
+    items.push(
+      { page: 'assign', label: 'לוח שיבוץ', icon: '🔀' },
+      { page: 'timeline', label: 'ציר זמן', icon: '📅' },
+      { page: 'users', label: 'משתמשים וצוותים', icon: '👤', params: { tab: 'users' } }
+    );
+  } else if (Roles_hasTimelineAccess(user.role)) {
+    items.push({ page: 'timeline', label: 'ציר זמן', icon: '📅' });
+  }
+  if (Roles_hasAdminAccess(user.role)) {
     items.push({ page: 'statistics', label: 'סטטיסטיקות', icon: '📊' });
   }
   items.push(
@@ -387,14 +396,7 @@ function _drawerNavItems(user) {
     { page: 'fireZones', label: 'שטחי אש', icon: '🔥' }
   );
   if (Roles_hasAdminAccess(user.role)) {
-    items.push(
-      { page: 'exercises', label: 'תרגילים', icon: '🎯' },
-      { page: 'users', label: 'משתמשים וצוותים', icon: '👤', params: { tab: 'users' } },
-      { page: 'timeline', label: 'ציר זמן', icon: '📅' },
-      { page: 'assign', label: 'לוח שיבוץ', icon: '🔀' }
-    );
-  } else if (Roles_hasTimelineAccess(user.role)) {
-    items.push({ page: 'timeline', label: 'ציר זמן', icon: '📅' });
+    items.push({ page: 'exercises', label: 'תרגילים', icon: '🎯' });
   }
   return items;
 }
