@@ -276,9 +276,11 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
     const endYmd = _timelineMsToYmdLocal(item.endMs);
     const startHm = _timelineMsToHmLocal(item.startMs);
     const endHm = _timelineMsToHmLocal(item.endMs);
+    const exWeekLabel = ex.rawStartDate ? _isoWeekLabel(ex.rawStartDate) : _isoWeekLabel(startYmd);
     s += '<tr data-exercise-id="' + _timelineAttrEsc(ex.id) + '">' +
       '<td>' + _badge(typeKey, typeKey === 'חיר' ? 'green' : typeKey === 'חשן' ? 'blue' : 'yellow') + '</td>' +
       '<td><b>' + _esc(ex.title) + '</b></td>' +
+      '<td style="font-size:12px;white-space:nowrap">' + (exWeekLabel ? _esc(exWeekLabel) : '—') + '</td>' +
       '<td class="mono">' + _esc(startYmd) + '</td>' +
       '<td class="mono">' + _esc(startHm) + '</td>' +
       '<td class="mono">' + _esc(endYmd) + '</td>' +
@@ -287,7 +289,7 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
       ' class="btn btn-secondary btn-sm">↗</a></td></tr>';
   });
   if (!items.length) {
-    s += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
+    s += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
   }
   return s;
 }
@@ -367,6 +369,7 @@ function Views_timeline(p) {
 
   const weekOffset = _timelineWeekOffset(p);
   const canEdit = Roles_hasAdminAccess(user.role);
+  const displayedIsoWeek = _isoWeekLabel(_timelineWeekBounds(weekOffset).weekStartYmd);
 
   const nowMs   = Date.now();
   const nowDate = new Date(nowMs);
@@ -434,7 +437,8 @@ function Views_timeline(p) {
 
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
 
-  s += '<div class="page-title" style="margin:0">📅 ציר זמן — ' + _esc(_timelineWeekLabel(weekOffset)) + '</div>';
+  s += '<div class="page-title" style="margin:0">📅 ציר זמן — ' + _esc(_timelineWeekLabel(weekOffset)) +
+    ' · מוצג: ' + _esc(displayedIsoWeek) + '</div>';
 
   s += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
 
@@ -451,10 +455,11 @@ function Views_timeline(p) {
       _spaParamsAttr({ week: 0 }) + '>היום</a>';
   }
 
-  s += '<select id="timelineWeekSelect" class="form-select" style="width:auto;min-width:150px;font-size:12px">';
+  s += '<select id="timelineWeekSelect" class="form-select" style="width:auto;min-width:200px;font-size:12px">';
   for (let w = -3; w <= 3; w++) {
+    const wIso = _isoWeekLabel(_timelineWeekBounds(w).weekStartYmd);
     s += '<option value="' + w + '"' + (w === weekOffset ? ' selected' : '') + '>' +
-      _esc(_timelineWeekLabel(w)) + '</option>';
+      _esc(_timelineWeekLabel(w) + ' · ' + wIso) + '</option>';
   }
   s += '</select>';
 
@@ -501,6 +506,8 @@ function Views_timeline(p) {
        wStartFmt +
        ' – ' +
        wEndFmt +
+       ' &nbsp;|&nbsp; ' +
+       _esc(displayedIsoWeek) +
        ' &nbsp;|&nbsp; ' +
        weekItems.length +
        ' תרגילים';
@@ -618,17 +625,22 @@ function Views_timeline(p) {
       ' data-lane="' + (item.lane || 0) + '"' +
       ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';
 
+    const exWeekLabel = item.ex.rawStartDate
+      ? _isoWeekLabel(item.ex.rawStartDate)
+      : _isoWeekLabel(_timelineMsToYmdLocal(item.startMs));
+    const barTitle = item.ex.title + (exWeekLabel ? ' · ' + exWeekLabel : '');
+
     if (canEdit) {
       s += '<div class="tl-bar"' + dataAttrs + ' style="' + barStyle + '">' +
         '<span class="tl-handle tl-handle-start" title="שינוי התחלה"></span>' +
-        '<span class="tl-bar-label" title="' + _timelineAttrEsc(item.ex.title) + '">' +
+        '<span class="tl-bar-label" title="' + _timelineAttrEsc(barTitle) + '">' +
         _esc(item.ex.title) + '</span>' +
         '<span class="tl-handle tl-handle-end" title="שינוי סיום"></span>' +
         '</div>';
     } else {
       s += '<a class="tl-bar tl-bar-link"' + dataAttrs + ' ' + _spaBarLink('exercise', { id: item.ex.id }) +
         ' style="' + barStyle + 'text-decoration:none">' +
-        '<span class="tl-bar-label" title="' + _timelineAttrEsc(item.ex.title) + '">' +
+        '<span class="tl-bar-label" title="' + _timelineAttrEsc(barTitle) + '">' +
         _esc(item.ex.title) + '</span></a>';
     }
   });
@@ -649,7 +661,7 @@ function Views_timeline(p) {
     s += '</div>';
   }
 
-  s += '<div class="page-title" style="margin-top:10px">📋 תרגילים בשבוע זה</div>';
+  s += '<div class="page-title" style="margin-top:10px">📋 תרגילים בשבוע זה · ' + _esc(displayedIsoWeek) + '</div>';
 
   s += '<div class="card" style="padding:0" id="timelineWeekTableCard">';
 
@@ -659,6 +671,7 @@ function Views_timeline(p) {
 
   s += '<th>סוג</th>';
   s += '<th>שם</th>';
+  s += '<th>שבוע לועזי</th>';
   s += '<th>התחלה</th>';
   s += '<th>שעה</th>';
   s += '<th>סיום</th>';

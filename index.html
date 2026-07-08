@@ -2493,6 +2493,38 @@ body {
       };
     }
 
+    function isoWeekNumber(dateStr) {
+      if (!dateStr) return 0;
+      var d = new Date(String(dateStr) + 'T12:00:00');
+      if (isNaN(d.getTime())) return 0;
+      var target = new Date(d.valueOf());
+      var dayNr = (d.getDay() + 6) % 7;
+      target.setDate(target.getDate() - dayNr + 3);
+      var firstThursday = target.valueOf();
+      target.setMonth(0, 1);
+      if (target.getDay() !== 4) {
+        target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+      }
+      return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+    }
+
+    function isoWeekYear(dateStr) {
+      if (!dateStr) return 0;
+      var d = new Date(String(dateStr) + 'T12:00:00');
+      if (isNaN(d.getTime())) return 0;
+      var target = new Date(d.valueOf());
+      var dayNr = (d.getDay() + 6) % 7;
+      target.setDate(target.getDate() - dayNr + 3);
+      return target.getFullYear();
+    }
+
+    function isoWeekLabelFromYmd(dateStr) {
+      var w = isoWeekNumber(dateStr);
+      if (!w) return '';
+      var y = isoWeekYear(dateStr);
+      return 'שבוע לועזי ' + w + (y ? ' · ' + y : '');
+    }
+
     function applyBar(bar, startMs, endMs) {
       if (!bar) return;
       var w = weekMs();
@@ -2620,7 +2652,7 @@ body {
         return (+a.dataset.startMs) - (+b.dataset.startMs);
       });
       if (!bars.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
         return;
       }
       var typeBadge = function(t) {
@@ -2637,9 +2669,11 @@ body {
         var open = '<a href="#" data-spa-page="exercise" data-spa-params="' +
           JSON.stringify({ id: exId }).replace(/"/g, '&quot;') +
           '" class="btn btn-secondary btn-sm">↗</a>';
+        var weekLabel = isoWeekLabelFromYmd(s.date);
         return '<tr data-exercise-id="' + exId + '">' +
           '<td>' + typeBadge(typeKey) + '</td>' +
           '<td><b>' + title + '</b></td>' +
+          '<td style="font-size:12px;white-space:nowrap">' + (weekLabel || '—') + '</td>' +
           '<td class="mono">' + s.date + '</td>' +
           '<td class="mono">' + s.time + '</td>' +
           '<td class="mono">' + e.date + '</td>' +
