@@ -60,6 +60,19 @@ body {
   z-index: 0;
   pointer-events: none;
 }
+
+/* מובייל: זום אאוט — הצגת כל תמונת הרקע בלי חיתוך אגרסיבי */
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
+  html, body {
+    background: #0a120a;
+  }
+  #app-bg.app-bg-img {
+    object-fit: contain;
+    object-position: center center;
+    width: 100%;
+    height: 100%;
+  }
+}
 #app-bg-overlay {
   position: fixed;
   inset: 0;
