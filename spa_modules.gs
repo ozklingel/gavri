@@ -29,15 +29,46 @@ function SpaModule_render(moduleId, p) {
       return _dashboardTabSearchModule(user, p);
 
     case 'dashboard.tab.team':
-      return '<div class="dashboard-tab-panel team-matrix-page">' +
-        _teamMatrixEmbedHtml(user, p) + '</div>';
+      return '<div class="team-matrix-page">' + _teamMatrixEmbedHtml(user, p) + '</div>';
 
     case 'dashboard.tab.exercise':
-      return '<div class="dashboard-tab-panel ex-matrix-page">' +
-        _exerciseMatrixEmbedHtml(user, p) + '</div>';
+      return '<div class="ex-matrix-page">' + _exerciseMatrixEmbedHtml(user, p) + '</div>';
 
     case 'dashboard.tab.conflicts':
-      return '<div class="dashboard-tab-panel">' + _dashboardConflictsTabHtml(sid) + '</div>';
+      return _dashboardConflictsTabHtml(sid);
+
+    case 'users.tab.users':
+      return _usersTab(sid);
+
+    case 'users.tab.teams':
+      return _teamsTab(sid);
+
+    case 'statistics.section.kpi':
+      return _statisticsSectionKpi(sid);
+
+    case 'statistics.section.team':
+      return _statisticsSectionTeam(sid);
+
+    case 'statistics.section.compare':
+      return _statisticsSectionCompare(sid);
+
+    case 'statistics.section.trainees':
+      return _statisticsSectionTrainees(sid);
+
+    case 'statistics.section.types':
+      return _statisticsSectionTypes(sid);
+
+    case 'assign.section.conflicts':
+      return _assignConflictsSectionHtml(sid);
+
+    case 'assign.section.least':
+      return _assignLeastSectionHtml();
+
+    case 'exercise.panel.edit':
+      return _exerciseEditPanelHtml(p);
+
+    case 'exercise.panel.assign':
+      return _exerciseAssignPanelHtml(p);
 
     case 'timeline.main':
       if (typeof _timelineMainModuleHtml === 'function') {
@@ -64,13 +95,9 @@ function SpaModule_render(moduleId, p) {
 
 function _dashboardTabSearchModule(user, p) {
   const searchUserId = String((p && p.searchUserId) || '').trim();
-  let s = '<div class="dashboard-tab-panel dashboard-tab-search">';
   if (searchUserId) {
-    s += _dashboardUserExerciseResults(user, searchUserId);
-  } else {
-    s += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
-      'הקלד שם או מספר אישי בשורת החיפוש למעלה.</p>';
+    return _dashboardUserExerciseResults(user, searchUserId);
   }
-  s += '</div>';
-  return s;
+  return '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
+    'הקלד שם או מספר אישי בשורת החיפוש למעלה.</p>';
 }

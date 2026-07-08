@@ -3,11 +3,19 @@ function Views_exercises(p) {
   const user = Auth_requireRole(p, ['admin']);
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
+  const tab = (p.tab || 'list') === 'new' ? 'new' : 'list';
 
-  let s = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
-  s += '<div style="flex:2;min-width:300px">' + _exercisesListModuleHtml(user, sid) + '</div>';
-  s += '<div style="flex:1;min-width:260px">' + _exercisesSidebarModuleHtml(user, sid) + '</div>';
-  s += '</div>';
+  let s = _spaTabsBar('exercises', {}, [
+    { id: 'list', label: '📋 כל התרגילים' },
+    { id: 'new', label: '➕ תרגיל חדש' }
+  ], tab);
+
+  if (tab === 'list') {
+    s += _exercisesListModuleHtml(user, sid);
+  } else {
+    s += '<div class="spa-tab-panel" style="margin-top:14px">' +
+      _exercisesSidebarModuleHtml(user, sid) + '</div>';
+  }
 
   const body =
     _topbar(user, sid) +

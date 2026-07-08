@@ -79,6 +79,7 @@ function Views_homeConstraints(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
+  const openSet = _parseOpenSections(p);
 
   const myItems = HomeConstraints_byUser(user.id).slice().reverse();
   const pendingApproval = HomeConstraints_pendingForApprover(user);
@@ -126,9 +127,7 @@ function Views_homeConstraints(p) {
     s += '</div>';
   }
 
-  s += '<div class="grid-2" style="align-items:start">';
-
-  s += '<div class="card"><div class="card-header"><div class="card-title">📋 הבקשות שלי (' + myItems.length + ')</div></div>';
+  s += '<div class="card" style="margin-bottom:14px"><div class="card-header"><div class="card-title">📋 הבקשות שלי (' + myItems.length + ')</div></div>';
   if (!myItems.length) {
     s += '<div class="empty">טרם הוגשו בקשות</div>';
   } else {
@@ -150,13 +149,14 @@ function Views_homeConstraints(p) {
   s += '</div>';
 
   if (canSubmit) {
-    s += _homeConstraintsSubmitForm(approverHint);
+    s += _expandablePanel('homeConstraints', {}, 'submit', '➕ בקשת אילוץ יציאה הביתה',
+      _homeConstraintsSubmitForm(approverHint), openSet);
   } else {
     s += '<div class="card"><div class="card-body"><p style="font-size:12px;color:var(--muted);margin:0">' +
       'תפקיד הסגל אינו מגיש בקשות אילוץ — ניהול אישורים בלבד.</p></div></div>';
   }
 
-  s += '</div></div>';
+  s += '</div>';
   return _wrapPage(s, 'אילוצי זמן בית');
 }
 

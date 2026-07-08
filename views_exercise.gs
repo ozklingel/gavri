@@ -36,6 +36,8 @@ function Views_exercise(p) {
     return Views_error('אין הרשאה לצפות בתרגיל זה.', p);
   }
   const sidQ = encodeURIComponent(sid);
+  const openSet = _parseOpenSections(p);
+  const exParams = { id: ex.id };
 
   let s = _topbar(user, sid) + '<div class="page">';
   s += _flash(p);
@@ -259,102 +261,12 @@ s += _confirmDelete(
   // ── Admin-only panels ──
   if (Roles_hasAdminAccess(user.role)) {
     s += _respDatalistHtml('respList');
-
-    // Edit exercise + Assign soldier — side by side
-    s += '<div class="grid-2" style="margin-bottom:14px">';
-
-    // Edit form
-    s += '<div class="collapsible">' +
-      '<button class="collapsible-toggle">✏ עריכת פרטי תרגיל <span class="arrow">▾</span></button>' +
-      '<div class="collapsible-content"><div class="card"><div class="card-body">' +
-      _formOpen() +
-      '<input type="hidden" name="action" value="editExercise">' +
-      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-      '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
-      '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', '', ex.title, 'text', 'required') + '</div>' +
-      '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', '', ex.description) + '</div>' +
-      '<div class="form-grid">' +
-      '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', ex.rawStartDate) + '</div>' +
-      '<div class="form-row"><label class="form-label">תאריך סיום</label>' + _dateInput('end_date', ex.rawEndDate) + '</div>' +
-      '</div>' +
-      '<div class="form-grid">' +
-      '<div class="form-row"><label class="form-label">שעת התחלה</label><input type="time" name="start_time" value="' + _esc(ex.rawStartTime || '') + '" class="form-input"></div>' +
-      '<div class="form-row"><label class="form-label">שעת סיום</label><input type="time" name="end_time" value="' + _esc(ex.rawEndTime || '') + '" class="form-input"></div>' +
-      '</div>' +
-      '<div class="form-grid">' +
-      '<div class="form-row"><label class="form-label">אקט</label>' + _input('act', 'אקט', ex.act) + '</div>' +
-      '<div class="form-row"><label class="form-label">סוג תרגיל</label>' + _input('exercise_type', 'סוג תרגיל', ex.exercise_type) + '</div>' +
-      '</div>' +
-      '<div class="form-grid">' +
-      '<div class="form-row"><label class="form-label">גדוד שת״פ</label>' +
-        _select('partner_battalion', _fieldForceSelectOptions(ex.partner_battalion), ex.partner_battalion, 'required') + '</div>' +
-      '<div class="form-row"><label class="form-label">מחנה / מגנן</label>' +
-        _select('camp', _fireZoneSelectOptions(ex.camp), ex.camp, 'required') + '</div>' +
-      '</div>' +
-      '<div class="form-row"><label class="form-label">מפקד אחראי גדוד</label>' + _input('battalion_commander', 'מפקד אחראי גדוד', ex.battalion_commander) + '</div>' +
-      _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
-      '</form>' +
-      '</div></div></div></div>';
-
-    // ── Assign panel (individual + team) ──
-    const allUsers    = Users_all();
-    const allTeams    = Teams_all();
-    const assignedIds = parts.map(function(a){ return a.user_id; });
-    const available   = allUsers.filter(function(u){ return assignedIds.indexOf(u.id) === -1; });
-
-    // Individual assign form
-    let indivForm;
-    if (!available.length) {
-      indivForm = '<div class="empty">כל המשתמשים כבר הוקצו</div>';
-    } else {
-      const userOptions = available.map(function(u){ return [u.id, u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')']; });
-      indivForm =
-        _formOpen() +
-        '<input type="hidden" name="action" value="assign">' +
-        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-        '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-        '<div class="form-row"><label class="form-label">חייל</label>' + _select('userId', userOptions) + '</div>' +
-        '<div class="form-row"><label class="form-label">תפקיד</label>' +
-        '<input name="responsibility" list="respList" placeholder="בחר או הקלד..." class="form-input" required>' +
-        '</div>' +
-        _submitBtn('➤ הקצה חייל', 'btn btn-primary') +
-        '</form>';
-    }
-
-    // Team assign form
-    let teamForm;
-    if (!allTeams.length) {
-      teamForm = '<div class="empty">אין צוותות מוגדרים</div>';
-    } else {
-      const teamOptions = allTeams.map(function(t) {
-        const cnt = Users_byTeam(t.id).length;
-        return [t.id, t.name + ' (' + cnt + ' חברים)'];
-      });
-      teamForm =
-        _formOpen() +
-        '<input type="hidden" name="action" value="assignTeam">' +
-        '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
-        '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-        '<div class="form-row"><label class="form-label">צוות</label>' + _select('teamId', teamOptions) + '</div>' +
-        '<p style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px">' +
-        'ישובצו אוטומטית: מפקד הצוות + 2 החניכים הראשונים. מי שכבר רשום ידולג.</p>' +
-        _submitBtn('🪖 הוסף צוות שלם', 'btn btn-primary') +
-        '</form>';
-    }
-
-    const exIdSafe = _esc(ex.id);
-    s += '<div class="collapsible">' +
-      '<button class="collapsible-toggle">➤ הוספת משתתפים <span class="arrow">▾</span></button>' +
-      '<div class="collapsible-content"><div class="card">' +
-      '<div class="dp-tabs" style="display:flex;border-bottom:1px solid var(--border)">' +
-      '<div class="dp-tab dp-tab-active" data-target="dp-indiv-' + exIdSafe + '" style="padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer">👤 חייל בודד</div>' +
-      '<div class="dp-tab" data-target="dp-team-' + exIdSafe + '" style="padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--muted);cursor:pointer">🪖 צוות שלם</div>' +
-      '</div>' +
-      '<div id="dp-indiv-' + exIdSafe + '" class="card-body dp-panel">' + indivForm + '</div>' +
-      '<div id="dp-team-'  + exIdSafe + '" class="card-body dp-panel" style="display:none">' + teamForm + '</div>' +
-      '</div></div></div>';
-
-    s += '</div>'; // end grid-2
+    s += '<div class="expandable-stack" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">';
+    s += _expandablePanel('exercise', exParams, 'edit', '✏ עריכת פרטי תרגיל',
+      _exerciseEditPanelHtml(Object.assign({}, p, { id: ex.id })), openSet);
+    s += _expandablePanel('exercise', exParams, 'assign', '➤ הוספת משתתפים',
+      _exerciseAssignPanelHtml(Object.assign({}, p, { id: ex.id })), openSet);
+    s += '</div>';
   }
 
   s += '</div>'; // end page
@@ -372,6 +284,8 @@ function Views_user(p) {
   const targetId = p.id || sid;
   const target   = Users_get(targetId);
   if (!target) return Views_error('המשתמש לא נמצא.', p);
+  const openSet = _parseOpenSections(p);
+  const userParams = { id: target.id };
 
   const team     = target.team_id ? Teams_get(target.team_id) : null;
   const teamName = team ? team.name : (target.team_id || '—');
@@ -459,10 +373,7 @@ function Views_user(p) {
     const teamOpts = [['', '— ללא צוות —']].concat(
       allTeams.map(function(t) { return [t.id, t.id + ' — ' + t.name]; })
     );
-
-    s += '<div class="collapsible" style="margin-bottom:14px">' +
-      '<button class="collapsible-toggle">✏ עריכת פרופיל <span class="arrow">▾</span></button>' +
-      '<div class="collapsible-content"><div class="card"><div class="card-body">' +
+    const editHtml = '<div class="card"><div class="card-body">' +
       _formOpen() +
       '<input type="hidden" name="action" value="updateProfile">' +
       '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
@@ -478,10 +389,114 @@ function Views_user(p) {
       '</div>' +
       _extraProfileFields(target) +
       _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
-      '</form>' +
-      '</div></div></div></div>';
+      '</form></div></div>';
+    s += '<div style="margin-bottom:14px">' +
+      _expandablePanel('user', userParams, 'editProfile', '✏ עריכת פרופיל', editHtml, openSet) +
+      '</div>';
   }
 
   s += '</div>';
   return _wrapPage(s, target.name + ' — פרופיל');
+}
+
+function _exerciseEditPanelHtml(p) {
+  const user = Auth_current(p);
+  if (!user || !Roles_hasAdminAccess(user.role)) return '';
+  const exId = String((p && p.id) || '').trim();
+  const ex = Exercises_get(exId);
+  if (!ex) return '<div class="empty">תרגיל לא נמצא</div>';
+  const sid = user.id;
+  return '<div class="card"><div class="card-body">' +
+    _formOpen() +
+    '<input type="hidden" name="action" value="editExercise">' +
+    '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+    '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
+    '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', '', ex.title, 'text', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', '', ex.description) + '</div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">תאריך התחלה</label>' + _dateInput('start_date', ex.rawStartDate) + '</div>' +
+    '<div class="form-row"><label class="form-label">תאריך סיום</label>' + _dateInput('end_date', ex.rawEndDate) + '</div>' +
+    '</div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">שעת התחלה</label><input type="time" name="start_time" value="' + _esc(ex.rawStartTime || '') + '" class="form-input"></div>' +
+    '<div class="form-row"><label class="form-label">שעת סיום</label><input type="time" name="end_time" value="' + _esc(ex.rawEndTime || '') + '" class="form-input"></div>' +
+    '</div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">אקט</label>' + _input('act', 'אקט', ex.act) + '</div>' +
+    '<div class="form-row"><label class="form-label">סוג תרגיל</label>' + _input('exercise_type', 'סוג תרגיל', ex.exercise_type) + '</div>' +
+    '</div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">גדוד שת״פ</label>' +
+      _select('partner_battalion', _fieldForceSelectOptions(ex.partner_battalion), ex.partner_battalion, 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">מחנה / מגנן</label>' +
+      _select('camp', _fireZoneSelectOptions(ex.camp), ex.camp, 'required') + '</div>' +
+    '</div>' +
+    '<div class="form-row"><label class="form-label">מפקד אחראי גדוד</label>' + _input('battalion_commander', 'מפקד אחראי גדוד', ex.battalion_commander) + '</div>' +
+    _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
+    '</form></div></div>';
+}
+
+function _exerciseAssignPanelHtml(p) {
+  const user = Auth_current(p);
+  if (!user || !Roles_hasAdminAccess(user.role)) return '';
+  const exId = String((p && p.id) || '').trim();
+  const ex = Exercises_get(exId);
+  if (!ex) return '<div class="empty">תרגיל לא נמצא</div>';
+  const sid = user.id;
+  const parts = Assignments_byExercise(exId);
+  const allUsers = Users_all();
+  const allTeams = Teams_all();
+  const assignedIds = parts.map(function(a) { return a.user_id; });
+  const available = allUsers.filter(function(u) { return assignedIds.indexOf(u.id) === -1; });
+
+  let indivForm;
+  if (!available.length) {
+    indivForm = '<div class="empty">כל המשתמשים כבר הוקצו</div>';
+  } else {
+    const userOptions = available.map(function(u) {
+      return [u.id, u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')'];
+    });
+    indivForm =
+      _formOpen() +
+      '<input type="hidden" name="action" value="assign">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+      '<div class="form-row"><label class="form-label">חייל</label>' + _select('userId', userOptions) + '</div>' +
+      '<div class="form-row"><label class="form-label">תפקיד</label>' +
+      '<input name="responsibility" list="respList" placeholder="בחר או הקלד..." class="form-input" required>' +
+      '</div>' +
+      _submitBtn('➤ הקצה חייל', 'btn btn-primary') +
+      '</form>';
+  }
+
+  let teamForm;
+  if (!allTeams.length) {
+    teamForm = '<div class="empty">אין צוותות מוגדרים</div>';
+  } else {
+    const teamOptions = allTeams.map(function(t) {
+      const cnt = Users_byTeam(t.id).length;
+      return [t.id, t.name + ' (' + cnt + ' חברים)'];
+    });
+    teamForm =
+      _formOpen() +
+      '<input type="hidden" name="action" value="assignTeam">' +
+      '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+      '<div class="form-row"><label class="form-label">צוות</label>' + _select('teamId', teamOptions) + '</div>' +
+      '<p style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px">' +
+      'ישובצו אוטומטית: מפקד הצוות + 2 החניכים הראשונים. מי שכבר רשום ידולג.</p>' +
+      _submitBtn('🪖 הוסף צוות שלם', 'btn btn-primary') +
+      '</form>';
+  }
+
+  const exIdSafe = _esc(ex.id);
+  return _respDatalistHtml('respList') +
+    '<div class="card">' +
+    '<div class="dp-tabs" style="display:flex;border-bottom:1px solid var(--border)">' +
+    '<div class="dp-tab dp-tab-active" data-target="dp-indiv-' + exIdSafe + '" style="padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer">👤 חייל בודד</div>' +
+    '<div class="dp-tab" data-target="dp-team-' + exIdSafe + '" style="padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--muted);cursor:pointer">🪖 צוות שלם</div>' +
+    '</div>' +
+    '<div id="dp-indiv-' + exIdSafe + '" class="card-body dp-panel">' + indivForm + '</div>' +
+    '<div id="dp-team-' + exIdSafe + '" class="card-body dp-panel" style="display:none">' + teamForm + '</div>' +
+    '</div>';
 }

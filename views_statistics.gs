@@ -25,13 +25,90 @@ function _statisticsKpiSection(title, badgeClass, badgeLabel, metrics, roleLabel
   return s;
 }
 
+function _statisticsDataScript() {
+  const payload = Statistics_buildPayload();
+  return '<script id="statisticsData" type="application/json">' +
+    JSON.stringify(payload).replace(/</g, '\\u003c') + '</script>';
+}
+
+function _statisticsSectionKpi(sid) {
+  const payload = Statistics_buildPayload();
+  const mpSub = payload.mp.rolePct + '% מכלל השיבוצים';
+  const magadSub = payload.magad.otherRoleAssigns + ' שיבוצים בתפקיד אחר';
+  return _statisticsKpiSection('מדדי מ״פ', 'stats-badge-mp', 'מ"פ', payload.mp, 'מ״פ', mpSub) +
+    _statisticsKpiSection('מדדי מגד', 'stats-badge-magad', 'מגד', payload.magad, 'מגד', magadSub);
+}
+
+function _statisticsSectionTeam(sid) {
+  return _statisticsDataScript() +
+    '<div class="card stats-card"><div class="card-header stats-card-header">' +
+    '<span class="card-title">👥 ממוצע תרגילים לחניך לפי צוות</span></div>' +
+    '<div class="card-body stats-chart-body">' +
+    '<div class="stats-chart-wrap"><canvas id="statsTeamChart"></canvas></div>' +
+    '<div class="stats-table-wrap"><table class="tbl stats-tbl"><thead><tr>' +
+    '<th>צוות</th><th>חניכים</th><th>ממוצע תרגילים</th><th>מקסימום</th><th>מינימום</th>' +
+    '</tr></thead><tbody id="statsTeamTableBody"></tbody></table></div></div></div>' +
+    '<script>' + _statisticsPageJs() + '</script>';
+}
+
+function _statisticsSectionCompare(sid) {
+  return _statisticsDataScript() +
+    '<div class="card stats-card"><div class="card-header stats-card-header">' +
+    '<span class="card-title">📊 השוואה מותאמת אישית</span></div><div class="card-body">' +
+    '<p class="stats-hint">בחר צוותים להשוואה (ריק = כולם):</p>' +
+    '<div id="statsCompareTeams" class="stats-chip-row"></div>' +
+    '<div class="stats-chart-wrap stats-chart-wrap-md"><canvas id="statsCompareChart"></canvas></div>' +
+    '<p class="stats-chart-caption">השוואת שיבוצים לפי תפקיד</p></div></div>' +
+    '<script>' + _statisticsPageJs() + '</script>';
+}
+
+function _statisticsSectionTrainees(sid) {
+  const payload = Statistics_buildPayload();
+  return _statisticsDataScript() +
+    '<div class="card stats-card"><div class="card-header stats-card-header">' +
+    '<span class="card-title">🏅 תרגילים לפי חניך</span>' +
+    '<div class="stats-seg-tabs">' +
+    '<button type="button" class="stats-seg active" data-stats-trainee-mode="team">לפי צוות</button>' +
+    '<button type="button" class="stats-seg" data-stats-trainee-mode="rank">לפי מדרג</button>' +
+    '</div></div><div class="card-body">' +
+    '<p class="stats-avg-line">ממוצע: <b>' + payload.avgExercisesPerTrainee + '</b> תרגילים</p>' +
+    '<div class="stats-table-wrap"><table class="tbl stats-tbl stats-leaderboard"><thead><tr>' +
+    '<th>#</th><th>שם</th><th>מדרג</th><th>צוות</th><th>תרגילים</th>' +
+    '</tr></thead><tbody id="statsTraineeTableBody"></tbody></table></div>' +
+    '<div class="stats-legend">' +
+    '<span><i class="dot above"></i>מעל הממוצע</span>' +
+    '<span><i class="dot below"></i>מתחת לממוצע</span>' +
+    '<span><i class="dot avg"></i>בממוצע</span></div></div></div>' +
+    '<script>' + _statisticsPageJs() + '</script>';
+}
+
+function _statisticsSectionTypes(sid) {
+  return _statisticsDataScript() +
+    '<div class="card stats-card"><div class="card-header stats-card-header">' +
+    '<span class="card-title">🥧 פירוט לפי סוג תרגיל</span></div><div class="card-body">' +
+    '<div class="stats-filters">' +
+    '<span class="stats-filter-label">סינון:</span>' +
+    '<div class="stats-seg-tabs stats-seg-sm">' +
+    '<button type="button" class="stats-seg active" data-stats-type-filter="all">כל החניכים</button>' +
+    '<button type="button" class="stats-seg" data-stats-type-filter="mp">רק מ״פ</button>' +
+    '<button type="button" class="stats-seg" data-stats-type-filter="magad">רק מגדים</button>' +
+    '</div>' +
+    '<select id="statsTypeTeam" class="form-select stats-team-select"></select>' +
+    '<span class="stats-filter-label">סדר:</span>' +
+    '<div class="stats-seg-tabs stats-seg-sm">' +
+    '<button type="button" class="stats-seg active" data-stats-type-sort="busy">עמוס ביותר</button>' +
+    '<button type="button" class="stats-seg" data-stats-type-sort="light">פחות עמוס</button>' +
+    '</div></div>' +
+    '<div class="stats-table-wrap"><table class="tbl stats-tbl"><thead><tr>' +
+    '<th>סוג תרגיל</th><th>כמות</th><th>שיבוצי חניכים</th>' +
+    '</tr></thead><tbody id="statsTypeTableBody"></tbody></table></div>' +
+    '<div class="stats-chart-wrap stats-chart-wrap-pie"><canvas id="statsTypeChart"></canvas></div>' +
+    '</div></div>' +
+    '<script>' + _statisticsPageJs() + '</script>';
+}
 function _statisticsPageJs() {
   return `
 (function() {
-  var root = document.getElementById('statisticsPage');
-  if (!root || root._statsInit) return;
-  root._statsInit = true;
-
   var dataEl = document.getElementById('statisticsData');
   if (!dataEl) return;
   var data;
@@ -310,90 +387,45 @@ function _statisticsPageJs() {
   }
 
   loadChartJs(function() {
-    renderTeamTable();
-    renderTeamChart();
-    renderCompareTeamButtons();
-    renderCompareChart();
-    renderTraineeTable();
-    renderTypeTable();
-    renderTypeChart();
+    if (document.getElementById('statsTeamTableBody')) {
+      renderTeamTable();
+      renderTeamChart();
+    }
+    if (document.getElementById('statsCompareChart')) {
+      renderCompareTeamButtons();
+      renderCompareChart();
+    }
+    if (document.getElementById('statsTraineeTableBody')) {
+      renderTraineeTable();
+    }
+    if (document.getElementById('statsTypeTableBody')) {
+      renderTypeTable();
+      renderTypeChart();
+    }
   });
-
-  window.addEventListener('pagehide', destroyCharts);
 })();
 `;
 }
 
-function _adminStatisticsContent(sid) {
-  const payload = Statistics_buildPayload();
-  const jsonData = JSON.stringify(payload).replace(/</g, '\\u003c');
-
-  const mpSub = payload.mp.rolePct + '% מכלל השיבוצים';
-  const magadSub = payload.magad.otherRoleAssigns + ' שיבוצים בתפקיד אחר';
-
-  let s = '<div id="statisticsPage" class="stats-page">';
-  s += '<script id="statisticsData" type="application/json">' + jsonData + '</script>';
-
-  s += _statisticsKpiSection('מדדי מ״פ', 'stats-badge-mp', 'מ"פ', payload.mp, 'מ״פ', mpSub);
-  s += _statisticsKpiSection('מדדי מגד', 'stats-badge-magad', 'מגד', payload.magad, 'מגד', magadSub);
-
-  s += '<div class="card stats-card"><div class="card-header stats-card-header">' +
-    '<span class="card-title">👥 ממוצע תרגילים לחניך לפי צוות</span></div>' +
-    '<div class="card-body stats-chart-body">' +
-    '<div class="stats-chart-wrap"><canvas id="statsTeamChart" aria-label="ממוצע תרגילים לפי צוות"></canvas></div>' +
-    '<div class="stats-table-wrap"><table class="tbl stats-tbl"><thead><tr>' +
-    '<th>צוות</th><th>חניכים</th><th>ממוצע תרגילים</th><th>מקסימום</th><th>מינימום</th>' +
-    '</tr></thead><tbody id="statsTeamTableBody"></tbody></table></div></div></div>';
-
-  s += '<div class="card stats-card"><div class="card-header stats-card-header">' +
-    '<span class="card-title">📊 השוואה מותאמת אישית</span>' +
-    '<div class="stats-seg-tabs">' +
-    '<button type="button" class="stats-seg active" data-stats-compare-mode="team">לפי צוות</button>' +
-    '<button type="button" class="stats-seg" data-stats-compare-mode="trainee">לפי חניכים</button>' +
-    '</div></div><div class="card-body">' +
-    '<p class="stats-hint">בחר צוותים להשוואה (ריק = כולם):</p>' +
-    '<div id="statsCompareTeams" class="stats-chip-row"></div>' +
-    '<div class="stats-chart-wrap stats-chart-wrap-md"><canvas id="statsCompareChart"></canvas></div>' +
-  '<p class="stats-chart-caption">השוואת שיבוצים לפי תפקיד</p></div></div>';
-
-  s += '<div class="card stats-card"><div class="card-header stats-card-header">' +
-    '<span class="card-title">🏅 תרגילים לפי חניך</span>' +
-    '<div class="stats-seg-tabs">' +
-    '<button type="button" class="stats-seg active" data-stats-trainee-mode="team">לפי צוות</button>' +
-    '<button type="button" class="stats-seg" data-stats-trainee-mode="rank">לפי מדרג</button>' +
-    '</div></div><div class="card-body">' +
-    '<p class="stats-avg-line">ממוצע: <b>' + payload.avgExercisesPerTrainee + '</b> תרגילים</p>' +
-    '<div class="stats-table-wrap"><table class="tbl stats-tbl stats-leaderboard"><thead><tr>' +
-    '<th>#</th><th>שם</th><th>מדרג</th><th>צוות</th><th>תרגילים</th>' +
-    '</tr></thead><tbody id="statsTraineeTableBody"></tbody></table></div>' +
-    '<div class="stats-legend">' +
-    '<span><i class="dot above"></i>מעל הממוצע</span>' +
-    '<span><i class="dot below"></i>מתחת לממוצע</span>' +
-    '<span><i class="dot avg"></i>בממוצע</span></div></div></div>';
-
-  s += '<div class="card stats-card"><div class="card-header stats-card-header">' +
-    '<span class="card-title">🥧 פירוט לפי סוג תרגיל</span></div><div class="card-body">' +
-    '<div class="stats-filters">' +
-    '<span class="stats-filter-label">סינון:</span>' +
-    '<div class="stats-seg-tabs stats-seg-sm">' +
-    '<button type="button" class="stats-seg active" data-stats-type-filter="all">כל החניכים</button>' +
-    '<button type="button" class="stats-seg" data-stats-type-filter="mp">רק מ״פ</button>' +
-    '<button type="button" class="stats-seg" data-stats-type-filter="magad">רק מגדים</button>' +
-    '</div>' +
-    '<select id="statsTypeTeam" class="form-select stats-team-select"></select>' +
-    '<span class="stats-filter-label">סדר:</span>' +
-    '<div class="stats-seg-tabs stats-seg-sm">' +
-    '<button type="button" class="stats-seg active" data-stats-type-sort="busy">עמוס ביותר</button>' +
-    '<button type="button" class="stats-seg" data-stats-type-sort="light">פחות עמוס</button>' +
-    '</div></div>' +
-    '<div class="stats-table-wrap"><table class="tbl stats-tbl"><thead><tr>' +
-    '<th>סוג תרגיל</th><th>כמות</th><th>שיבוצי חניכים</th>' +
-    '</tr></thead><tbody id="statsTypeTableBody"></tbody></table></div>' +
-    '<div class="stats-chart-wrap stats-chart-wrap-pie"><canvas id="statsTypeChart"></canvas></div>' +
-    '</div></div>';
-
-  s += '<script>' + _statisticsPageJs() + '</script>';
-  s += '</div>';
+function _adminStatisticsContent(sid, section) {
+  section = section || 'kpi';
+  const items = [
+    { id: 'kpi', label: '📊 מדדים' },
+    { id: 'team', label: '👥 לפי צוות' },
+    { id: 'compare', label: '📊 השוואה' },
+    { id: 'trainees', label: '🏅 לפי חניך' },
+    { id: 'types', label: '🥧 לפי סוג' }
+  ];
+  let s = '<div id="statisticsPage" class="stats-page">' +
+    _spaSectionTabsBar('statistics', {}, 'section', items, section) +
+    '<div class="spa-tab-panel" style="margin-top:14px">';
+  if (section === 'kpi') s += _statisticsSectionKpi(sid);
+  else if (section === 'team') s += _statisticsSectionTeam(sid);
+  else if (section === 'compare') s += _statisticsSectionCompare(sid);
+  else if (section === 'trainees') s += _statisticsSectionTrainees(sid);
+  else if (section === 'types') s += _statisticsSectionTypes(sid);
+  else s += _statisticsSectionKpi(sid);
+  s += '</div></div>';
   return s;
 }
 
@@ -408,6 +440,9 @@ function Views_statistics(p) {
 
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
+  const section = String((p && p.section) || 'kpi').trim();
+  const allowed = ['kpi', 'team', 'compare', 'trainees', 'types'];
+  const activeSection = allowed.indexOf(section) === -1 ? 'kpi' : section;
 
   let s = _topbar(user, sid);
   s += '<div class="page">' + _flash(p);
@@ -415,7 +450,7 @@ function Views_statistics(p) {
   s += '<h1 class="page-title" style="margin:0">📊 סטטיסטיקות — סגל</h1>';
   s += _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
   s += '</div>';
-  s += _adminStatisticsContent(sid);
+  s += _adminStatisticsContent(sid, activeSection);
   s += '</div>';
 
   return _wrapPage(s, 'סטטיסטיקות');

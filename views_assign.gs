@@ -6,6 +6,7 @@ function Views_assign(p) {
 
   const sid  = user.id;
   const sidQ = encodeURIComponent(sid);
+  const openSet = _parseOpenSections(p);
 
   const body = _topbar(user, sid) +
     '<div class="page">' + _flash(p) +
@@ -18,13 +19,14 @@ function Views_assign(p) {
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
     '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד · ריחוף או לחיצה ארוכה לפרטים אישיים' +
     '</div>' +
-    _assignMainModuleHtml(user, sid) +
+    _assignMainModuleHtml(user, sid, openSet) +
     '</div>';
 
   return _wrapPage(body, 'לוח שיבוץ');
 }
 
-function _assignMainModuleHtml(user, sid) {
+function _assignMainModuleHtml(user, sid, openSet) {
+  openSet = openSet || {};
   const sidQ = encodeURIComponent(sid);
 
   const exercises = Exercises_all();
@@ -71,7 +73,6 @@ function _assignMainModuleHtml(user, sid) {
 
   const approvedHome = HomeConstraints_allApproved();
   const homeBlocked = HomeConstraints_blockedPairsForAssign();
-  const assignConflicts = AssignmentConflicts_scan();
 
   const jsonData = JSON.stringify({
     exercises: exData,
@@ -80,7 +81,6 @@ function _assignMainModuleHtml(user, sid) {
     unassigned: unassigned.map(function(u) { return { id: u.id, name: u.name, role: u.role }; }),
     homeBlocked: homeBlocked,
     approvedHomeCount: approvedHome.length,
-    assignConflicts: assignConflicts,
     corpsList: [
       { key: 'חיר', label: 'חי״ר' },
       { key: 'חשן', label: 'חשן' },
@@ -112,13 +112,24 @@ function _assignMainModuleHtml(user, sid) {
     'color:var(--text1);pointer-events:none;line-height:1.45"></div>' +
     '<div id="assignBoard" style="display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:16px">' +
     '</div>' +
-    _assignmentConflictsPanel(assignConflicts) +
-    '<div id="assignLeastSection" style="margin-top:8px;border-top:1px solid var(--border);padding-top:16px">' +
-    '<div class="card-title" style="margin-bottom:10px;font-size:13px">📊 חניך מועדף לשיבוץ — הכי פחות משובץ לכל חיל</div>' +
-    '<div id="assignLeastPanel" style="display:flex;gap:10px;flex-wrap:wrap"></div>' +
-    '<p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:8px 0 0">מתעדכן אוטומטית לפי מספר התרגילים הנוכחי · אחד לכל חיל</p>' +
+    '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">' +
+    _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
+      _assignConflictsSectionHtml(sid), openSet) +
+    _expandablePanel('assign', {}, 'least', '📊 חניך מועדף לשיבוץ',
+      _assignLeastSectionHtml(), openSet) +
     '</div>' +
     '<script>' + _assignBoardJs() + '</script>';
+}
+
+function _assignConflictsSectionHtml(sid) {
+  return _assignmentConflictsPanel(AssignmentConflicts_scan(), { alwaysShow: true });
+}
+
+function _assignLeastSectionHtml() {
+  return '<div id="assignLeastSection" style="padding-top:4px">' +
+    '<div id="assignLeastPanel" style="display:flex;gap:10px;flex-wrap:wrap"></div>' +
+    '<p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:8px 0 0">' +
+    'מתעדכן לפי מספר התרגילים הנוכחי · אחד לכל חיל</p></div>';
 }
 
 function _assignBoardJs() {
@@ -639,7 +650,13 @@ function _assignBoardJs() {
       );
     });
 
-    renderLeastAssigned();
+    var leastRendered = false;
+    function ensureLeastRendered() {
+      if (leastRendered) return;
+      leastRendered = true;
+      renderLeastAssigned();
+    }
+    window.MapimAssignEnsureLeast = ensureLeastRendered;
   }
 
   // ── API calls via google.script.run ──
@@ -773,6 +790,7 @@ function _assignBoardJs() {
   }
 
   render();
+  if (document.getElementById('assignLeastPanel')) ensureLeastRendered();
 })();
 `;
 }

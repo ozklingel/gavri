@@ -17,6 +17,7 @@ function Views_fireZones(p) {
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
   const isAdmin = Roles_hasAdminAccess(user.role);
+  const openSet = _parseOpenSections(p);
   const items = FireZones_all();
 
   let s = _topbar(user, sid) + '<div class="page">' + _flash(p);
@@ -24,8 +25,6 @@ function Views_fireZones(p) {
     '<h1 class="page-title" style="margin:0">🔥 שטחי אש</h1>' +
     _a('page=dashboard', '← לוח בקרה', 'btn btn-ghost btn-sm') +
     '</div>';
-
-  s += '<div class="grid-2" style="align-items:start">';
 
   s += '<div class="card"><div class="card-header"><div class="card-title">📋 רשימה (' + items.length + ')</div></div>';
   if (!items.length) {
@@ -58,7 +57,7 @@ function Views_fireZones(p) {
   s += '</div>';
 
   if (isAdmin) {
-    s += '<div class="card"><div class="card-header"><div class="card-title">➕ שטח אש חדש</div></div><div class="card-body">' +
+    const createHtml = '<div class="card"><div class="card-body">' +
       _formOpen() +
       '<input type="hidden" name="action" value="createFireZone">' +
       '<div class="form-row"><label class="form-label">שם</label>' +
@@ -66,9 +65,12 @@ function Views_fireZones(p) {
       _fireZoneFlagsForm() +
       _submitBtn('צור שטח אש', 'btn btn-primary btn-full') +
       '</form></div></div>';
+    s += '<div style="margin-top:12px">' +
+      _expandablePanel('fireZones', {}, 'new', '➕ שטח אש חדש', createHtml, openSet) +
+      '</div>';
   }
 
-  s += '</div></div>';
+  s += '</div>';
   return _wrapPage(s, 'שטחי אש');
 }
 

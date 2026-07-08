@@ -425,6 +425,18 @@ body {
       transition: color 0.15s, border-color 0.15s;
       flex-shrink: 0;
     }
+    button.dashboard-tab,
+    button.lazy-tab-btn,
+    button.tab-link.lazy-tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font: inherit;
+    }
+    .lazy-tab-panel[hidden] {
+      display: none !important;
+    }
     .dashboard-tab:hover {
       color: var(--text2);
     }
@@ -515,6 +527,16 @@ body {
     .collapsible-content { display: none; }
     .collapsible-content.open { display: block; }
     .coll-open .arrow { transform: rotate(180deg); }
+    a.collapsible-toggle {
+      text-decoration: none;
+      box-sizing: border-box;
+    }
+    .expandable-closed-wrap { margin-bottom: 2px; }
+    .expandable-closed {
+      display: flex;
+      margin-bottom: 0;
+    }
+    .spa-tab-panel { width: 100%; }
 
     /* ── TABLE ── */
     .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -1884,7 +1906,12 @@ body {
     function load(root) {
       root = root || document.getElementById('app-content');
       if (!root) return;
-      root.querySelectorAll('[data-spa-module]:not([data-spa-module-loaded="1"])').forEach(loadSlot);
+      root.querySelectorAll('[data-spa-module]:not([data-spa-module-loaded="1"])').forEach(function(slot) {
+        if (slot.closest('.lazy-tab-panel[hidden]')) return;
+        var coll = slot.closest('.collapsible-content');
+        if (coll && !coll.classList.contains('open')) return;
+        loadSlot(slot);
+      });
     }
     return { load: load, loadSlot: loadSlot };
   })();
@@ -1963,6 +1990,10 @@ body {
       initAppDrawer();
       if (typeof initTimelineWeek === 'function') initTimelineWeek();
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
+      var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
+      if (openPanel) {
+        try { openPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (x) {}
+      }
     }
 
     function initAppDrawer() {
@@ -2035,7 +2066,6 @@ body {
         app.innerHTML = result.body;
         runScripts(app);
         afterRender();
-        if (window.MapimModules) MapimModules.load(app);
       }
       if (result.title) document.title = result.title;
       MapimLoader.hide();
@@ -2108,7 +2138,7 @@ body {
     }
 
     function isLocalUiClick(el) {
-      return el.closest('.collapsible-toggle') ||
+      return el.closest('button.collapsible-toggle') ||
         el.closest('.dp-tab') ||
         el.closest('.dp-wrap') ||
         el.closest('.dp-popup') ||
@@ -2357,11 +2387,12 @@ body {
   }
 
   function initCollapsibles() {
-    document.querySelectorAll('.collapsible-toggle').forEach(function(btn) {
+    document.querySelectorAll('button.collapsible-toggle').forEach(function(btn) {
       if (btn._collInit) return;
       btn._collInit = true;
       btn.addEventListener('click', function() {
         const content = this.nextElementSibling;
+        if (!content || !content.classList.contains('collapsible-content')) return;
         const isOpen = content.classList.toggle('open');
         this.classList.toggle('coll-open', isOpen);
       });

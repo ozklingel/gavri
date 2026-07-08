@@ -169,6 +169,62 @@ function _spaModuleSlot(moduleId, params, label) {
     '</div></div>';
 }
 
+function _parseOpenSections(p) {
+  const raw = String((p && p.open) || '').trim();
+  if (!raw) return {};
+  const set = {};
+  raw.split(',').forEach(function(part) {
+    part = String(part).trim();
+    if (part) set[part] = true;
+  });
+  return set;
+}
+
+function _spaTabsBar(page, baseParams, items, activeId) {
+  let bar = '<nav class="spa-tabs-bar tabs" aria-label="לשוניות">';
+  items.forEach(function(item) {
+    const params = Object.assign({}, baseParams || {}, item.params || {}, { tab: item.id });
+    delete params.open;
+    delete params.section;
+    const isActive = item.id === activeId;
+    bar += '<a href="#" class="tab-link' + (isActive ? ' active' : '') +
+      '" data-spa-page="' + _esc(page) + '"' + _spaParamsAttr(params) + '>' +
+      item.label + '</a>';
+  });
+  return bar + '</nav>';
+}
+
+function _spaSectionTabsBar(page, baseParams, paramKey, items, activeId) {
+  let bar = '<nav class="spa-tabs-bar tabs" aria-label="לשוניות">';
+  items.forEach(function(item) {
+    const params = Object.assign({}, baseParams || {}, item.params || {});
+    params[paramKey] = item.id;
+    delete params.open;
+    const isActive = item.id === activeId;
+    bar += '<a href="#" class="tab-link' + (isActive ? ' active' : '') +
+      '" data-spa-page="' + _esc(page) + '"' + _spaParamsAttr(params) + '>' +
+      item.label + '</a>';
+  });
+  return bar + '</nav>';
+}
+
+function _expandablePanel(page, baseParams, sectionId, title, contentHtml, openSet) {
+  openSet = openSet || {};
+  const isOpen = !!openSet[sectionId];
+  if (isOpen) {
+    const closeParams = Object.assign({}, baseParams || {});
+    delete closeParams.open;
+    return '<div class="collapsible open" id="panel-' + _esc(sectionId) + '">' +
+      '<a href="#" class="collapsible-toggle coll-open" data-spa-page="' + _esc(page) + '"' +
+      _spaParamsAttr(closeParams) + '>' + title + ' <span class="arrow">▴</span></a>' +
+      '<div class="collapsible-content open">' + contentHtml + '</div></div>';
+  }
+  const openParams = Object.assign({}, baseParams || {}, { open: sectionId });
+  return '<div class="expandable-closed-wrap">' +
+    '<a href="#" class="expandable-closed collapsible-toggle" data-spa-page="' + _esc(page) + '"' +
+    _spaParamsAttr(openParams) + '>' + title + ' <span class="arrow">▾</span></a></div>';
+}
+
 function _htmlShell() {
   const tpl = HtmlService.createTemplateFromFile('index');
   tpl.pageTitle = 'סדרת השטח — מערכת תרגילים';
@@ -533,38 +589,40 @@ function _dashboardResolveTab(p, user) {
   return tab;
 }
 
-function _dashboardTabsBar(user, activeTab, extraParams) {
-  extraParams = extraParams || {};
-  let s = '<nav class="dashboard-tabs" aria-label="לשוניות לוח בקרה">';
-  _dashboardTabItems(user).forEach(function(item) {
-    const params = { tab: item.id };
-    if (extraParams.searchUserId) params.searchUserId = extraParams.searchUserId;
-    s += '<a href="#" class="dashboard-tab' + (item.id === activeTab ? ' active' : '') +
-      '" data-spa-page="dashboard"' + _spaParamsAttr(params) + '>' +
-      _esc(item.label) + '</a>';
-  });
-  return s + '</nav>';
+function _dashboardTabPanelHtml(user, sid, tab, p) {
+  if (tab === 'team') {
+    return '<div class="team-matrix-page">' + _teamMatrixEmbedHtml(user, p) + '</div>';
+  }
+  if (tab === 'exercise') {
+    return '<div class="ex-matrix-page">' + _exerciseMatrixEmbedHtml(user, p) + '</div>';
+  }
+  if (tab === 'conflicts') {
+    return _dashboardConflictsTabHtml(sid);
+  }
+  const searchUserId = String((p && p.searchUserId) || '').trim();
+  let s = '';
+  if (searchUserId) {
+    s += _dashboardUserExerciseResults(user, searchUserId);
+  } else {
+    s += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
+      'הקלד שם או מספר אישי בשורת החיפוש למעלה.</p>';
+  }
+  return s;
+}
+
+function _dashboardTabsShell(user, sid, activeTab, p) {
+  const searchUserId = String((p && p.searchUserId) || '').trim();
+  const baseParams = {};
+  if (searchUserId) baseParams.searchUserId = searchUserId;
+  const items = _dashboardTabItems(user);
+  let s = _spaTabsBar('dashboard', baseParams, items, activeTab);
+  s += '<div class="spa-tab-panel dashboard-tab-panel">' +
+    _dashboardTabPanelHtml(user, sid, activeTab, p) + '</div>';
+  return s;
 }
 
 function _dashboardTabContent(user, sid, tab, p) {
-  if (tab === 'team') {
-    return '<div class="dashboard-tab-panel team-matrix-page">' +
-      _teamMatrixEmbedHtml(user, p) + '</div>';
-  }
-  if (tab === 'exercise') {
-    return '<div class="dashboard-tab-panel ex-matrix-page">' +
-      _exerciseMatrixEmbedHtml(user, p) + '</div>';
-  }
-  if (tab === 'conflicts') {
-    return '<div class="dashboard-tab-panel">' + _dashboardConflictsTabHtml(sid) + '</div>';
-  }
-
-  const searchUserId = String((p && p.searchUserId) || '').trim();
-  let s = _dashboardUserSearchBar(searchUserId);
-  if (searchUserId) {
-    s += _dashboardUserExerciseResults(user, searchUserId);
-  }
-  return '<div class="dashboard-tab-panel dashboard-tab-search">' + s + '</div>';
+  return _dashboardTabsShell(user, sid, tab, p);
 }
 
 function Views_dashboard(p) {
@@ -577,8 +635,8 @@ function Views_dashboard(p) {
 
   const body = _topbar(user, sid) +
     '<div class="page page-dashboard">' + _flash(p) +
-    _dashboardTabsBar(user, tab, { searchUserId: searchUserId }) +
-    _dashboardTabContent(user, sid, tab, p) +
+    _dashboardUserSearchBar(searchUserId) +
+    _dashboardTabsShell(user, sid, tab, p) +
     '</div>';
   return _wrapPage(body, 'לוח בקרה');
 }
