@@ -1,19 +1,11 @@
 // statistics.gs — נתוני סטטיסטיקות לדשבורד סגל
 
-function _Statistics_normText(s) {
-  return String(s || '').replace(/״/g, '"').replace(/"/g, '').trim();
+function _Statistics_isMpUser(user) {
+  return !!(user && Roles_isCompanyCommander(user.role));
 }
 
-function _Statistics_isMpTrainee(user) {
-  if (!user || !Roles_isTrainee(user.role)) return false;
-  const tr = _Statistics_normText(user.target_role);
-  return tr.indexOf('מפ') !== -1;
-}
-
-function _Statistics_isMagadTrainee(user) {
-  if (!user || !Roles_isTrainee(user.role)) return false;
-  const tr = _Statistics_normText(user.target_role);
-  return tr.indexOf('מגד') !== -1;
+function _Statistics_isMagadUser(user) {
+  return !!(user && Roles_isUnitCommander(user.role));
 }
 
 function _Statistics_isMpAssignment(resp) {
@@ -80,11 +72,11 @@ function Statistics_buildPayload() {
   });
 
   const trainees = users.filter(function(u) { return Roles_isTrainee(u.role); });
-  const mpTrainees = trainees.filter(_Statistics_isMpTrainee);
-  const magadTrainees = trainees.filter(_Statistics_isMagadTrainee);
+  const mpUsers = users.filter(_Statistics_isMpUser);
+  const magadUsers = users.filter(_Statistics_isMagadUser);
 
-  const mpIds = mpTrainees.map(function(u) { return u.id; });
-  const magadIds = magadTrainees.map(function(u) { return u.id; });
+  const mpIds = mpUsers.map(function(u) { return u.id; });
+  const magadIds = magadUsers.map(function(u) { return u.id; });
 
   const mp = _Statistics_cohortMetricsWithRole(mpIds, assigns, _Statistics_isMpAssignment);
   const magad = _Statistics_cohortMetricsWithRole(magadIds, assigns, _Statistics_isMagadAssignment);
@@ -134,8 +126,25 @@ function Statistics_buildPayload() {
       teamName: team ? team.name : '—',
       rank: u.target_role || '—',
       exercises: count,
-      isMp: _Statistics_isMpTrainee(u),
-      isMagad: _Statistics_isMagadTrainee(u)
+      isMp: false,
+      isMagad: false
+    };
+  }).sort(function(a, b) { return b.exercises - a.exercises; });
+
+  const commanderRows = users.filter(function(u) {
+    return _Statistics_isMpUser(u) || _Statistics_isMagadUser(u);
+  }).map(function(u) {
+    const team = Teams_get(u.team_id);
+    const count = (assignsByUser[u.id] || []).length;
+    return {
+      id: u.id,
+      name: u.name,
+      teamId: u.team_id || '',
+      teamName: team ? team.name : '—',
+      rank: Roles_label(u.role),
+      exercises: count,
+      isMp: _Statistics_isMpUser(u),
+      isMagad: _Statistics_isMagadUser(u)
     };
   }).sort(function(a, b) { return b.exercises - a.exercises; });
 
@@ -186,8 +195,8 @@ function Statistics_buildPayload() {
       exerciseId: a.exercise_id,
       type: _Statistics_exerciseTypeKey(ex),
       teamId: u ? String(u.team_id || '') : '',
-      isMp: !!(u && _Statistics_isMpTrainee(u)),
-      isMagad: !!(u && _Statistics_isMagadTrainee(u))
+      isMp: !!(u && _Statistics_isMpUser(u)),
+      isMagad: !!(u && _Statistics_isMagadUser(u))
     };
   });
 
@@ -197,6 +206,7 @@ function Statistics_buildPayload() {
     teams: teams.map(function(t) { return { id: t.id, name: t.name }; }),
     teamStats: teamStats,
     trainees: traineeRows,
+    commanders: commanderRows,
     exerciseTypes: exerciseTypes,
     assignmentsLite: assignmentsLite,
     avgExercisesPerTrainee: avgExercisesPerTrainee

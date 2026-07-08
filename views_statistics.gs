@@ -164,9 +164,14 @@ function _statisticsPageJs() {
   }
 
   function traineeRowsFiltered() {
-    var rows = data.trainees.slice();
-    if (typeFilter === 'mp') rows = rows.filter(function(r) { return r.isMp; });
-    else if (typeFilter === 'magad') rows = rows.filter(function(r) { return r.isMagad; });
+    var rows;
+    if (typeFilter === 'mp') {
+      rows = (data.commanders || []).filter(function(r) { return r.isMp; });
+    } else if (typeFilter === 'magad') {
+      rows = (data.commanders || []).filter(function(r) { return r.isMagad; });
+    } else {
+      rows = data.trainees.slice();
+    }
     if (typeTeam) rows = rows.filter(function(r) { return String(r.teamId) === String(typeTeam); });
     if (traineeMode === 'rank') {
       rows.sort(function(a, b) {
