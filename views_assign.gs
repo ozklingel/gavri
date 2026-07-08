@@ -97,7 +97,6 @@ function _assignMainModuleHtml(user, sid) {
         _a('page=homeConstraints', 'צפה ברשימה', 'btn btn-ghost btn-sm') +
         '</div>'
       : '') +
-    _assignmentConflictsPanel(assignConflicts) +
     '<div style="display:flex;gap:8px;margin-bottom:14px">' +
     _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
       'לבצע שיבוץ אוטומטי? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
@@ -113,6 +112,7 @@ function _assignMainModuleHtml(user, sid) {
     'color:var(--text1);pointer-events:none;line-height:1.45"></div>' +
     '<div id="assignBoard" style="display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:16px">' +
     '</div>' +
+    _assignmentConflictsPanel(assignConflicts) +
     '<div id="assignLeastSection" style="margin-top:8px;border-top:1px solid var(--border);padding-top:16px">' +
     '<div class="card-title" style="margin-bottom:10px;font-size:13px">📊 חניך מועדף לשיבוץ — הכי פחות משובץ לכל חיל</div>' +
     '<div id="assignLeastPanel" style="display:flex;gap:10px;flex-wrap:wrap"></div>' +
