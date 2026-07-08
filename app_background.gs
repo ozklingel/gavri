@@ -1,7 +1,7 @@
 // app_background.gs — fixed app background (from assets/mapim-bg.png)
 
 function _appBgDataUri() {
-  return 'data:image/png;base64,' + _APP_BG_B64();
+  return 'data:image/jpeg;base64,' + _APP_BG_B64();
 }
 
 function _APP_BG_B64() {
