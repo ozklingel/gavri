@@ -600,12 +600,12 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
     return _dashboardConflictsTabHtml(sid);
   }
   const searchUserId = String((p && p.searchUserId) || '').trim();
-  let s = '';
+  let s = _dashboardUserSearchBar(searchUserId);
   if (searchUserId) {
     s += _dashboardUserExerciseResults(user, searchUserId);
   } else {
     s += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
-      'הקלד שם או מספר אישי בשורת החיפוש למעלה.</p>';
+      'הקלד שם או מספר אישי בשורת החיפוש.</p>';
   }
   return s;
 }
@@ -616,8 +616,10 @@ function _dashboardTabsShell(user, sid, activeTab, p) {
   if (searchUserId) baseParams.searchUserId = searchUserId;
   const items = _dashboardTabItems(user);
   let s = _spaTabsBar('dashboard', baseParams, items, activeTab);
+  s += '<div class="dashboard-shell">';
   s += '<div class="spa-tab-panel dashboard-tab-panel">' +
     _dashboardTabPanelHtml(user, sid, activeTab, p) + '</div>';
+  s += '</div>';
   return s;
 }
 
@@ -631,11 +633,9 @@ function Views_dashboard(p) {
   const sid = user.id;
 
   const tab = _dashboardResolveTab(p, user);
-  const searchUserId = String(p.searchUserId || '').trim();
 
   const body = _topbar(user, sid) +
     '<div class="page page-dashboard">' + _flash(p) +
-    _dashboardUserSearchBar(searchUserId) +
     _dashboardTabsShell(user, sid, tab, p) +
     '</div>';
   return _wrapPage(body, 'לוח בקרה');

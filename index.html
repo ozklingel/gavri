@@ -461,6 +461,48 @@ body {
     .dashboard-tab-panel {
       width: 100%;
     }
+    /* דשבורד — רקע כהה יותר לניגודיות מול תמונת הרקע */
+    .page-dashboard .spa-tabs-bar.tabs {
+      background: rgba(0, 0, 0, 0.78) !important;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border2);
+      border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 6px 8px 0;
+      margin-bottom: 0;
+    }
+    .page-dashboard .spa-tabs-bar .tab-link {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 6px 6px 0 0;
+      margin-inline: 2px;
+      padding: 10px 14px;
+    }
+    .page-dashboard .spa-tabs-bar .tab-link.active {
+      background: rgba(0, 0, 0, 0.88);
+      color: var(--green);
+      border-bottom-color: var(--green);
+    }
+    .page-dashboard .dashboard-shell {
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border2);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      padding: 16px;
+    }
+    .page-dashboard .dashboard-tab-panel .card {
+      background: rgba(0, 0, 0, 0.55) !important;
+    }
+    .page-dashboard .btn-ghost,
+    .page-dashboard .btn-secondary {
+      background: rgba(0, 0, 0, 0.55) !important;
+      border: 1px solid var(--border2);
+    }
+    .page-dashboard .dashboard-search-panel {
+      margin-bottom: 16px;
+    }
     .page-title {
       font-family: var(--mono);
       font-size: 20px;
