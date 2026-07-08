@@ -50,6 +50,26 @@ body {
   position: relative;
 }
 
+#app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image: url('<?!= appBgDataUri ?>');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  pointer-events: none;
+}
+#app-bg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(11, 15, 11, 0.9) 0%, rgba(11, 15, 11, 0.78) 45%, rgba(11, 15, 11, 0.92) 100%);
+  pointer-events: none;
+}
+
 * {
   box-sizing: border-box;
   max-width: 100%;
@@ -1456,7 +1476,7 @@ body {
     /* ── PAGE LOADER ── */
     #page-loader {
       position:fixed;inset:0;z-index:9999;
-      background:rgba(11,15,11,0.88);backdrop-filter:blur(4px);
+      background:rgba(11,15,11,0.72);backdrop-filter:blur(3px);
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
       opacity:0;pointer-events:none;transition:opacity .18s ease;
     }
@@ -1487,7 +1507,8 @@ body {
       position: fixed;
       inset: 0;
       z-index: 10000;
-      background: var(--bg);
+      background: rgba(11, 15, 11, 0.72);
+      backdrop-filter: blur(2px);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1529,6 +1550,9 @@ body {
 </style>
 </head>
 <body>
+<div id="app-bg" aria-hidden="true"></div>
+<div id="app-bg-overlay" aria-hidden="true"></div>
+
 <div id="app-splash" aria-live="polite" aria-label="טוען את המערכת">
   <img
     class="app-splash-logo"

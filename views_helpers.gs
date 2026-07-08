@@ -173,6 +173,7 @@ function _htmlShell() {
   const tpl = HtmlService.createTemplateFromFile('index');
   tpl.pageTitle = 'סדרת השטח — מערכת תרגילים';
   tpl.body = '';
+  tpl.appBgDataUri = typeof _appBgDataUri === 'function' ? _appBgDataUri() : '';
   return tpl.evaluate()
     .setTitle('סדרת השטח — מערכת תרגילים')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
