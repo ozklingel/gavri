@@ -493,6 +493,8 @@ function Views_login(p) {
     '<div class="demo-item"><div class="demo-role">סגל</div><div class="demo-cred">1<br>111</div></div>' +
     '<div class="demo-item"><div class="demo-role">מפקצ</div><div class="demo-cred">222<br>222</div></div>' +
     '<div class="demo-item"><div class="demo-role">חניך</div><div class="demo-cred">3332<br>3332</div></div>' +
+    '<div class="demo-item"><div class="demo-role">חונך</div><div class="demo-cred">333<br>333</div></div>' +
+    '<div class="demo-item"><div class="demo-role">מגד</div><div class="demo-cred">1010<br>1010</div></div>' +
     '</div>' +
     '</div></div></div>';
   return _wrapPage(body, 'התחברות');
