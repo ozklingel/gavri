@@ -94,8 +94,6 @@ function Statistics_buildPayload() {
     });
     const sum = counts.reduce(function(s, n) { return s + n; }, 0);
     const avg = members.length ? _Statistics_round1(sum / members.length) : 0;
-    const max = counts.length ? Math.max.apply(null, counts) : 0;
-    const min = counts.length ? Math.min.apply(null, counts) : 0;
     let mpRole = 0;
     let otherRole = 0;
     members.forEach(function(m) {
@@ -109,8 +107,6 @@ function Statistics_buildPayload() {
       name: team.name,
       trainees: members.length,
       avg: avg,
-      max: max,
-      min: min,
       mpRole: mpRole,
       otherRole: otherRole
     };

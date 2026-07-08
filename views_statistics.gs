@@ -46,7 +46,7 @@ function _statisticsSectionTeam(sid) {
     '<div class="card-body stats-chart-body">' +
     '<div class="stats-chart-wrap"><canvas id="statsTeamChart"></canvas></div>' +
     '<div class="stats-table-wrap"><table class="tbl stats-tbl"><thead><tr>' +
-    '<th>צוות</th><th>חניכים</th><th>ממוצע תרגילים</th><th>מקסימום</th><th>מינימום</th>' +
+    '<th>צוות</th><th>חניכים</th><th>ממוצע תרגילים לחניך</th>' +
     '</tr></thead><tbody id="statsTeamTableBody"></tbody></table></div></div></div>' +
     '<script>' + _statisticsPageJs() + '</script>';
 }
@@ -146,9 +146,7 @@ function _statisticsPageJs() {
     if (!tbody) return;
     tbody.innerHTML = data.teamStats.map(function(t) {
       return '<tr><td>' + esc(t.name) + '</td><td>' + t.trainees + '</td>' +
-        '<td class="stats-num-green">' + t.avg + '</td>' +
-        '<td class="stats-num-blue">' + t.max + '</td>' +
-        '<td class="stats-num-orange">' + t.min + '</td></tr>';
+        '<td class="stats-num-green">' + t.avg + '</td></tr>';
     }).join('');
   }
 
@@ -162,9 +160,7 @@ function _statisticsPageJs() {
       data: {
         labels: labels,
         datasets: [
-          { label: 'ממוצע', data: data.teamStats.map(function(t) { return t.avg; }), backgroundColor: '#16a34a' },
-          { label: 'מקסימום', data: data.teamStats.map(function(t) { return t.max; }), backgroundColor: '#6366f1' },
-          { label: 'מינימום', data: data.teamStats.map(function(t) { return t.min; }), backgroundColor: '#f59e0b' }
+          { label: 'ממוצע תרגילים לחניך', data: data.teamStats.map(function(t) { return t.avg; }), backgroundColor: '#16a34a' }
         ]
       },
       options: {
