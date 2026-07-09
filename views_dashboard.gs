@@ -4,6 +4,7 @@ function Views_exercises(p) {
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
   const tab = (p.tab || 'list') === 'new' ? 'new' : 'list';
+  const exs = Exercises_all();
 
   let s = _spaTabsBar('exercises', {}, [
     { id: 'list', label: '📋 כל התרגילים' },
@@ -22,11 +23,35 @@ function Views_exercises(p) {
     '<div class="page">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
       '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
+      (exs.length
+        ? '<button type="button" class="btn btn-secondary btn-sm" onclick="toggleCollapsible(\'ex-duplicate-panel\')">⎘ שכפל תרגיל</button>'
+        : '') +
     '</div>' +
+    (exs.length ? _exercisesDuplicatePanelHtml(exs) : '') +
     s +
     '</div>';
 
   return _wrapPage(body, 'ניהול תרגילים');
+}
+
+function _exercisesDuplicatePanelHtml(exs) {
+  let opts = '<option value="">— בחר תרגיל —</option>';
+  exs.forEach(function(e) {
+    opts += '<option value="' + _esc(e.id) + '">' + _esc(e.title) + ' (' + _esc(e.id) + ')</option>';
+  });
+  return '<div id="ex-duplicate-panel" style="display:none;margin-bottom:14px" class="card">' +
+    '<div class="card-header"><div class="card-title">⎘ שכפל תרגיל</div></div>' +
+    '<div class="card-body">' +
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">' +
+    'בחר תרגיל קיים — ייווצר עותק עם ציר הזמן שלו, ללא הקצאות משתתפים.</p>' +
+    '<div class="form-row">' +
+    '<label class="form-label">תרגיל לשיכפול</label>' +
+    '<select id="exDuplicateSelect" class="form-select">' + opts + '</select>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+    '<button type="button" class="btn btn-primary btn-sm" onclick="duplicateExerciseFromList()">⎘ שכפל ופתח</button>' +
+    '<button type="button" class="btn btn-ghost btn-sm" onclick="toggleCollapsible(\'ex-duplicate-panel\')">ביטול</button>' +
+    '</div></div></div>';
 }
 
 function _exercisesListModuleHtml(user, sid) {

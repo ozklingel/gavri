@@ -47,7 +47,12 @@ function Views_exercise(p) {
     '<div class="page-title" style="margin:0">' + _esc(ex.title) + '</div>' +
     '<div style="display:flex;gap:6px">';
   if (Roles_hasAdminAccess(user.role)) {
-    s += _a('action=duplicateExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, '⎘ שכפל', 'btn btn-ghost btn-sm');
+    s += _confirmAction(
+      'action=duplicateExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ,
+      '⎘ שכפל',
+      'לשכפל את התרגיל «' + ex.title + '»? ייווצר עותק עם ציר הזמן, ללא הקצאות.',
+      'btn btn-ghost btn-sm'
+    );
 s += _confirmDelete(
   'action=deleteExercise&id=' + encodeURIComponent(ex.id) + '&from=exercise&sid=' + sidQ,
   'מחיקת תרגיל "' + ex.title + '" תסיר גם את כל ההקצאות וציר הזמן שלו. להמשיך?'

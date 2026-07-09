@@ -2731,6 +2731,19 @@ body {
     btn.classList.toggle('btn-secondary', !isOpen);
   }
 
+  function duplicateExerciseFromList() {
+    var sel = document.getElementById('exDuplicateSelect');
+    if (!sel || !sel.value) {
+      alert('בחר תרגיל לשיכפול');
+      return false;
+    }
+    var opt = sel.options[sel.selectedIndex];
+    var title = (opt && opt.textContent) ? opt.textContent.trim() : sel.value;
+    if (!confirm('לשכפל את התרגיל «' + title + '»?\nייווצר עותק עם ציר הזמן, ללא הקצאות.')) return false;
+    MapimSpa.runAction('duplicateExercise', { id: sel.value });
+    return false;
+  }
+
   // Confirm-before-delete for all 🗑 delete buttons
   function confirmDelete(el) {
     const msg = el.dataset.confirm || 'בטוח שרוצים למחוק?';

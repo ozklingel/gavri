@@ -450,9 +450,10 @@ function Exercises_duplicate(p) {
   const orig = Exercises_get(p.id);
   if (!orig) throw new Error('התרגיל לא נמצא.');
   const newId = 'E' + new Date().getTime();
-  _append('Exercises', [newId, orig.title + ' (copy)', orig.description, u.id,
+  _append('Exercises', [newId, orig.title + ' (עותק)', orig.description, u.id,
     orig.rawStartDate, orig.rawEndDate, orig.act, orig.exercise_type,
-    orig.partner_battalion, orig.camp, orig.battalion_commander]);
+    orig.partner_battalion, orig.camp, orig.battalion_commander,
+    orig.rawStartTime || '', orig.rawEndTime || '']);
 
   // PERF: batch-append all detail rows at once
   const details = Exercises_details(orig.id);
@@ -463,7 +464,11 @@ function Exercises_duplicate(p) {
     _appendBatch('ExerciseDetails', detailRows);
   }
 
-  return Views_dashboard({ sid: p.sid, info: 'התרגיל שוכפל כ-' + newId + '.' });
+  return Views_exercise({
+    sid: p.sid,
+    id: newId,
+    info: 'התרגיל «' + orig.title + '» שוכפל בהצלחה.'
+  });
 }
 
 function Exercises_addDetail(p) {
