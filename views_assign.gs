@@ -9,7 +9,7 @@ function Views_assign(p) {
   const openSet = _parseOpenSections(p);
 
   const body = _topbar(user, sid) +
-    '<div class="page">' + _flash(p) +
+    '<div class="page page-assign">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<div class="page-title" style="margin:0">🔀 לוח שיבוץ</div>' +
     '<div style="display:flex;gap:6px;align-items:center">' +
@@ -17,7 +17,7 @@ function Views_assign(p) {
     _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
     '</div></div>' +
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
-    '// גרור חייל מהעמודה השמאלית לתרגיל · גרור בין תרגילים להעברה · גרור לשורה השמאלית להסרה · לחץ על משתתף בתרגיל לשינוי תפקיד · ריחוף או לחיצה ארוכה לפרטים אישיים' +
+    '// גרור חניך מרשימת החניכים (ממוינת לפי מעט שיבוצים) לתרגיל · שינויים נשמרים רק בלחיצה על «שמירה ואישור»' +
     '</div>' +
     _assignMainModuleHtml(user, sid, openSet) +
     '</div>';
@@ -62,15 +62,6 @@ function _assignMainModuleHtml(user, sid, openSet) {
     exMap[a.exercise_id].push({ id: a.id, userId: a.user_id, resp: a.responsibility, status: a.status });
   });
 
-  const assignedUserIds = {};
-  assigns.forEach(function(a) {
-    const uid = String(a.user_id || '').trim();
-    if (uid) assignedUserIds[uid] = true;
-  });
-  const unassigned = allUsers.filter(function(u) {
-    return !assignedUserIds[String(u.id).trim()];
-  });
-
   const approvedHome = HomeConstraints_allApproved();
   const homeBlocked = HomeConstraints_blockedPairsForAssign();
 
@@ -78,7 +69,6 @@ function _assignMainModuleHtml(user, sid, openSet) {
     exercises: exData,
     userMap:   userMap,
     exMap:     exMap,
-    unassigned: unassigned.map(function(u) { return { id: u.id, name: u.name, role: u.role }; }),
     homeBlocked: homeBlocked,
     approvedHomeCount: approvedHome.length,
     corpsList: [
@@ -110,7 +100,23 @@ function _assignMainModuleHtml(user, sid, openSet) {
     'max-width:280px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border2);' +
     'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-family:var(--mono);font-size:11px;' +
     'color:var(--text1);pointer-events:none;line-height:1.45"></div>' +
-    '<div id="assignBoard" style="display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:16px">' +
+    '<div id="assignChangesBar" class="assign-changes-bar" hidden>' +
+    '<div class="assign-changes-head">' +
+    '<span class="assign-changes-title">📝 שינויים ממתינים לאישור</span>' +
+    '<span id="assignChangesCount" class="assign-changes-count"></span>' +
+    '</div>' +
+    '<ul id="assignChangesList" class="assign-changes-list"></ul>' +
+    '<div class="assign-changes-actions">' +
+    '<button type="button" id="assignDiscardBtn" class="btn btn-secondary btn-sm">↺ בטל שינויים</button>' +
+    '<button type="button" id="assignSaveBtn" class="btn btn-primary">💾 שמירה ואישור</button>' +
+    '</div></div>' +
+    '<div id="assignNeedsWrap" class="assign-section-wrap">' +
+    '<div class="assign-section-label">⚠ תרגילים ללא שיבוץ — גרור חניכים לכאן</div>' +
+    '<div id="assignNeedsBoard" class="assign-priority-board"></div>' +
+    '</div>' +
+    '<div class="assign-section-wrap">' +
+    '<div class="assign-section-label">🔀 לוח שיבוץ</div>' +
+    '<div id="assignBoard" class="assign-main-board"></div>' +
     '</div>' +
     '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">' +
     _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
@@ -135,11 +141,22 @@ function _assignLeastSectionHtml() {
 function _assignBoardJs() {
   return `
 (function() {
-  var data  = JSON.parse(document.getElementById('assignData').textContent);
-  var sid   = document.getElementById('assignSid').value;
+  var data = JSON.parse(document.getElementById('assignData').textContent);
+  var sid = document.getElementById('assignSid').value;
   var board = document.getElementById('assignBoard');
+  var needsBoard = document.getElementById('assignNeedsBoard');
+  var needsWrap = document.getElementById('assignNeedsWrap');
   var status = document.getElementById('assignStatus');
   var leastPanel = document.getElementById('assignLeastPanel');
+  var changesBar = document.getElementById('assignChangesBar');
+  var changesList = document.getElementById('assignChangesList');
+  var changesCount = document.getElementById('assignChangesCount');
+  var saveBtn = document.getElementById('assignSaveBtn');
+  var discardBtn = document.getElementById('assignDiscardBtn');
+
+  var baseline = JSON.parse(JSON.stringify({ exMap: data.exMap }));
+  var nextTempId = 1;
+  var editingChip = null;
 
   var ROLE_LABELS = {
     admin: 'סגל', unitCommander: 'מגד', companyCommander: 'מפקצ',
@@ -151,12 +168,241 @@ function _assignBoardJs() {
   };
   var popoverPinned = false;
   var hoverTimer = null;
-  var popoverAnchor = null;
 
   function escHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function setStatus(msg, color) {
+    if (!status) return;
+    status.textContent = msg;
+    status.style.color = color || 'var(--muted)';
+  }
+
+  function getExTitle(exId) {
+    var ex = data.exercises.find(function(e) { return e.id === exId; });
+    return ex ? ex.title : exId;
+  }
+
+  function countAssignments(userId) {
+    var n = 0;
+    Object.keys(data.exMap).forEach(function(exId) {
+      (data.exMap[exId] || []).forEach(function(a) {
+        if (a.userId === userId) n++;
+      });
+    });
+    return n;
+  }
+
+  function exAssigneeCount(exId) {
+    return (data.exMap[exId] || []).length;
+  }
+
+  function isTempId(id) {
+    return String(id || '').indexOf('__new_') === 0;
+  }
+
+  function newTempId() {
+    return '__new_' + (nextTempId++) + '__';
+  }
+
+  function cloneExMap(src) {
+    var out = {};
+    Object.keys(src || {}).forEach(function(exId) {
+      out[exId] = (src[exId] || []).map(function(a) {
+        return { id: a.id, userId: a.userId, resp: a.resp || '', status: a.status || 'pending' };
+      });
+    });
+    return out;
+  }
+
+  function resetWorking() {
+    data.exMap = cloneExMap(baseline.exMap);
+    editingChip = null;
+    hideUserPopoverForce();
+    render();
+    setStatus('', 'var(--muted)');
+  }
+
+  function computePendingChanges() {
+    var changes = [];
+    var baseList = [];
+    var workList = [];
+
+    Object.keys(baseline.exMap).forEach(function(exId) {
+      (baseline.exMap[exId] || []).forEach(function(a) {
+        baseList.push({ assignId: a.id, userId: a.userId, exId: exId, resp: a.resp || '' });
+      });
+    });
+    Object.keys(data.exMap).forEach(function(exId) {
+      (data.exMap[exId] || []).forEach(function(a) {
+        workList.push({ assignId: a.id, userId: a.userId, exId: exId, resp: a.resp || '' });
+      });
+    });
+
+    var baseById = {};
+    baseList.forEach(function(a) { baseById[a.assignId] = a; });
+    var workById = {};
+    workList.forEach(function(a) { workById[a.assignId] = a; });
+
+    baseList.forEach(function(a) {
+      if (!workById[a.assignId]) {
+        changes.push({ type: 'remove', assignId: a.assignId, userId: a.userId, exId: a.exId });
+      }
+    });
+
+    workList.forEach(function(a) {
+      if (isTempId(a.assignId)) {
+        changes.push({ type: 'add', userId: a.userId, exId: a.exId, resp: a.resp });
+        return;
+      }
+      var b = baseById[a.assignId];
+      if (!b) return;
+      if (b.exId !== a.exId) {
+        changes.push({
+          type: 'move', assignId: a.assignId, userId: a.userId,
+          fromExId: b.exId, toExId: a.exId, resp: a.resp
+        });
+      } else if (b.resp !== a.resp) {
+        changes.push({
+          type: 'resp', assignId: a.assignId, exId: a.exId,
+          userId: a.userId, resp: a.resp, oldResp: b.resp
+        });
+      }
+    });
+
+    return changes;
+  }
+
+  function changeLabel(ch) {
+    var u = data.userMap[ch.userId];
+    var name = u ? u.name : ch.userId;
+    if (ch.type === 'add') {
+      return '+ שיבוץ ' + name + ' → ' + getExTitle(ch.exId) + (ch.resp ? ' (' + ch.resp + ')' : '');
+    }
+    if (ch.type === 'remove') {
+      return '− הסרת ' + name + ' מ־' + getExTitle(ch.exId);
+    }
+    if (ch.type === 'move') {
+      return '↔ העברת ' + name + ' ל־' + getExTitle(ch.toExId);
+    }
+    if (ch.type === 'resp') {
+      return '✎ תפקיד ' + name + ': ' + (ch.oldResp || '—') + ' → ' + ch.resp;
+    }
+    return '';
+  }
+
+  function renderChangesBar() {
+    var changes = computePendingChanges();
+    if (!changesBar) return;
+    if (!changes.length) {
+      changesBar.hidden = true;
+      changesList.innerHTML = '';
+      if (changesCount) changesCount.textContent = '';
+      return;
+    }
+    changesBar.hidden = false;
+    if (changesCount) changesCount.textContent = changes.length + ' שינויים';
+    changesList.innerHTML = '';
+    changes.forEach(function(ch, idx) {
+      var li = document.createElement('li');
+      li.className = 'assign-change-item assign-change-' + ch.type;
+      li.textContent = (idx + 1) + '. ' + changeLabel(ch);
+      changesList.appendChild(li);
+    });
+    setStatus('● ' + changes.length + ' שינויים ממתינים לשמירה', '#fbbf24');
+  }
+
+  function homeBlockMsg(userId, exId) {
+    var key = userId + '\\x1f' + exId;
+    if (data.homeBlocked && data.homeBlocked[key]) {
+      return 'אילוץ בית מאושר (' + data.homeBlocked[key] + ')';
+    }
+    return '';
+  }
+
+  function userAlreadyInExercise(userId, exId) {
+    return (data.exMap[exId] || []).some(function(a) { return a.userId === userId; });
+  }
+
+  function stageAdd(exId, userId, resp) {
+    var block = homeBlockMsg(userId, exId);
+    if (block) {
+      setStatus('✗ לא ניתן לשבץ: ' + block, '#f87171');
+      return false;
+    }
+    if (userAlreadyInExercise(userId, exId)) {
+      setStatus('✗ החניך כבר משובץ לתרגיל זה', '#f87171');
+      return false;
+    }
+    if (!data.exMap[exId]) data.exMap[exId] = [];
+    data.exMap[exId].push({
+      id: newTempId(),
+      userId: userId,
+      resp: resp || '',
+      status: 'pending'
+    });
+    render();
+    return true;
+  }
+
+  function stageRemove(assignId, fromExId) {
+    if (!data.exMap[fromExId]) return;
+    data.exMap[fromExId] = data.exMap[fromExId].filter(function(a) {
+      return a.id !== assignId;
+    });
+    render();
+  }
+
+  function stageMove(assignId, toExId, userId, resp, fromExId) {
+    var block = homeBlockMsg(userId, toExId);
+    if (block) {
+      setStatus('✗ לא ניתן להעביר: ' + block, '#f87171');
+      return false;
+    }
+    if (userAlreadyInExercise(userId, toExId)) {
+      setStatus('✗ החניך כבר משובץ לתרגיל יעד', '#f87171');
+      return false;
+    }
+    var list = data.exMap[fromExId] || [];
+    var a = list.find(function(x) { return x.id === assignId; });
+    if (!a) return false;
+    data.exMap[fromExId] = list.filter(function(x) { return x.id !== assignId; });
+    if (!data.exMap[toExId]) data.exMap[toExId] = [];
+    data.exMap[toExId].push({
+      id: assignId,
+      userId: userId,
+      resp: resp || a.resp || '',
+      status: a.status || 'pending'
+    });
+    render();
+    return true;
+  }
+
+  function stageResp(assignId, exId, newResp) {
+    if (!newResp) { alert('יש לציין תפקיד'); return; }
+    var list = data.exMap[exId] || [];
+    list.forEach(function(a) {
+      if (a.id === assignId) a.resp = newResp;
+    });
+    editingChip = null;
+    render();
+  }
+
+  function getTraineePool() {
+    var list = [];
+    Object.keys(data.userMap).forEach(function(uid) {
+      var u = data.userMap[uid];
+      if (!u || u.role !== 'trainee') return;
+      list.push({ id: uid, name: u.name, count: countAssignments(uid) });
+    });
+    list.sort(function(a, b) {
+      if (a.count !== b.count) return a.count - b.count;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+    });
+    return list;
   }
 
   function profileRow(label, val) {
@@ -166,24 +412,18 @@ function _assignBoardJs() {
       '<span style="word-break:break-word">' + escHtml(val) + '</span></div>';
   }
 
-  function buildProfileHtml(u) {
+  function buildProfileHtml(u, uid) {
     if (!u) return '';
     var h = '<div style="font-weight:700;margin-bottom:8px;font-size:12px">' + escHtml(u.name) +
-      ' <span style="font-weight:400;color:var(--muted)">' + escHtml(u.id || '') + '</span></div>';
+      ' <span style="font-weight:400;color:var(--muted)">' + escHtml(uid || '') + '</span></div>';
     h += profileRow('תפקיד', ROLE_LABELS[u.role] || u.role);
     h += profileRow('צוות', u.teamName);
+    h += profileRow('שיבוצים', String(countAssignments(uid)));
     h += profileRow('טלפון', u.phone);
-    h += profileRow('שיוך יחידתי', u.unitAffiliation);
-    h += profileRow('סוג שירות', u.serviceType);
-    h += profileRow('שיוך חיילי', u.militaryAffiliation);
-    h += profileRow('אפיון יחידתי', u.unitClassification);
-    h += profileRow('תפקיד מיועד', u.targetRole);
     return h;
   }
 
-  function getPopover() {
-    return document.getElementById('assignUserPopover');
-  }
+  function getPopover() { return document.getElementById('assignUserPopover'); }
 
   function positionPopover(anchor) {
     var pop = getPopover();
@@ -207,8 +447,7 @@ function _assignBoardJs() {
     var pop = getPopover();
     if (!pop || !u) return;
     popoverPinned = !!pin;
-    popoverAnchor = anchor;
-    pop.innerHTML = buildProfileHtml(u);
+    pop.innerHTML = buildProfileHtml(u, userId);
     positionPopover(anchor);
   }
 
@@ -216,20 +455,17 @@ function _assignBoardJs() {
     if (popoverPinned) return;
     var pop = getPopover();
     if (pop) pop.style.display = 'none';
-    popoverAnchor = null;
   }
 
   function hideUserPopoverForce() {
     popoverPinned = false;
     var pop = getPopover();
     if (pop) pop.style.display = 'none';
-    popoverAnchor = null;
   }
 
   function attachProfileHints(chipEl, userId) {
     var longPressTimer = null;
     var longPressTriggered = false;
-
     chipEl.addEventListener('mouseenter', function() {
       if (chipEl.dataset.editing === '1') return;
       clearTimeout(hoverTimer);
@@ -237,12 +473,10 @@ function _assignBoardJs() {
         if (!popoverPinned) showUserPopover(userId, chipEl, false);
       }, 350);
     });
-
     chipEl.addEventListener('mouseleave', function() {
       clearTimeout(hoverTimer);
       if (!popoverPinned) hideUserPopover();
     });
-
     chipEl.addEventListener('pointerdown', function(e) {
       if (e.target.closest && e.target.closest('.assign-chip-del')) return;
       if (chipEl.dataset.editing === '1') return;
@@ -253,24 +487,10 @@ function _assignBoardJs() {
         showUserPopover(userId, chipEl, true);
       }, 500);
     });
-
-    chipEl.addEventListener('pointerup', function() {
-      clearTimeout(longPressTimer);
-    });
-
-    chipEl.addEventListener('pointercancel', function() {
-      clearTimeout(longPressTimer);
-    });
-
-    chipEl.addEventListener('pointerleave', function() {
-      clearTimeout(longPressTimer);
-    });
-
+    chipEl.addEventListener('pointerup', function() { clearTimeout(longPressTimer); });
+    chipEl.addEventListener('pointercancel', function() { clearTimeout(longPressTimer); });
     chipEl.addEventListener('click', function(e) {
-      if (longPressTriggered) {
-        e.stopPropagation();
-        e.preventDefault();
-      }
+      if (longPressTriggered) { e.stopPropagation(); e.preventDefault(); }
     }, true);
   }
 
@@ -280,35 +500,104 @@ function _assignBoardJs() {
     hideUserPopoverForce();
   });
 
-  function setStatus(msg, color) {
-    status.textContent = msg;
-    status.style.color = color || 'var(--muted)';
+  function makePoolChip(userId, count) {
+    var u = data.userMap[userId] || { name: userId, role: 'trainee' };
+    var div = document.createElement('div');
+    div.className = 'assign-chip assign-chip-pool';
+    div.draggable = true;
+    div.dataset.userId = userId;
+    div.dataset.assignId = '';
+    div.dataset.exId = '';
+    div.dataset.resp = '';
+    div.style.cssText = [
+      'display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px',
+      'background:var(--bg3);border:1px solid var(--border);border-radius:4px',
+      'cursor:grab;font-family:var(--mono);font-size:12px;color:var(--text1)',
+      'user-select:none'
+    ].join(';');
+
+    var dot = document.createElement('span');
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (ROLE_COLORS[u.role] || '#888');
+
+    var txt = document.createElement('span');
+    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    txt.textContent = u.name;
+
+    var badge = document.createElement('span');
+    badge.className = 'assign-count-badge';
+    badge.textContent = count + ' תרגילים';
+    badge.title = 'מספר שיבוצים נוכחי';
+
+    div.appendChild(dot);
+    div.appendChild(txt);
+    div.appendChild(badge);
+
+    div.addEventListener('dragstart', function(e) {
+      e.dataTransfer.setData('text/plain', JSON.stringify({
+        userId: userId, assignId: '', fromExId: '', resp: ''
+      }));
+      div.style.opacity = '0.4';
+    });
+    div.addEventListener('dragend', function() { div.style.opacity = '1'; });
+    attachProfileHints(div, userId);
+    return div;
   }
 
-  var editingChip = null;
+  function makeChip(userId, assignId, resp, exId) {
+    var u = data.userMap[userId] || { name: userId, role: 'trainee' };
+    var div = document.createElement('div');
+    div.className = 'assign-chip';
+    div.draggable = true;
+    div.dataset.userId = userId;
+    div.dataset.assignId = assignId || '';
+    div.dataset.exId = exId || '';
+    div.dataset.resp = resp || '';
+    div.style.cssText = [
+      'display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px',
+      'background:var(--bg3);border:1px solid var(--border);border-radius:4px',
+      'cursor:grab;font-family:var(--mono);font-size:12px;color:var(--text1)',
+      'user-select:none'
+    ].join(';');
 
-  function saveAssignmentResp(assignId, exId, newResp) {
-    if (!newResp) { alert('יש לציין תפקיד'); return; }
-    setStatus('⏳ מעדכן תפקיד...', '#fbbf24');
-    showPageLoader('// UPDATING ROLE...');
-    google.script.run
-      .withSuccessHandler(function() {
-        hidePageLoader();
-        var list = data.exMap[exId];
-        if (list) {
-          list.forEach(function(a) {
-            if (a.id === assignId) a.resp = newResp;
-          });
-        }
-        editingChip = null;
-        render();
-        setStatus('✓ תפקיד עודכן', '#4ade80');
-      })
-      .withFailureHandler(function(err) {
-        hidePageLoader();
-        setStatus('✗ ' + err.message, '#f87171');
-      })
-      .updateAssignmentRespFromBoard(sid, assignId, exId, newResp);
+    var dot = document.createElement('span');
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (ROLE_COLORS[u.role] || '#888');
+
+    var txt = document.createElement('span');
+    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    txt.textContent = u.name + (resp ? ' · ' + resp : '');
+
+    if (assignId && exId && exId !== '__pool__') {
+      txt.style.cursor = 'pointer';
+      txt.title = 'לחץ לשינוי תפקיד';
+      txt.onclick = function(e) {
+        e.stopPropagation();
+        openRespEditor(div, assignId, exId, userId, resp, u.name);
+      };
+    }
+
+    var del = document.createElement('span');
+    del.className = 'assign-chip-del';
+    del.textContent = '✕';
+    del.title = 'הסר מתרגיל';
+    del.style.cssText = 'color:var(--muted);cursor:pointer;padding:0 2px;flex-shrink:0';
+    del.onclick = function(e) {
+      e.stopPropagation();
+      if (assignId) stageRemove(assignId, exId);
+    };
+
+    div.appendChild(dot);
+    div.appendChild(txt);
+    if (assignId) div.appendChild(del);
+
+    div.addEventListener('dragstart', function(e) {
+      e.dataTransfer.setData('text/plain', JSON.stringify({
+        userId: userId, assignId: assignId || '', fromExId: exId || '', resp: resp || ''
+      }));
+      div.style.opacity = '0.4';
+    });
+    div.addEventListener('dragend', function() { div.style.opacity = '1'; });
+    attachProfileHints(div, userId);
+    return div;
   }
 
   function openRespEditor(chipEl, assignId, exId, userId, currentResp, userName) {
@@ -321,7 +610,6 @@ function _assignBoardJs() {
 
     var wrap = document.createElement('div');
     wrap.className = 'assign-resp-edit';
-    wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%';
     wrap.onclick = function(e) { e.stopPropagation(); };
 
     var lbl = document.createElement('div');
@@ -339,13 +627,13 @@ function _assignBoardJs() {
     var btns = document.createElement('div');
     btns.style.cssText = 'display:flex;gap:4px';
 
-    var saveBtn = document.createElement('button');
-    saveBtn.type = 'button';
-    saveBtn.className = 'btn btn-primary btn-sm';
-    saveBtn.textContent = 'שמור';
-    saveBtn.onclick = function(e) {
+    var okBtn = document.createElement('button');
+    okBtn.type = 'button';
+    okBtn.className = 'btn btn-primary btn-sm';
+    okBtn.textContent = 'אישור';
+    okBtn.onclick = function(e) {
       e.stopPropagation();
-      saveAssignmentResp(assignId, exId, inp.value.trim());
+      stageResp(assignId, exId, inp.value.trim());
     };
 
     var cancelBtn = document.createElement('button');
@@ -359,17 +647,15 @@ function _assignBoardJs() {
     };
 
     inp.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); saveBtn.click(); }
+      if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); }
       if (e.key === 'Escape') { e.preventDefault(); cancelBtn.click(); }
     });
 
-    btns.appendChild(saveBtn);
+    btns.appendChild(okBtn);
     btns.appendChild(cancelBtn);
     wrap.appendChild(lbl);
     wrap.appendChild(inp);
     wrap.appendChild(btns);
-
-    chipEl._respEditBackup = chipEl.innerHTML;
     chipEl.innerHTML = '';
     chipEl.appendChild(wrap);
     inp.focus();
@@ -383,47 +669,85 @@ function _assignBoardJs() {
     if (editingChip === chipEl) editingChip = null;
   }
 
-  function countAssignments(userId) {
-    var n = 0;
-    for (var exId in data.exMap) {
-      if (!data.exMap.hasOwnProperty(exId)) continue;
-      (data.exMap[exId] || []).forEach(function(a) {
-        if (a.userId === userId) n++;
-      });
+  function makeColumn(exId, title, subtitle, chips, opts) {
+    opts = opts || {};
+    var col = document.createElement('div');
+    col.dataset.exId = exId;
+    col.className = 'assign-col' + (opts.priority ? ' assign-col-priority' : '');
+    col.style.cssText = [
+      'min-width:200px;max-width:220px;flex-shrink:0',
+      'background:var(--bg2);border:1px solid var(--border);border-radius:6px',
+      'display:flex;flex-direction:column'
+    ].join(';');
+    if (opts.priority) {
+      col.style.borderColor = 'var(--amber, #fbbf24)';
+      col.style.boxShadow = '0 0 0 1px rgba(251,191,36,.15)';
     }
-    return n;
+
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'padding:10px 12px;border-bottom:1px solid var(--border)';
+    var h3 = document.createElement('div');
+    h3.style.cssText = 'font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text1);margin-bottom:2px;word-break:break-word';
+    h3.textContent = title;
+    var sub = document.createElement('div');
+    sub.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted)';
+    sub.textContent = subtitle || '';
+    hdr.appendChild(h3);
+    if (subtitle) hdr.appendChild(sub);
+    col.appendChild(hdr);
+
+    var zone = document.createElement('div');
+    zone.style.cssText = 'padding:8px;flex:1;min-height:60px';
+    zone.dataset.exId = exId;
+    chips.forEach(function(c) { zone.appendChild(c); });
+
+    zone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      zone.style.background = 'rgba(74,222,128,0.07)';
+    });
+    zone.addEventListener('dragleave', function() { zone.style.background = ''; });
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      zone.style.background = '';
+      var payload;
+      try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (err) { return; }
+      var toExId = exId;
+      var fromExId = payload.fromExId;
+      if (toExId === fromExId) return;
+      if (toExId === '__pool__') {
+        if (payload.assignId && fromExId) stageRemove(payload.assignId, fromExId);
+        return;
+      }
+      if (payload.assignId && fromExId) {
+        stageMove(payload.assignId, toExId, payload.userId, payload.resp, fromExId);
+      } else {
+        stageAdd(toExId, payload.userId, payload.resp || '');
+      }
+    });
+
+    col.appendChild(zone);
+    return col;
   }
 
   function renderLeastAssigned() {
     if (!leastPanel) return;
     leastPanel.innerHTML = '';
-
     (data.corpsList || []).forEach(function(c) {
       var candidates = [];
-      for (var uid in data.userMap) {
-        if (!data.userMap.hasOwnProperty(uid)) continue;
+      Object.keys(data.userMap).forEach(function(uid) {
         var u = data.userMap[uid];
-        if (u.role !== 'trainee') continue;
-        if ((u.corps || '') !== c.key) continue;
+        if (!u || u.role !== 'trainee' || (u.corps || '') !== c.key) return;
         candidates.push({ id: uid, name: u.name, count: countAssignments(uid) });
-      }
-
+      });
       candidates.sort(function(a, b) {
         if (a.count !== b.count) return a.count - b.count;
         return a.name.localeCompare(b.name, 'he');
       });
-
       var card = document.createElement('div');
-      card.style.cssText = [
-        'min-width:150px;flex:1;max-width:200px',
-        'background:var(--bg2);border:1px solid var(--border);border-radius:6px',
-        'padding:10px 12px'
-      ].join(';');
-
+      card.style.cssText = 'min-width:150px;flex:1;max-width:200px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px';
       var lbl = document.createElement('div');
       lbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px';
       lbl.textContent = c.label;
-
       var body = document.createElement('div');
       if (!candidates.length) {
         body.style.cssText = 'font-size:12px;color:var(--muted)';
@@ -431,366 +755,108 @@ function _assignBoardJs() {
       } else {
         var pick = candidates[0];
         body.style.cssText = 'font-family:var(--mono);font-size:12px;color:var(--text1)';
-        var nameEl = document.createElement('b');
-        nameEl.textContent = pick.name;
-        body.appendChild(nameEl);
-        body.appendChild(document.createElement('br'));
-        var sub = document.createElement('span');
-        sub.style.cssText = 'font-size:10px;color:var(--muted)';
-        sub.textContent = pick.id + ' · ' + pick.count + ' תרגילים';
-        body.appendChild(sub);
+        body.innerHTML = '<b>' + escHtml(pick.name) + '</b><br><span style="font-size:10px;color:var(--muted)">' +
+          escHtml(pick.id) + ' · ' + pick.count + ' תרגילים</span>';
       }
-
       card.appendChild(lbl);
       card.appendChild(body);
       leastPanel.appendChild(card);
     });
   }
 
-  // ── Build a draggable chip ──
-  function makeChip(userId, assignId, resp, exId) {
-    var u    = data.userMap[userId] || { name: userId, role: 'trainee' };
-    var div  = document.createElement('div');
-    div.className   = 'assign-chip';
-    div.draggable   = true;
-    div.dataset.userId   = userId;
-    div.dataset.assignId = assignId || '';
-    div.dataset.exId     = exId     || '';
-    div.dataset.resp     = resp     || '';
-    div.style.cssText = [
-      'display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px',
-      'background:var(--bg3);border:1px solid var(--border);border-radius:4px',
-      'cursor:grab;font-family:var(--mono);font-size:12px;color:var(--text1)',
-      'user-select:none;transition:opacity .15s'
-    ].join(';');
-
-    var dot = document.createElement('span');
-    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (ROLE_COLORS[u.role] || '#888');
-
-    var txt = document.createElement('span');
-    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-    txt.textContent = u.name + (resp ? ' · ' + resp : '');
-
-    if (assignId && exId && exId !== '__unassigned__') {
-      txt.style.cursor = 'pointer';
-      txt.title = 'לחץ לשינוי תפקיד';
-      txt.onclick = function(e) {
-        e.stopPropagation();
-        openRespEditor(div, assignId, exId, userId, resp, u.name);
-      };
-    }
-
-    var del = document.createElement('span');
-    del.className = 'assign-chip-del';
-    del.textContent = '✕';
-    del.title = 'הסר מתרגיל';
-    del.style.cssText = 'color:var(--muted);cursor:pointer;padding:0 2px;flex-shrink:0';
-    del.onclick = function(e) {
-      e.stopPropagation();
-      if (assignId) removeAssignment(assignId, div, exId);
-    };
-
-    div.appendChild(dot);
-    div.appendChild(txt);
-    if (assignId) div.appendChild(del);
-
-    // Drag events
-    div.addEventListener('dragstart', function(e) {
-      e.dataTransfer.setData('text/plain', JSON.stringify({
-        userId: userId, assignId: assignId || '', fromExId: exId || '', resp: resp || ''
-      }));
-      div.style.opacity = '0.4';
-    });
-
-    div.addEventListener('dragend', function() {
-      div.style.opacity = '1';
-    });
-
-    attachProfileHints(div, userId);
-
-    return div;
-  }
-
-  // ── Build a column (exercise or unassigned) ──
-  function makeColumn(exId, title, subtitle, chips) {
-    var col = document.createElement('div');
-    col.dataset.exId = exId;
-    col.style.cssText = [
-      'min-width:200px;max-width:220px;flex-shrink:0',
-      'background:var(--bg2);border:1px solid var(--border);border-radius:6px',
-      'display:flex;flex-direction:column'
-    ].join(';');
-
-    // Header
-    var hdr = document.createElement('div');
-    hdr.style.cssText = 'padding:10px 12px;border-bottom:1px solid var(--border)';
-
-    var h3 = document.createElement('div');
-    h3.style.cssText = 'font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text1);margin-bottom:2px;word-break:break-word';
-    h3.textContent = title;
-
-    var sub = document.createElement('div');
-    sub.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted)';
-    sub.textContent = subtitle || '';
-
-    hdr.appendChild(h3);
-    if (subtitle) hdr.appendChild(sub);
-
-    col.appendChild(hdr);
-
-    // Drop zone
-    var zone = document.createElement('div');
-    zone.style.cssText = 'padding:8px;flex:1;min-height:60px';
-    zone.dataset.exId = exId;
-
-    chips.forEach(function(c) {
-      zone.appendChild(c);
-    });
-
-    // Drag-over highlight
-    zone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      zone.style.background = 'rgba(74,222,128,0.07)';
-    });
-
-    zone.addEventListener('dragleave', function() {
-      zone.style.background = '';
-    });
-
-    zone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      zone.style.background = '';
-
-      var payload;
-
-      try {
-        payload = JSON.parse(e.dataTransfer.getData('text/plain'));
-      } catch(err) {
-        return;
-      }
-
-      var toExId = exId;
-      var fromExId = payload.fromExId;
-
-      if (toExId === fromExId) return;
-
-      if (toExId === '__unassigned__') {
-        // Remove assignment
-        if (payload.assignId) {
-          removeAssignment(payload.assignId, null, fromExId);
-        }
-      } else {
-        // Move or add
-        if (payload.assignId && fromExId) {
-          moveAssignment(payload.assignId, toExId, payload.userId, payload.resp, zone, fromExId);
-        } else {
-          addAssignment(toExId, payload.userId, payload.resp || '', zone);
-        }
-      }
-    });
-
-    col.appendChild(zone);
-
-    return col;
-  }
-
-  // ── Render board ──
-  function rebuildUnassigned() {
-    var assignedIds = {};
-    Object.keys(data.exMap).forEach(function(exId) {
-      (data.exMap[exId] || []).forEach(function(a) {
-        var uid = String(a.userId || '').trim();
-        if (uid) assignedIds[uid] = true;
-      });
-    });
-    var list = [];
-    Object.keys(data.userMap).forEach(function(uid) {
-      if (assignedIds[uid]) return;
-      var u = data.userMap[uid];
-      if (!u) return;
-      list.push({ id: uid, name: u.name, role: u.role });
-    });
-    list.sort(function(a, b) {
-      return String(a.name || '').localeCompare(String(b.name || ''), 'he');
-    });
-    data.unassigned = list;
-  }
-
   function render() {
-    rebuildUnassigned();
     hideUserPopoverForce();
-    board.innerHTML = '';
+    if (board) board.innerHTML = '';
+    if (needsBoard) needsBoard.innerHTML = '';
 
-    // Unassigned column
-    var unassignedChips = data.unassigned.map(function(u) {
-      return makeChip(u.id, '', '', '');
-    });
-
-    board.appendChild(
-      makeColumn(
-        '__unassigned__',
-        '👤 לא משובצים',
-        data.unassigned.length + ' חיילים',
-        unassignedChips
-      )
-    );
-
-    // Exercise columns
+    var emptyExercises = [];
+    var filledExercises = [];
     data.exercises.forEach(function(ex) {
-      var parts = data.exMap[ex.id] || [];
-
-      var chips = parts.map(function(a) {
-        return makeChip(a.userId, a.id, a.resp, ex.id);
-      });
-
-      var subtitle = [ex.start, ex.end].filter(Boolean).join(' — ') || '';
-
-      board.appendChild(
-        makeColumn(ex.id, ex.title, subtitle, chips)
-      );
+      if (exAssigneeCount(ex.id) === 0) emptyExercises.push(ex);
+      else filledExercises.push(ex);
     });
 
-    var leastRendered = false;
-    function ensureLeastRendered() {
-      if (leastRendered) return;
-      leastRendered = true;
-      renderLeastAssigned();
+    if (needsWrap) {
+      needsWrap.style.display = emptyExercises.length ? '' : 'none';
     }
-    window.MapimAssignEnsureLeast = ensureLeastRendered;
+
+    emptyExercises.forEach(function(ex) {
+      var subtitle = [ex.start, ex.end].filter(Boolean).join(' — ') || 'ללא משתתפים';
+      var col = makeColumn(ex.id, ex.title, subtitle, [], { priority: true });
+      if (needsBoard) needsBoard.appendChild(col);
+    });
+
+    var pool = getTraineePool();
+    var poolChips = pool.map(function(t) {
+      return makePoolChip(t.id, t.count);
+    });
+    if (board) {
+      board.appendChild(makeColumn('__pool__', '👤 חניכים לשיבוץ', pool.length + ' חניכים · פחות שיבוצים למעלה', poolChips));
+
+      filledExercises.forEach(function(ex) {
+        var parts = data.exMap[ex.id] || [];
+        var chips = parts.map(function(a) {
+          return makeChip(a.userId, a.id, a.resp, ex.id);
+        });
+        var subtitle = [ex.start, ex.end].filter(Boolean).join(' — ') || '';
+        subtitle += (subtitle ? ' · ' : '') + parts.length + ' משתתפים';
+        board.appendChild(makeColumn(ex.id, ex.title, subtitle, chips));
+      });
+    }
+
+    renderChangesBar();
+    renderLeastAssigned();
   }
 
-  // ── API calls via google.script.run ──
+  function showPageLoader(msg) {
+    if (window.MapimSpaShowLoader) window.MapimSpaShowLoader(msg || '// SAVING...');
+  }
   function hidePageLoader() {
     if (window.MapimSpaHideLoader) window.MapimSpaHideLoader();
   }
-  function showPageLoader(msg) {
-    if (window.MapimSpaShowLoader) window.MapimSpaShowLoader(msg || '// ASSIGNING...');
-  }
 
-  function homeBlockMsg(userId, exId) {
-    var key = userId + '\\x1f' + exId;
-    if (data.homeBlocked && data.homeBlocked[key]) {
-      return 'אילוץ בית מאושר (' + data.homeBlocked[key] + ')';
-    }
-    return '';
-  }
+  function saveChanges() {
+    var changes = computePendingChanges();
+    if (!changes.length) return;
+    var summary = changes.map(function(ch, i) { return (i + 1) + '. ' + changeLabel(ch); }).join('\\n');
+    if (!confirm('לאשר ' + changes.length + ' שינויים?\\n\\n' + summary)) return;
 
-  function addAssignment(exId, userId, resp, zone) {
-    var block = homeBlockMsg(userId, exId);
-    if (block) {
-      setStatus('✗ לא ניתן לשבץ: ' + block, '#f87171');
-      return;
-    }
-    setStatus('⏳ משבץ...', '#fbbf24');
-    showPageLoader('// ASSIGNING...');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ שומר...'; }
+    setStatus('⏳ שומר שינויים...', '#fbbf24');
+    showPageLoader('// SAVING ASSIGNMENTS...');
 
     google.script.run
-      .withSuccessHandler(function(result) {
+      .withSuccessHandler(function(res) {
         hidePageLoader();
-        if (result && result.id) {
-          if (!data.exMap[exId]) data.exMap[exId] = [];
-
-          data.exMap[exId].push({
-            id: result.id,
-            userId: userId,
-            resp: resp,
-            status: 'pending'
-          });
-
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 שמירה ואישור'; }
+        var n = (res && res.applied) || changes.length;
+        if (window.MapimSpa && MapimSpa.navigate) {
+          MapimSpa.navigate('assign', { info: 'נשמרו ' + n + ' שינויים בהצלחה' });
+        } else {
+          setStatus('✓ נשמרו ' + n + ' שינויים', '#4ade80');
+          baseline.exMap = cloneExMap(data.exMap);
           render();
-
-          if (result.warnings && result.warnings.length) {
-            setStatus('⚠ שובץ — ' + result.warnings[0].message, '#fbbf24');
-          } else {
-            setStatus('✓ שובץ בהצלחה', '#4ade80');
-          }
         }
       })
       .withFailureHandler(function(err) {
         hidePageLoader();
-        setStatus('✗ ' + err.message, '#f87171');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 שמירה ואישור'; }
+        setStatus('✗ ' + (err.message || String(err)), '#f87171');
+        alert(err.message || String(err));
       })
-      .assignFromBoard(sid, exId, userId, resp);
+      .applyBoardChanges(sid, JSON.stringify(changes));
   }
 
-  function removeAssignment(assignId, chip, fromExId) {
-    setStatus('⏳ מסיר...', '#fbbf24');
-    showPageLoader('// REMOVING...');
-
-    google.script.run
-      .withSuccessHandler(function() {
-        hidePageLoader();
-        var userId = '';
-
-        if (data.exMap[fromExId]) {
-          var a = data.exMap[fromExId].find(function(x) {
-            return x.id === assignId;
-          });
-
-          if (a) userId = a.userId;
-
-          data.exMap[fromExId] = data.exMap[fromExId].filter(function(x) {
-            return x.id !== assignId;
-          });
-        }
-
-        render();
-
-        setStatus('✓ הוסר בהצלחה', '#4ade80');
-      })
-      .withFailureHandler(function(err) {
-        hidePageLoader();
-        setStatus('✗ ' + err.message, '#f87171');
-      })
-      .removeAssignmentById(sid, assignId);
-  }
-
-  function moveAssignment(assignId, toExId, userId, resp, zone, fromExId) {
-    var block = homeBlockMsg(userId, toExId);
-    if (block) {
-      setStatus('✗ לא ניתן להעביר: ' + block, '#f87171');
-      return;
-    }
-    setStatus('⏳ מעביר...', '#fbbf24');
-    showPageLoader('// MOVING...');
-
-    google.script.run
-      .withSuccessHandler(function() {
-        hidePageLoader();
-        if (data.exMap[fromExId]) {
-          var a = data.exMap[fromExId].find(function(x) {
-            return x.id === assignId;
-          });
-
-          if (a) {
-            data.exMap[fromExId] = data.exMap[fromExId].filter(function(x) {
-              return x.id !== assignId;
-            });
-
-            if (!data.exMap[toExId]) data.exMap[toExId] = [];
-
-            data.exMap[toExId].push({
-              id: assignId,
-              userId: userId,
-              resp: resp,
-              status: a.status
-            });
-          }
-        }
-
-        render();
-
-        setStatus('✓ הועבר בהצלחה', '#4ade80');
-      })
-      .withFailureHandler(function(err) {
-        hidePageLoader();
-        setStatus('✗ ' + err.message, '#f87171');
-      })
-      .moveAssignmentById(sid, assignId, toExId);
+  if (saveBtn) saveBtn.addEventListener('click', saveChanges);
+  if (discardBtn) {
+    discardBtn.addEventListener('click', function() {
+      if (!computePendingChanges().length) return;
+      if (!confirm('לבטל את כל השינויים שלא נשמרו?')) return;
+      resetWorking();
+    });
   }
 
   render();
-  if (document.getElementById('assignLeastPanel')) ensureLeastRendered();
 })();
 `;
 }

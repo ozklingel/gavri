@@ -780,6 +780,47 @@ function updateAssignmentRespFromBoard(sid, assignId, exerciseId, responsibility
   return { ok: true, responsibility: resp };
 }
 
+// Apply staged board changes (batch save from assignment UI)
+function applyBoardChanges(sid, changesJson) {
+  var p = { sid: sid };
+  Auth_requireRole(p, ['admin']);
+  var changes = [];
+  try {
+    changes = JSON.parse(changesJson || '[]');
+  } catch (e) {
+    throw new Error('נתוני שינויים לא תקינים.');
+  }
+  if (!changes.length) return { ok: true, applied: 0 };
+
+  var applied = 0;
+  var errors = [];
+
+  changes.forEach(function(ch, idx) {
+    try {
+      if (ch.type === 'add') {
+        assignFromBoard(sid, ch.exId, ch.userId, ch.resp || '');
+        applied++;
+      } else if (ch.type === 'remove') {
+        removeAssignmentById(sid, ch.assignId);
+        applied++;
+      } else if (ch.type === 'move') {
+        moveAssignmentById(sid, ch.assignId, ch.toExId);
+        applied++;
+      } else if (ch.type === 'resp') {
+        updateAssignmentRespFromBoard(sid, ch.assignId, ch.exId, ch.resp);
+        applied++;
+      }
+    } catch (err) {
+      errors.push((idx + 1) + '. ' + (err.message || String(err)));
+    }
+  });
+
+  if (errors.length) {
+    throw new Error('חלק מהשינויים נכשלו:\n' + errors.join('\n'));
+  }
+  return { ok: true, applied: applied };
+}
+
 function _assignmentMatrixCellPayload(assignment) {
   const u = Users_get(assignment.user_id);
   return {

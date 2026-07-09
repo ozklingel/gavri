@@ -517,6 +517,89 @@ body {
       color: var(--green2);
     }
 
+    /* ── ASSIGNMENT BOARD ── */
+    .page-assign .assign-changes-bar {
+      margin-bottom: 14px;
+      padding: 12px 14px;
+      background: rgba(251, 191, 36, 0.08);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      border-radius: var(--radius);
+    }
+    .page-assign .assign-changes-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .page-assign .assign-changes-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--amber, #fbbf24);
+    }
+    .page-assign .assign-changes-count {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .page-assign .assign-changes-list {
+      list-style: none;
+      margin: 0 0 12px;
+      padding: 0;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .page-assign .assign-change-item {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 4px;
+      border-right: 3px solid var(--border2);
+    }
+    .page-assign .assign-change-add { border-right-color: var(--green2); }
+    .page-assign .assign-change-remove { border-right-color: var(--danger, #f87171); }
+    .page-assign .assign-change-move { border-right-color: var(--blue, #60a5fa); }
+    .page-assign .assign-change-resp { border-right-color: var(--amber, #fbbf24); }
+    .page-assign .assign-changes-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .page-assign .assign-section-wrap {
+      margin-bottom: 16px;
+    }
+    .page-assign .assign-section-label {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text2, #86efac);
+      margin-bottom: 8px;
+    }
+    .page-assign .assign-priority-board,
+    .page-assign .assign-main-board {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      align-items: flex-start;
+      padding-bottom: 8px;
+    }
+    .page-assign .assign-count-badge {
+      font-size: 9px;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.35);
+      padding: 2px 5px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .page-assign .assign-chip-pool {
+      border-style: dashed;
+    }
+
     /* ── GRID LAYOUTS ── */
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
