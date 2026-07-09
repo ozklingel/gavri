@@ -94,7 +94,7 @@ function SpaModule_render(moduleId, p) {
 }
 
 function _dashboardTabSearchModule(user, p) {
-  const searchUserId = String((p && p.searchUserId) || '').trim();
+  const searchUserId = _dashboardResolveSearchUserId(p, user, 'search');
   if (searchUserId) {
     return _dashboardUserExerciseResults(user, searchUserId);
   }

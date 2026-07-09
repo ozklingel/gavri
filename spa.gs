@@ -81,9 +81,10 @@ function _cacheWarmForPage(page, p) {
 
   if (pg === 'dashboard') {
     const tab = String((p && p.tab) || 'search').trim();
-    const searchUserId = String((p && p.searchUserId) || '').trim();
-    if (tab === 'team' || tab === 'exercise' || tab === 'conflicts' || searchUserId) {
+    if (tab === 'team' || tab === 'exercise' || tab === 'conflicts') {
       _cacheWarmAllIfNeeded();
+    } else if (tab === 'search') {
+      _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments']);
     } else {
       _cacheWarmSheetsIfNeeded(DB_BOOT_SHEETS);
     }

@@ -573,6 +573,15 @@ function _isoWeekLabel(dateStr) {
 
 // ─────────── DASHBOARD ───────────
 
+function _dashboardResolveSearchUserId(p, user, tab) {
+  const explicit = String((p && p.searchUserId) || '').trim();
+  if (explicit) return explicit;
+  if (String(tab || 'search').trim() === 'search' && user && user.id) {
+    return String(user.id).trim();
+  }
+  return '';
+}
+
 function _dashboardTabItems(user) {
   const items = [{ id: 'search', label: '🔍 חיפוש' }];
   if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
@@ -602,7 +611,7 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
   if (tab === 'conflicts') {
     return _dashboardConflictsTabHtml(sid);
   }
-  const searchUserId = String((p && p.searchUserId) || '').trim();
+  const searchUserId = _dashboardResolveSearchUserId(p, user, tab);
   let s = _dashboardUserSearchBar(searchUserId);
   if (searchUserId) {
     s += _dashboardUserExerciseResults(user, searchUserId);
@@ -614,9 +623,11 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
 }
 
 function _dashboardTabsShell(user, sid, activeTab, p) {
-  const searchUserId = String((p && p.searchUserId) || '').trim();
   const baseParams = {};
-  if (searchUserId) baseParams.searchUserId = searchUserId;
+  if (activeTab === 'search') {
+    const searchUserId = _dashboardResolveSearchUserId(p, user, 'search');
+    if (searchUserId) baseParams.searchUserId = searchUserId;
+  }
   const items = _dashboardTabItems(user);
   let s = _spaTabsBar('dashboard', baseParams, items, activeTab);
   s += '<div class="dashboard-shell">';
