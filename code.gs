@@ -8,7 +8,6 @@ function SS() {
 }
 
 function doGet(e) {
-  _cacheFlush();
   return _htmlShell();
 }
 
@@ -25,38 +24,138 @@ function _sheet(name) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  PERF: Request-scoped in-memory cache
-//  All _rows() calls are memoized for the duration of a single doGet/doPost
-//  execution. This eliminates repeated Spreadsheet API round-trips.
+//  PERF: Script cache + request-scoped cache for sheet data
 // ─────────────────────────────────────────────────────────────────────────────
 var _rowsCache = {};
+
+var DB_SHEET_NAMES = [
+  'Users', 'Credentials', 'Teams', 'Exercises', 'ExerciseDetails',
+  'Assignments', 'FieldForces', 'FireZones', 'HomeConstraints', 'TimelineBlocks'
+];
+var DB_CACHE_TTL_SEC = 600;
+var DB_CACHE_PREFIX = 'mdb:';
+var DB_CACHE_CHUNK = 90000;
+
+function _dbCacheKey(name, part) {
+  return DB_CACHE_PREFIX + name + (part == null ? '' : ':' + part);
+}
+
+function _readSheetFromSpreadsheet(name) {
+  const sh = _sheet(name);
+  const last = sh.getLastRow();
+  if (last < 2) {
+    return {
+      header: sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0],
+      data: []
+    };
+  }
+  const values = sh.getDataRange().getValues();
+  return { header: values[0], data: values.slice(1) };
+}
+
+function _getScriptCacheRows(name) {
+  const cache = CacheService.getScriptCache();
+  const direct = cache.get(_dbCacheKey(name));
+  if (direct) {
+    try { return JSON.parse(direct); } catch (e1) { return null; }
+  }
+  const partsStr = cache.get(_dbCacheKey(name, 'parts'));
+  if (!partsStr) return null;
+  const parts = parseInt(partsStr, 10);
+  if (!parts || parts < 1) return null;
+  let json = '';
+  for (let i = 0; i < parts; i++) {
+    const chunk = cache.get(_dbCacheKey(name, 'c' + i));
+    if (chunk == null) return null;
+    json += chunk;
+  }
+  try { return JSON.parse(json); } catch (e2) { return null; }
+}
+
+function _putScriptCacheRows(name, result) {
+  const cache = CacheService.getScriptCache();
+  const json = JSON.stringify(result);
+  if (json.length <= DB_CACHE_CHUNK) {
+    cache.put(_dbCacheKey(name), json, DB_CACHE_TTL_SEC);
+    cache.remove(_dbCacheKey(name, 'parts'));
+    for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
+    return;
+  }
+  const parts = Math.ceil(json.length / DB_CACHE_CHUNK);
+  cache.put(_dbCacheKey(name, 'parts'), String(parts), DB_CACHE_TTL_SEC);
+  cache.remove(_dbCacheKey(name));
+  for (let i = 0; i < parts; i++) {
+    cache.put(
+      _dbCacheKey(name, 'c' + i),
+      json.substring(i * DB_CACHE_CHUNK, (i + 1) * DB_CACHE_CHUNK),
+      DB_CACHE_TTL_SEC
+    );
+  }
+}
+
+function _scriptCacheHas(name) {
+  const cache = CacheService.getScriptCache();
+  return !!(cache.get(_dbCacheKey(name)) || cache.get(_dbCacheKey(name, 'parts')));
+}
+
+function _cacheWarmSheet(name) {
+  let result = _getScriptCacheRows(name);
+  if (!result) {
+    result = _readSheetFromSpreadsheet(name);
+    _putScriptCacheRows(name, result);
+  }
+  _rowsCache[name] = result;
+  return result;
+}
+
+function _cacheWarmAllIfNeeded() {
+  DB_SHEET_NAMES.forEach(function(name) {
+    if (_rowsCache[name]) return;
+    if (_scriptCacheHas(name)) {
+      _rowsCache[name] = _getScriptCacheRows(name);
+      return;
+    }
+    _cacheWarmSheet(name);
+  });
+}
+
+function _cacheWarmAll(force) {
+  if (force) {
+    DB_SHEET_NAMES.forEach(function(name) { _cacheInvalidate(name); });
+  }
+  DB_SHEET_NAMES.forEach(function(name) { _cacheWarmSheet(name); });
+  return { ok: true, sheets: DB_SHEET_NAMES.length };
+}
+
+function apiWarmCache(sid) {
+  if (sid) {
+    try { Auth_current({ sid: sid }); } catch (e) { /* warm גם לפני התחברות */ }
+  }
+  return _cacheWarmAll(false);
+}
 
 function _cacheFlush() {
   _rowsCache = {};
 }
 
 function _rows(name) {
-  if (_rowsCache[name]) return _rowsCache[name];          // ← cache hit
+  if (_rowsCache[name]) return _rowsCache[name];
 
-  const sh = _sheet(name);
-  const last = sh.getLastRow();
-  let result;
-  if (last < 2) {
-    result = {
-      header: sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0],
-      data: []
-    };
-  } else {
-    const values = sh.getDataRange().getValues();
-    result = { header: values[0], data: values.slice(1) };
+  let result = _getScriptCacheRows(name);
+  if (!result) {
+    result = _readSheetFromSpreadsheet(name);
+    _putScriptCacheRows(name, result);
   }
-  _rowsCache[name] = result;                              // ← store in cache
+  _rowsCache[name] = result;
   return result;
 }
 
-// Invalidate a single sheet from the cache (call after any write to that sheet)
 function _cacheInvalidate(name) {
   delete _rowsCache[name];
+  const cache = CacheService.getScriptCache();
+  cache.remove(_dbCacheKey(name));
+  cache.remove(_dbCacheKey(name, 'parts'));
+  for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
 }
 
 function _append(name, row) {

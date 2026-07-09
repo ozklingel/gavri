@@ -149,6 +149,7 @@ function _authUserEmail(user) {
 }
 
 function _authCompleteLogin(user) {
+  _cacheWarmAllIfNeeded();
   const page = Views_dashboard({ sid: user.id });
   page.sid = user.id;
   return page;

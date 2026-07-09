@@ -1,7 +1,7 @@
 // spa_modules.gs — lazy HTML fragments (legacy module slots on GAS)
 
 function apiLoadModule(sid, moduleId, paramsJson) {
-  _cacheFlush();
+  _cacheWarmAllIfNeeded();
   const p = _spaMergeParams(sid, paramsJson);
   try {
     const html = SpaModule_render(String(moduleId || '').trim(), p);

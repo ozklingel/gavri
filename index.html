@@ -2189,7 +2189,17 @@ body {
 
     function boot() {
       var sid = getSid();
-      navigate(sid ? 'dashboard' : 'login', {});
+      if (typeof MapimLoader !== 'undefined' && MapimLoader.showSplashStatus) {
+        MapimLoader.showSplashStatus('טוען נתונים...');
+      }
+      google.script.run
+        .withSuccessHandler(function() {
+          navigate(sid ? 'dashboard' : 'login', {});
+        })
+        .withFailureHandler(function() {
+          navigate(sid ? 'dashboard' : 'login', {});
+        })
+        .apiWarmCache(sid || '');
     }
 
     function isLocalUiClick(el) {

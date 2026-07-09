@@ -1,7 +1,7 @@
 // spa.gs — Single-page API (fixed URL, no query-string navigation)
 
 function apiRenderPage(sid, page, paramsJson) {
-  _cacheFlush();
+  _cacheWarmAllIfNeeded();
   const p = _spaMergeParams(sid, paramsJson);
   try {
     return _spaEnsureWrap(_spaDispatchPage(page || 'login', p));
@@ -12,7 +12,6 @@ function apiRenderPage(sid, page, paramsJson) {
 
 // Direct update for participant row save (explicit params — reliable in HtmlService iframe)
 function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, endTime, week) {
-  _cacheFlush();
   const p = {
     sid: String(sid || '').trim(),
     id: String(exerciseId || '').trim(),
@@ -31,7 +30,6 @@ function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, 
 }
 
 function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, responsibility, tutor) {
-  _cacheFlush();
   const p = {
     sid: String(sid || '').trim(),
     assignmentId: String(assignmentId || '').trim(),
@@ -49,7 +47,6 @@ function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, respo
 }
 
 function apiRunAction(sid, action, paramsJson) {
-  _cacheFlush();
   const p = _spaMergeParams(sid, paramsJson);
   p.action = action;
   try {
