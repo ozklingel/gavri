@@ -12,22 +12,42 @@ var SERIES_DAY_START_H = 6;
 var SERIES_DAY_END_H = 18;
 var SERIES_BLOCKED_WEEKDAYS = { 0: true, 5: true, 6: true }; // Sun, Fri, Sat
 
-/** מיקום → סוגי תרגיל מותרים (תווית וריאנט כמו ב-SERIES_VARIANTS_BY_FORCE). */
-var SERIES_LOCATIONS = {
-  'נוטרה': ['התקדמות לילה', 'התקדמות יום'],
-  'חפר': ['יבש רטוב יום', 'יבש רטוב לילה'],
-  'שיפון': ['יבש רטוב יום', 'יבש רטוב לילה'],
-  'אל פוראן': ['התקפה לילה', 'התקפה יום'],
-  'אודם': ['התקפה יום', 'התקפה לילה']
-};
+/** סוגי תרגיל מותרים לשטח אש — לפי עמודות בטבלת FireZones. */
+function _seriesAllowedVariantsForFireZone(zone) {
+  const allowed = [];
+  if (zone.advancement) {
+    allowed.push('התקדמות לילה', 'התקדמות יום');
+  }
+  if (zone.attack) {
+    allowed.push('התקפה יום', 'התקפה לילה');
+  }
+  if (zone.defense) {
+    allowed.push('הגנה יום', 'הגנה לילה');
+  }
+  if (zone.dry_wet_day) {
+    allowed.push('יבש רטוב יום');
+  }
+  if (zone.dry_wet_night) {
+    allowed.push('יבש רטוב לילה');
+  }
+  return allowed;
+}
 
-var SERIES_LOCATION_FORM_KEYS = {
-  'נוטרה': 'notra',
-  'חפר': 'hefer',
-  'שיפון': 'shifon',
-  'אל פוראן': 'poran',
-  'אודם': 'odem'
-};
+/** שם שטח אש → סוגי תרגיל מותרים (מטבלת שטחי אש). */
+function Series_fireZoneMap() {
+  const map = {};
+  FireZones_all().forEach(function(z) {
+    const name = String(z.name || '').trim();
+    if (!name) return;
+    const allowed = _seriesAllowedVariantsForFireZone(z);
+    if (allowed.length) map[name] = allowed;
+  });
+  return map;
+}
+
+function _seriesLocationNames() {
+  return Object.keys(Series_fireZoneMap());
+}
 
 var SERIES_VARIANTS_BY_FORCE = {
   /** סוג כוח → וריאנטים (תווית, משך שעות, יום/לילה) — מקור אמת לבניית סדרה */
@@ -58,11 +78,12 @@ function _seriesNormalizeForceType(v) {
 }
 
 function _seriesLocationFormKey(loc) {
-  return SERIES_LOCATION_FORM_KEYS[loc] || String(loc).replace(/\s+/g, '_');
+  return String(loc || '').trim().replace(/\s+/g, '_');
 }
 
 function _seriesLocationsFromParams(p) {
-  const all = Object.keys(SERIES_LOCATIONS);
+  const zoneMap = Series_fireZoneMap();
+  const all = Object.keys(zoneMap);
   const selected = [];
   let anyParam = false;
   all.forEach(function(loc) {
@@ -76,8 +97,9 @@ function _seriesLocationsFromParams(p) {
   return selected;
 }
 
-function _seriesLocationAllowsVariant(location, variantLabel) {
-  const allowed = SERIES_LOCATIONS[location];
+function _seriesLocationAllowsVariant(location, variantLabel, zoneMap) {
+  zoneMap = zoneMap || Series_fireZoneMap();
+  const allowed = zoneMap[location];
   if (!allowed || !allowed.length) return false;
   const v = String(variantLabel || '').trim();
   return allowed.some(function(rule) {
@@ -492,9 +514,9 @@ function Series_schedule(startYmd, endYmd, queue, locations, opts) {
     throw new Error('טווח תאריכים לא תקין.');
   }
   if (!queue.length) throw new Error('יש לציין לפחות תרגיל אחד בסדרה.');
-  locations = locations && locations.length ? locations : Object.keys(SERIES_LOCATIONS);
+  locations = locations && locations.length ? locations : _seriesLocationNames();
   if (!locations.length) {
-    throw new Error('יש לבחור לפחות מיקום אחד לסדרה.');
+    throw new Error('יש לבחור לפחות שטח אש אחד לסדרה.');
   }
 
   const holyDays = _seriesFetchHolyDays(startYmd, endYmd);
@@ -601,23 +623,35 @@ function Series_variantsRulesHtml() {
 }
 
 function Series_locationRulesHtml() {
+  const zoneMap = Series_fireZoneMap();
+  const names = Object.keys(zoneMap);
+  if (!names.length) {
+    return '<p style="font-size:11px;color:#d97706;margin:0 0 12px">' +
+      'אין שטחי אש במערכת — הוסף ב<a href="#" data-spa-page="fireZones">שטחי אש</a>.</p>';
+  }
   let s = '<table class="tbl" style="font-size:11px;margin:0 0 12px"><thead><tr>' +
-    '<th>מיקום</th><th>סוגי תרגיל</th></tr></thead><tbody>';
-  Object.keys(SERIES_LOCATIONS).forEach(function(loc) {
-    s += '<tr><td><b>' + loc + '</b></td><td>' +
-      SERIES_LOCATIONS[loc].join(' · ') + '</td></tr>';
+    '<th>שטח אש</th><th>סוגי תרגיל (לפי הטבלה)</th></tr></thead><tbody>';
+  names.forEach(function(loc) {
+    s += '<tr><td><b>' + _esc(loc) + '</b></td><td>' +
+      zoneMap[loc].join(' · ') + '</td></tr>';
   });
   s += '</tbody></table>';
   return s;
 }
 
 function Series_locationCheckboxesHtml() {
+  const zoneMap = Series_fireZoneMap();
+  const names = Object.keys(zoneMap);
+  if (!names.length) {
+    return '<p style="font-size:12px;color:#d97706;margin-top:6px">' +
+      'אין שטחי אש — הוסף רשומות ב<a href="#" data-spa-page="fireZones">שטחי אש</a>.</p>';
+  }
   let s = '<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">';
-  Object.keys(SERIES_LOCATIONS).forEach(function(loc) {
+  names.forEach(function(loc) {
     const key = _seriesLocationFormKey(loc);
     s += '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">' +
       '<input type="checkbox" name="series_loc_' + key + '" value="1" checked> ' +
-      '<span>' + loc + '</span></label>';
+      '<span>' + _esc(loc) + '</span></label>';
   });
   s += '</div>';
   return s;
@@ -648,7 +682,7 @@ function Series_buildFormHtml(sid) {
   s += '<li>ללא שבת/חג/יום ראשון · בקיץ ללא התחלה 12:00–16:00</li>';
   s += '</ul>';
   s += Series_variantsRulesHtml();
-  s += '<p style="font-size:11px;color:var(--muted);margin:0 0 6px"><b>מיקומים מותרים</b></p>';
+  s += '<p style="font-size:11px;color:var(--muted);margin:0 0 6px"><b>שטחי אש לשיבוץ</b> (מטבלת שטחי אש)</p>';
   s += Series_locationRulesHtml();
   s += _formOpen();
   s += '<input type="hidden" name="action" value="buildSeries">';
@@ -669,7 +703,7 @@ function Series_buildFormHtml(sid) {
   s += '<div class="form-row"><label class="form-label">גדוד 3</label>' +
     _select('series_ff_3', ffOpts, saved[2] ? saved[2].fieldForceId : '', 'required') + '</div>';
   s += '</div>';
-  s += '<div class="form-row" style="margin-top:12px"><label class="form-label">מיקומים לשיבוץ</label>';
+  s += '<div class="form-row" style="margin-top:12px"><label class="form-label">שטחי אש לשיבוץ</label>';
   s += Series_locationCheckboxesHtml() + '</div>';
   s += '<p style="font-size:11px;color:var(--muted);margin-top:8px">' +
     'דוגמה: 9 תרגילים, 3 גדודים (חיר + חשן + 900) → 3 תרגילים לכל גדוד. בציר הזמן — שורה לכל גדוד.</p>';
@@ -689,7 +723,7 @@ function Exercises_buildSeries(p) {
 
   if (!startYmd || !endYmd) throw new Error('חובה לבחור תאריך התחלה וסיום לסדרה.');
   if (!locations.length) {
-    throw new Error('יש לבחור לפחות מיקום אחד לסדרה.');
+    throw new Error('יש לבחור לפחות שטח אש אחד לסדרה.');
   }
   const startTs = _parseRawDate(startYmd);
   const endTs   = _parseRawDate(endYmd);

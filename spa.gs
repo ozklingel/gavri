@@ -108,7 +108,7 @@ function _cacheWarmForPage(page, p) {
     return;
   }
   if (pg === 'exercises') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'FieldForces']);
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'FieldForces', 'FireZones']);
     return;
   }
   if (pg === 'assign') {

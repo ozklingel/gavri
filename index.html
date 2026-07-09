@@ -363,7 +363,17 @@ body {
       color: #fff;
       border: 1px solid var(--green2);
     }
-    .btn-primary:hover { background: var(--green2); }
+    .btn-primary:hover { background: var(--green2); color: #fff; }
+    button.btn-primary,
+    a.btn-primary,
+    input.btn-primary[type="submit"] {
+      color: #fff !important;
+    }
+    button.btn-primary:hover,
+    a.btn-primary:hover,
+    input.btn-primary[type="submit"]:hover {
+      color: #fff !important;
+    }
     .btn-secondary {
       background: var(--bg4);
       color: var(--text2);
@@ -389,6 +399,8 @@ body {
 
     /* ── LINKS as buttons ── */
     a.btn { color: inherit; }
+    a.btn-primary { color: #fff !important; }
+    a.btn-primary:hover { color: #fff !important; }
     a.btn-secondary { color: var(--text2); }
     a.btn-secondary:hover { color: var(--green); }
     a.btn-ghost:hover { color: var(--green); }
@@ -2032,7 +2044,7 @@ body {
     .stats-seg.active {
       background: #166534;
       border-color: #166534;
-      color: #fff;
+      color: #fff !important;
     }
     .stats-seg-sm .stats-seg { padding: 5px 10px; font-size: 10px; }
     .stats-hint, .stats-chart-caption, .stats-avg-line {
@@ -2048,7 +2060,7 @@ body {
       font-size: 11px;
       cursor: pointer;
     }
-    .stats-chip.active { background: #166534; border-color: #166534; color: #fff; }
+    .stats-chip.active { background: #166534; border-color: #166534; color: #fff !important; }
     .stats-chip-clear { background: transparent; }
     .stats-filters {
       display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
