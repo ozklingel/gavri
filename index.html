@@ -3360,6 +3360,9 @@ body {
         var la = parseInt(a.getAttribute('data-lane') || '9', 10);
         var lb = parseInt(b.getAttribute('data-lane') || '9', 10);
         if (la !== lb) return la - lb;
+        var sa = parseInt(a.getAttribute('data-sub-lane') || '0', 10);
+        var sb = parseInt(b.getAttribute('data-sub-lane') || '0', 10);
+        if (sa !== sb) return sa - sb;
         return (+a.dataset.startMs) - (+b.dataset.startMs);
       });
       if (!bars.length) {

@@ -181,7 +181,7 @@ function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
     '</div></aside>';
 }
 
-function _timelineRenderBlockBar(block, weekStartMs, weekEndMs, laneHeight, rowTopPx, maxLane) {
+function _timelineRenderBlockBar(block, weekStartMs, weekEndMs, layout, rowTopPx) {
   const startMs = _timelineBlockStartMs(block);
   const endMs = _timelineBlockEndMs(block);
   if (isNaN(startMs) || isNaN(endMs)) return '';
@@ -193,11 +193,13 @@ function _timelineRenderBlockBar(block, weekStartMs, weekEndMs, laneHeight, rowT
   const widthPct = Math.max(endPct - startPct, 1.5);
 
   let topPx = rowTopPx;
-  let heightPx = (maxLane + 1) * laneHeight - 8;
+  let heightPx = layout.totalHeight - 8;
   const lane = block.lane || 'all';
   if (lane === '0' || lane === '1' || lane === '2') {
-    topPx = rowTopPx + parseInt(lane, 10) * laneHeight + 4;
-    heightPx = laneHeight - 8;
+    const typeKey = lane === '0' ? 'חיר' : lane === '1' ? 'חשן' : '900';
+    const band = layout.bandByType[typeKey];
+    topPx = rowTopPx + band.top + 4;
+    heightPx = band.height - 8;
   }
 
   const style = 'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;width:' + widthPct + '%;' +
@@ -283,19 +285,78 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
   return s;
 }
 
-function _timelineAssignTypeLanes(items) {
-  let maxLane = 2;
+function _timelineRangesOverlap(a, b) {
+  return a.startMs < b.endMs && a.endMs > b.startMs;
+}
+
+var TIMELINE_TYPE_ORDER = ['חיר', 'חשן', '900', 'אחר'];
+
+/** Assign base type + sub-lane when exercises of the same type overlap in time. */
+function _timelineAssignStackedLanes(items) {
+  const SUB_BAR_H = 46;
+  const MIN_BAND_H = 58;
+  const bandByType = {};
+  let bandOffset = 0;
+
   items.forEach(function(item) {
-    const typeKey = _timelineNormalizeType(item.ex);
-    item.typeKey = typeKey;
-    if (TIMELINE_TYPE_LANES.hasOwnProperty(typeKey)) {
-      item.lane = TIMELINE_TYPE_LANES[typeKey];
-    } else {
-      item.lane = 3;
-      if (item.lane > maxLane) maxLane = item.lane;
-    }
+    item.typeKey = _timelineNormalizeType(item.ex);
+    item.baseLane = TIMELINE_TYPE_LANES.hasOwnProperty(item.typeKey)
+      ? TIMELINE_TYPE_LANES[item.typeKey] : 3;
+    item.subLane = 0;
   });
-  return maxLane;
+
+  const byType = {};
+  items.forEach(function(item) {
+    const k = item.typeKey;
+    if (!byType[k]) byType[k] = [];
+    byType[k].push(item);
+  });
+
+  TIMELINE_TYPE_ORDER.forEach(function(typeKey) {
+    const group = byType[typeKey] || [];
+    let maxSub = 1;
+
+    if (group.length) {
+      group.sort(function(a, b) { return a.startMs - b.startMs; });
+      const subLanes = [];
+
+      group.forEach(function(item) {
+        let sub = -1;
+        for (let s = 0; s < subLanes.length; s++) {
+          const free = !subLanes[s].some(function(other) {
+            return _timelineRangesOverlap(item, other);
+          });
+          if (free) {
+            sub = s;
+            break;
+          }
+        }
+        if (sub < 0) {
+          sub = subLanes.length;
+          subLanes.push([]);
+        }
+        item.subLane = sub;
+        subLanes[sub].push(item);
+      });
+      maxSub = subLanes.length;
+    }
+
+    const bandH = Math.max(MIN_BAND_H, maxSub * SUB_BAR_H);
+    bandByType[typeKey] = { top: bandOffset, height: bandH, maxSub: maxSub, subBarH: SUB_BAR_H };
+    bandOffset += bandH;
+  });
+
+  items.forEach(function(item) {
+    item.lane = item.baseLane;
+    item.band = bandByType[item.typeKey];
+  });
+
+  return {
+    totalHeight: bandOffset,
+    bandByType: bandByType,
+    maxLane: 2,
+    subBarH: SUB_BAR_H
+  };
 }
 
 function Views_timeline(p) {
@@ -386,9 +447,10 @@ function Views_timeline(p) {
     item.endMs > weekStartMs
   );
 
-  const maxLane = _timelineAssignTypeLanes(weekItems);
+  const layout = _timelineAssignStackedLanes(weekItems);
   weekItems.sort(function(a, b) {
-    if (a.lane !== b.lane) return a.lane - b.lane;
+    if (a.baseLane !== b.baseLane) return a.baseLane - b.baseLane;
+    if ((a.subLane || 0) !== (b.subLane || 0)) return (a.subLane || 0) - (b.subLane || 0);
     return a.startMs - b.startMs;
   });
 
@@ -525,15 +587,14 @@ function Views_timeline(p) {
   const TIMELINE_DAY_WIDTH = 400;
   const TIMELINE_MIN_WIDTH = 7 * TIMELINE_DAY_WIDTH;
   const timelineHeaderH = 54;
-  const laneHeight = 58;
   const rowTopPx = timelineHeaderH;
-  const barMinH = 48;
-  const trackH = Math.max(280, rowTopPx + (maxLane + 1) * laneHeight + 12);
+  const barMinH = 44;
+  const trackH = Math.max(280, rowTopPx + layout.totalHeight + 12);
 
   s += '<div class="timeline-scroll" id="timelineScroll">';
   s += '<div id="timelineTrack" class="timeline-track" style="position:relative;height:' +
        trackH + 'px;min-width:' + TIMELINE_MIN_WIDTH + 'px;padding-right:48px;' +
-       '--tl-lane-h:' + laneHeight + 'px;--tl-bar-min-h:' + barMinH + 'px"' +
+       '--tl-lane-h:' + layout.subBarH + 'px;--tl-bar-min-h:' + barMinH + 'px"' +
        ' data-week-start="' + weekStartMs + '"' +
        ' data-week-end="' + weekEndMs + '"' +
        ' data-week-offset="' + weekOffset + '"' +
@@ -541,13 +602,15 @@ function Views_timeline(p) {
        ' data-can-edit="' + (canEdit ? '1' : '0') + '">';
 
   const rowLabels = [
-    { lane: 0, label: 'חי״ר' },
-    { lane: 1, label: 'חשן' },
-    { lane: 2, label: '900' }
+    { typeKey: 'חיר', label: 'חי״ר' },
+    { typeKey: 'חשן', label: 'חשן' },
+    { typeKey: '900', label: '900' }
   ];
   rowLabels.forEach(function(row) {
+    const band = layout.bandByType[row.typeKey];
+    const labelTop = rowTopPx + band.top + Math.round(band.height / 2) - 8;
     s += '<div class="timeline-row-label" style="position:absolute;right:4px;top:' +
-      (rowTopPx + row.lane * laneHeight + 8) + 'px;font-family:var(--mono);font-size:10px;color:var(--muted);' +
+      labelTop + 'px;font-family:var(--mono);font-size:10px;color:var(--muted);' +
       'z-index:15;pointer-events:none">' + row.label + '</div>';
   });
 
@@ -597,13 +660,15 @@ function Views_timeline(p) {
   }
 
   weekBlocks.forEach(function(block) {
-    s += _timelineRenderBlockBar(block, weekStartMs, weekEndMs, laneHeight, rowTopPx, maxLane);
+    s += _timelineRenderBlockBar(block, weekStartMs, weekEndMs, layout, rowTopPx);
   });
 
   weekItems.forEach(function(item, idx) {
     const startPct = ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
     const widthPct = ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
-    const topPx = rowTopPx + (item.lane || 0) * laneHeight + 4;
+    const band = item.band;
+    const barH = band.subBarH - 8;
+    const topPx = rowTopPx + band.top + (item.subLane || 0) * band.subBarH + 4;
     const color = TIMELINE_TYPE_COLORS[item.typeKey] || COLORS[idx % COLORS.length];
     const isPast = item.endMs < nowMs;
     const exId = String(item.ex.id);
@@ -612,15 +677,17 @@ function Views_timeline(p) {
     const barStyle =
       'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;' +
       'width:' + Math.max(widthPct, 1.5) + '%;' +
+      'height:' + barH + 'px;min-height:' + barH + 'px;' +
       'background:' + color + '55;border:1px solid ' + color + ';border-radius:8px;' +
       'padding:4px 6px;overflow:hidden;color:#1a2e22;font-weight:600;opacity:' + (isPast ? '0.72' : '1') + ';' +
-      'z-index:' + (10 + (item.lane || 0)) + ';display:flex;align-items:stretch;box-sizing:border-box';
+      'z-index:' + (10 + (item.baseLane || 0) * 3 + (item.subLane || 0)) + ';display:flex;align-items:stretch;box-sizing:border-box';
 
     const dataAttrs =
       ' id="' + _timelineAttrEsc(barDomId) + '"' +
       ' data-tl-bar="1" data-exercise-id="' + _timelineAttrEsc(exId) + '"' +
       ' data-exercise-type="' + _timelineAttrEsc(item.typeKey || '') + '"' +
-      ' data-lane="' + (item.lane || 0) + '"' +
+      ' data-lane="' + (item.baseLane || 0) + '"' +
+      ' data-sub-lane="' + (item.subLane || 0) + '"' +
       ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';
 
     const exWeekLabel = item.ex.rawStartDate
