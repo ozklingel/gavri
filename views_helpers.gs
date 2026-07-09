@@ -478,7 +478,6 @@ function Views_login(p) {
     '<div class="login-head">' +
     '<div class="login-star">★</div>' +
     '<div class="login-title">סדרת השטח</div>' +
-    '<div class="login-sub">// AUTHORIZED PERSONNEL ONLY //</div>' +
     '</div>' +
     '<div class="login-body">' +
     _flash(p) +

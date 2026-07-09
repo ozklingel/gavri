@@ -482,11 +482,7 @@ function _seriesSortLocationsByAvailability(locs, locationLastEnd) {
 }
 
 function _seriesSlotLabel(plan, parentVariantLabel) {
-  const parentKind = Exercise_slotKindFromName(parentVariantLabel || '');
-  const nameKind = parentKind || Exercise_slotKindFromName(plan.variantLabel || '');
-  const base = nameKind === 'night' ? 'לילה' : (nameKind === 'day' ? 'יום' : (plan.slotKind === 'night' ? 'לילה' : 'יום'));
-  const label = plan.variantLabel || '';
-  return label ? (label + ' (' + base + ')') : ('תרגיל ' + base);
+  return plan.variantLabel || parentVariantLabel || 'תרגיל';
 }
 
 function Series_schedule(startYmd, endYmd, queue, locations, opts) {

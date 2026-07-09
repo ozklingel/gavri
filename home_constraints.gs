@@ -1,5 +1,13 @@
 // home_constraints.gs — אילוצי זמן בית (יציאה הביתה)
 
+function HomeConstraints_appendRow(row) {
+  const sh = _sheet('HomeConstraints');
+  const last = sh.getLastRow();
+  sh.getRange(last + 1, 1, 1, row.length).setValues([row]);
+  sh.getRange(last + 1, 3, 1, 4).setNumberFormat('@');
+  _cacheInvalidate('HomeConstraints');
+}
+
 function HomeConstraints_all() {
   return _rows('HomeConstraints').data.map(function(r) {
     return {
@@ -90,8 +98,10 @@ function HomeConstraints_timeRange(c) {
 
 function HomeConstraints_formatRange(c) {
   if (!c) return '—';
-  const start = _fmtDateTimeFull(c.start_date, c.start_time);
-  const end   = _fmtDateTimeFull(c.end_date || c.start_date, c.end_time);
+  const startDate = _rawDate(c.start_date) || '';
+  const endDate = _rawDate(c.end_date || c.start_date) || startDate;
+  const start = _fmtDateTimeFull(startDate, c.start_time);
+  const end   = _fmtDateTimeFull(endDate, c.end_time);
   if (start && end && start !== end) return start + ' — ' + end;
   return start || end || '—';
 }
@@ -217,7 +227,7 @@ function HomeConstraints_create(p) {
   }
 
   const id = 'HC' + new Date().getTime();
-  _append('HomeConstraints', [
+  HomeConstraints_appendRow([
     id, user.id, startDate, startTime, endDate, endTime, notes,
     'pending', tier, supervisorId, '', '', '', new Date().toISOString()
   ]);

@@ -15,6 +15,7 @@ function _fmtDate(val) {
     d = new Date(val);
   }
   if (isNaN(d.getTime())) return String(val);
+  if (d.getFullYear() < 1900) return '';
   const dd = d.getDate();
   const mm = d.getMonth();
   const yy = d.getFullYear();
@@ -153,6 +154,7 @@ function _ymdFromCellValue(val) {
   if (val == null || val === '') return '';
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return '';
+    if (val.getFullYear() < 1900) return '';
     const y  = val.getFullYear();
     const m  = String(val.getMonth() + 1).padStart(2, '0');
     const dd = String(val.getDate()).padStart(2, '0');
@@ -162,8 +164,11 @@ function _ymdFromCellValue(val) {
   const s = String(val).trim();
   if (!s) return '';
 
-  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (iso) return iso[1];
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    if (+iso[1] < 1900) return '';
+    return iso[1] + '-' + iso[2] + '-' + iso[3];
+  }
 
   const dmy = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
   if (dmy) {

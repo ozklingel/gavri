@@ -60,7 +60,6 @@ function _assignMainModuleHtml(user, sid, openSet) {
     exMap[a.exercise_id].push({ id: a.id, userId: a.user_id, resp: a.responsibility, status: a.status });
   });
 
-  const approvedHome = HomeConstraints_allApproved();
   const homeBlocked = HomeConstraints_blockedPairsForAssign();
 
   const jsonData = JSON.stringify({
@@ -68,7 +67,6 @@ function _assignMainModuleHtml(user, sid, openSet) {
     userMap:   userMap,
     exMap:     exMap,
     homeBlocked: homeBlocked,
-    approvedHomeCount: approvedHome.length,
     corpsList: [
       { key: 'חיר', label: 'חי״ר' },
       { key: 'חשן', label: 'חשן' },
@@ -82,13 +80,7 @@ function _assignMainModuleHtml(user, sid, openSet) {
     })
   });
 
-  return (approvedHome.length
-      ? '<div class="flash flash-error" style="margin-bottom:12px;font-size:12px;line-height:1.5">' +
-        '🏠 <b>' + approvedHome.length + ' אילוצי בית מאושרים</b> — לא ניתן לשבץ חניך לתרגיל החופף לטווח. ' +
-        _a('page=homeConstraints', 'צפה ברשימה', 'btn btn-ghost btn-sm') +
-        '</div>'
-      : '') +
-    '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+  return '<div style="display:flex;gap:8px;margin-bottom:14px">' +
     _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
       'לבצע שיבוץ אוטומטי? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
     _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס שיבוצים',
