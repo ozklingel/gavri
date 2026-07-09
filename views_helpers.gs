@@ -377,7 +377,7 @@ function _checkboxRow(name, label, checked) {
 }
 
 function _drawerNavItems(user) {
-  const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
+  const items = [{ page: 'dashboard', label: 'מסך הבית', icon: '⊞' }];
   if (Roles_hasAdminAccess(user.role)) {
     items.push({ page: 'exercises', label: 'תרגילים', icon: '🎯' });
     items.push(
@@ -649,7 +649,7 @@ function Views_dashboard(p) {
     '<div class="page page-dashboard">' + _flash(p) +
     _dashboardTabsShell(user, sid, tab, p) +
     '</div>';
-  return _wrapPage(body, 'לוח בקרה');
+  return _wrapPage(body, 'מסך הבית');
 }
 
 // ─────────── EXERCISES MANAGEMENT ───────────

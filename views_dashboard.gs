@@ -214,13 +214,13 @@ function _dashboardCorpsStatsHtml(corpsStats, compact) {
 
 function _unitCommanderDashboardPanels(sid) {
   const corpsStats = _dashboardCorpsAssignedCounts();
-  let s = '<div class="drawer-section-title">לוח בקרה — מגד</div>';
+  let s = '<div class="drawer-section-title">מסך הבית — מגד</div>';
   s += _dashboardCorpsStatsHtml(corpsStats, true);
   return s;
 }
 
 function _departmentCommanderDashboardPanels(user, sid) {
-  return '<div class="drawer-section-title">לוח בקרה — ממ</div>';
+  return '<div class="drawer-section-title">מסך הבית — ממ</div>';
 }
 
 function _drawerDashboardPanels(user, sid) {
@@ -349,7 +349,7 @@ function _commanderTraineeExercisesHtml(assigns) {
 function _commanderDashboardPanels(user, sid) {
   const trainees = Users_traineesOfCommander(user.id);
 
-  let s = '<div class="drawer-section-title">לוח בקרה — ' + Roles_label(user.role) + '</div>';
+  let s = '<div class="drawer-section-title">מסך הבית — ' + Roles_label(user.role) + '</div>';
 
   if (!trainees.length) {
     return s + '<div class="card"><div class="empty">אין חיילים מוקצים לצוות שלך עדיין</div></div>';
@@ -408,7 +408,7 @@ function _tutorDashboardPanels(user, sid) {
   });
 
   const exIds = Object.keys(exMap);
-  let s = '<div class="drawer-section-title">לוח בקרה — חונך</div>';
+  let s = '<div class="drawer-section-title">מסך הבית — חונך</div>';
 
   if (!exIds.length) {
     return s + '<div class="card"><div class="empty">אין תרגילים עם חניכים משויכים אליך</div></div>';
