@@ -17,7 +17,7 @@ function Views_assign(p) {
     _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
     '</div></div>' +
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
-    '// גרור חניך מרשימת החניכים (ממוינת לפי מעט שיבוצים) לתרגיל · שינויים נשמרים רק בלחיצה על «שמירה ואישור»' +
+    '// ימין: חניכים לשיבוץ · שמאל: תרגילים (חסרים למעלה) · גרור לתרגיל · שינויים נשמרים בלחיצה על «שמירה ואישור»' +
     '</div>' +
     _assignMainModuleHtml(user, sid, openSet) +
     '</div>';
@@ -113,13 +113,15 @@ function _assignMainModuleHtml(user, sid, openSet) {
     '<button type="button" id="assignDiscardBtn" class="btn btn-secondary btn-sm">↺ בטל שינויים</button>' +
     '<button type="button" id="assignSaveBtn" class="btn btn-primary">💾 שמירה ואישור</button>' +
     '</div></div>' +
-    '<div id="assignNeedsWrap" class="assign-section-wrap">' +
-    '<div class="assign-section-label">⚠ תרגילים הזקוקים לשיבוץ (ריקים או חלקיים)</div>' +
-    '<div id="assignNeedsBoard" class="assign-priority-board"></div>' +
+    '<div class="assign-layout">' +
+    '<aside class="assign-users-col" id="assignUsersCol">' +
+    '<div class="assign-panel-head">👤 משתמשים לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
+    '<div id="assignUsersList" class="assign-users-list"></div>' +
+    '</aside>' +
+    '<div class="assign-exercises-col">' +
+    '<div class="assign-panel-head">🎯 תרגילים <span class="assign-panel-sub">חסרים למעלה</span></div>' +
+    '<div id="assignExercisesList" class="assign-exercises-list"></div>' +
     '</div>' +
-    '<div class="assign-section-wrap">' +
-    '<div class="assign-section-label">✓ תרגילים משובצים במלואם + חניכים לשיבוץ</div>' +
-    '<div id="assignBoard" class="assign-main-board"></div>' +
     '</div>' +
     '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">' +
     _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
@@ -146,9 +148,8 @@ function _assignBoardJs() {
 (function() {
   var data = JSON.parse(document.getElementById('assignData').textContent);
   var sid = document.getElementById('assignSid').value;
-  var board = document.getElementById('assignBoard');
-  var needsBoard = document.getElementById('assignNeedsBoard');
-  var needsWrap = document.getElementById('assignNeedsWrap');
+  var usersList = document.getElementById('assignUsersList');
+  var exercisesList = document.getElementById('assignExercisesList');
   var status = document.getElementById('assignStatus');
   var leastPanel = document.getElementById('assignLeastPanel');
   var changesBar = document.getElementById('assignChangesBar');
@@ -540,14 +541,8 @@ function _assignBoardJs() {
     div.draggable = true;
     div.dataset.userId = userId;
     div.dataset.assignId = '';
-    div.dataset.exId = '';
+    div.dataset.exId = '__pool__';
     div.dataset.resp = '';
-    div.style.cssText = [
-      'display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px',
-      'background:var(--bg3);border:1px solid var(--border);border-radius:4px',
-      'cursor:grab;font-family:var(--mono);font-size:12px;color:var(--text1)',
-      'user-select:none'
-    ].join(';');
 
     var dot = document.createElement('span');
     dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (ROLE_COLORS[u.role] || '#888');
@@ -567,7 +562,7 @@ function _assignBoardJs() {
 
     div.addEventListener('dragstart', function(e) {
       e.dataTransfer.setData('text/plain', JSON.stringify({
-        userId: userId, assignId: '', fromExId: '', resp: ''
+        userId: userId, assignId: '', fromExId: '__pool__', resp: ''
       }));
       div.style.opacity = '0.4';
     });
@@ -702,46 +697,40 @@ function _assignBoardJs() {
     if (editingChip === chipEl) editingChip = null;
   }
 
-  function makeColumn(exId, title, subtitle, chips, opts) {
+  function makeExerciseRow(exId, title, subtitle, chips, opts) {
     opts = opts || {};
-    var col = document.createElement('div');
-    col.dataset.exId = exId;
-    col.className = 'assign-col' + (opts.priority ? ' assign-col-priority' : '');
-    col.style.cssText = [
-      'min-width:200px;max-width:220px;flex-shrink:0',
-      'background:var(--bg2);border:1px solid var(--border);border-radius:6px',
-      'display:flex;flex-direction:column'
-    ].join(';');
-    if (opts.priority) {
-      col.style.borderColor = 'var(--amber, #fbbf24)';
-      col.style.boxShadow = '0 0 0 1px rgba(251,191,36,.15)';
-    }
+    var row = document.createElement('div');
+    row.dataset.exId = exId;
+    row.className = 'assign-ex-row' + (opts.needs ? ' assign-ex-row-needs' : '');
 
     var hdr = document.createElement('div');
-    hdr.style.cssText = 'padding:10px 12px;border-bottom:1px solid var(--border)';
+    hdr.className = 'assign-ex-row-head';
     var h3 = document.createElement('div');
-    h3.style.cssText = 'font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text1);margin-bottom:2px;word-break:break-word';
+    h3.className = 'assign-ex-row-title';
     h3.textContent = title;
     var sub = document.createElement('div');
-    sub.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted)';
+    sub.className = 'assign-ex-row-meta';
     sub.textContent = subtitle || '';
     hdr.appendChild(h3);
     if (subtitle) hdr.appendChild(sub);
-    col.appendChild(hdr);
+    row.appendChild(hdr);
 
     var zone = document.createElement('div');
-    zone.style.cssText = 'padding:8px;flex:1;min-height:60px';
+    zone.className = 'assign-ex-row-zone';
     zone.dataset.exId = exId;
+    if (!chips.length) {
+      zone.classList.add('is-empty');
+    }
     chips.forEach(function(c) { zone.appendChild(c); });
 
     zone.addEventListener('dragover', function(e) {
       e.preventDefault();
-      zone.style.background = 'rgba(74,222,128,0.07)';
+      zone.classList.add('drag-over');
     });
-    zone.addEventListener('dragleave', function() { zone.style.background = ''; });
+    zone.addEventListener('dragleave', function() { zone.classList.remove('drag-over'); });
     zone.addEventListener('drop', function(e) {
       e.preventDefault();
-      zone.style.background = '';
+      zone.classList.remove('drag-over');
       var payload;
       try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (err) { return; }
       var toExId = exId;
@@ -758,8 +747,25 @@ function _assignBoardJs() {
       }
     });
 
-    col.appendChild(zone);
-    return col;
+    row.appendChild(zone);
+    return row;
+  }
+
+  function bindPoolDropZone(zone) {
+    zone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', function() { zone.classList.remove('drag-over'); });
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      var payload;
+      try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (err) { return; }
+      if (payload.assignId && payload.fromExId && payload.fromExId !== '__pool__') {
+        stageRemove(payload.assignId, payload.fromExId);
+      }
+    });
   }
 
   function renderLeastAssigned() {
@@ -799,54 +805,44 @@ function _assignBoardJs() {
 
   function render() {
     hideUserPopoverForce();
-    if (board) board.innerHTML = '';
-    if (needsBoard) needsBoard.innerHTML = '';
+    if (usersList) usersList.innerHTML = '';
+    if (exercisesList) exercisesList.innerHTML = '';
 
-    var incompleteExercises = [];
-    var fullExercises = [];
-    data.exercises.forEach(function(ex) {
-      var status = exerciseFillStatus(ex.id);
-      if (status.isFull) fullExercises.push(ex);
-      else incompleteExercises.push(ex);
-    });
-
-    incompleteExercises.sort(function(a, b) {
+    var sortedExercises = data.exercises.slice().sort(function(a, b) {
       var sa = exerciseFillStatus(a.id);
       var sb = exerciseFillStatus(b.id);
       if (sa.missing !== sb.missing) return sb.missing - sa.missing;
-      if (sa.filled !== sb.filled) return sa.filled - sb.filled;
+      if (sa.isFull !== sb.isFull) return sa.isFull ? 1 : -1;
       return String(a.title || '').localeCompare(String(b.title || ''), 'he');
     });
 
-    if (needsWrap) {
-      needsWrap.style.display = incompleteExercises.length ? '' : 'none';
-    }
-
-    incompleteExercises.forEach(function(ex) {
-      var status = exerciseFillStatus(ex.id);
-      var parts = data.exMap[ex.id] || [];
-      var chips = parts.map(function(a) {
-        return makeChip(a.userId, a.id, a.resp, ex.id);
-      });
-      var col = makeColumn(ex.id, ex.title, exerciseSubtitle(ex, status), chips, { priority: true });
-      if (needsBoard) needsBoard.appendChild(col);
-    });
-
-    var pool = getTraineePool();
-    var poolChips = pool.map(function(t) {
-      return makePoolChip(t.id, t.count);
-    });
-    if (board) {
-      board.appendChild(makeColumn('__pool__', '👤 חניכים לשיבוץ', pool.length + ' חניכים · פחות שיבוצים למעלה', poolChips));
-
-      fullExercises.forEach(function(ex) {
+    if (exercisesList) {
+      sortedExercises.forEach(function(ex) {
         var status = exerciseFillStatus(ex.id);
         var parts = data.exMap[ex.id] || [];
         var chips = parts.map(function(a) {
           return makeChip(a.userId, a.id, a.resp, ex.id);
         });
-        board.appendChild(makeColumn(ex.id, ex.title, exerciseSubtitle(ex, status), chips));
+        exercisesList.appendChild(
+          makeExerciseRow(ex.id, ex.title, exerciseSubtitle(ex, status), chips, { needs: !status.isFull })
+        );
       });
+    }
+
+    if (usersList) {
+      usersList.className = 'assign-users-list';
+      bindPoolDropZone(usersList);
+      var pool = getTraineePool();
+      if (!pool.length) {
+        var empty = document.createElement('div');
+        empty.className = 'assign-users-empty';
+        empty.textContent = 'אין חניכים במערכת';
+        usersList.appendChild(empty);
+      } else {
+        pool.forEach(function(t) {
+          usersList.appendChild(makePoolChip(t.id, t.count));
+        });
+      }
     }
 
     renderChangesBar();

@@ -569,23 +569,124 @@ body {
       gap: 8px;
       flex-wrap: wrap;
     }
-    .page-assign .assign-section-wrap {
-      margin-bottom: 16px;
+    .page-assign .assign-layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
     }
-    .page-assign .assign-section-label {
+    .page-assign .assign-panel-head {
       font-family: var(--mono);
       font-size: 12px;
       font-weight: 700;
       color: var(--text2, #86efac);
-      margin-bottom: 8px;
-    }
-    .page-assign .assign-priority-board,
-    .page-assign .assign-main-board {
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      align-items: flex-start;
+      margin-bottom: 10px;
       padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-assign .assign-panel-sub {
+      display: block;
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .page-assign .assign-users-col {
+      position: sticky;
+      top: 8px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .page-assign .assign-users-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 80px;
+    }
+    .page-assign .assign-users-list.drag-over {
+      background: rgba(74, 222, 128, 0.06);
+      border-radius: 6px;
+    }
+    .page-assign .assign-users-empty {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding: 12px 4px;
+      text-align: center;
+    }
+    .page-assign .assign-exercises-col {
+      min-width: 0;
+    }
+    .page-assign .assign-exercises-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .page-assign .assign-ex-row {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .page-assign .assign-ex-row-needs {
+      border-color: rgba(251, 191, 36, 0.45);
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.12);
+    }
+    .page-assign .assign-ex-row-head {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .page-assign .assign-ex-row-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text1);
+      margin-bottom: 2px;
+    }
+    .page-assign .assign-ex-row-meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .page-assign .assign-ex-row-zone {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: flex-start;
+      padding: 10px 14px;
+      min-height: 52px;
+    }
+    .page-assign .assign-ex-row-zone.is-empty::after {
+      content: '// גרור חניך לכאן';
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding: 8px 2px;
+    }
+    .page-assign .assign-ex-row-zone.drag-over {
+      background: rgba(74, 222, 128, 0.07);
+    }
+    .page-assign .assign-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: grab;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text1);
+      user-select: none;
+    }
+    .page-assign .assign-ex-row-zone .assign-chip {
+      max-width: 220px;
     }
     .page-assign .assign-count-badge {
       font-size: 9px;
@@ -598,6 +699,16 @@ body {
     }
     .page-assign .assign-chip-pool {
       border-style: dashed;
+      width: 100%;
+    }
+    @media (max-width: 900px) {
+      .page-assign .assign-layout {
+        grid-template-columns: 1fr;
+      }
+      .page-assign .assign-users-col {
+        position: static;
+        max-height: none;
+      }
     }
 
     /* ── GRID LAYOUTS ── */
