@@ -1441,18 +1441,16 @@ body {
     .timeline-track .tl-bar-label {
       flex: 1;
       min-width: 0;
-      min-height: 0;
+      width: 100%;
       overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: block;
       font-size: 11px;
       font-weight: bold;
-      line-height: 1.2;
+      line-height: 1.3;
       text-align: center;
-      word-break: break-word;
-      white-space: normal;
-      padding: 2px 4px;
+      padding: 2px 6px;
       text-shadow: 0 1px 1px rgba(255, 255, 255, 0.65);
     }
     .timeline-day-slots span {
@@ -1474,18 +1472,33 @@ body {
     .timeline-track.edit-mode .tl-bar-link { pointer-events: none; }
     .timeline-track.edit-mode .tl-handle {
       display: block;
-      width: 8px;
-      min-width: 8px;
-      height: 100%;
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      width: 10px;
+      min-width: 10px;
       cursor: ew-resize;
       flex-shrink: 0;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.35);
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      z-index: 3;
+    }
+    .timeline-track.edit-mode .tl-handle-start {
+      right: 2px;
+      left: auto;
+    }
+    .timeline-track.edit-mode .tl-handle-end {
+      left: 2px;
+      right: auto;
     }
     .timeline-track.edit-mode .tl-handle:hover {
       background: rgba(74, 222, 128, 0.55);
     }
-    .timeline-track:not(.edit-mode) .tl-handle { display: none; }
+    .timeline-track:not(.edit-mode) .tl-handle { display: none !important; }
+    .timeline-track.edit-mode .tl-bar-label {
+      padding-inline: 14px;
+    }
     .tl-bar.tl-saving { opacity: 0.6; pointer-events: none; }
     .tl-bar.is-dragging {
       z-index: 200 !important;
@@ -3396,6 +3409,23 @@ body {
       }).join('');
     }
 
+    function syncTimelineEditHandles(on) {
+      track.querySelectorAll('.tl-bar').forEach(function(bar) {
+        bar.querySelectorAll('.tl-handle').forEach(function(h) { h.remove(); });
+        if (!on) return;
+        var hs = document.createElement('span');
+        hs.className = 'tl-handle tl-handle-start';
+        hs.title = 'שינוי התחלה';
+        hs.setAttribute('aria-hidden', 'true');
+        var he = document.createElement('span');
+        he.className = 'tl-handle tl-handle-end';
+        he.title = 'שינוי סיום';
+        he.setAttribute('aria-hidden', 'true');
+        bar.appendChild(hs);
+        bar.appendChild(he);
+      });
+    }
+
     if (editBtn && !editBtn._bound) {
       editBtn._bound = true;
       editBtn.addEventListener('click', function() {
@@ -3403,8 +3433,10 @@ body {
         editBtn.classList.toggle('active', on);
         editBtn.textContent = on ? '✓ יציאה מעריכה' : '✏ מצב עריכה';
         if (hint) hint.style.display = on ? 'block' : 'none';
+        syncTimelineEditHandles(on);
         if (!on) refreshTimelineWeekTable();
       });
+      if (track.classList.contains('edit-mode')) syncTimelineEditHandles(true);
     }
 
     if (track._tlBound) return;

@@ -779,11 +779,8 @@ function Views_timeline(p) {
 
     if (canEdit) {
       s += '<div class="tl-bar"' + dataAttrs + ' style="' + barStyle + '">' +
-        '<span class="tl-handle tl-handle-start" title="שינוי התחלה"></span>' +
         '<span class="tl-bar-label" title="' + _timelineAttrEsc(barTitle) + '">' +
-        _esc(item.ex.title) + '</span>' +
-        '<span class="tl-handle tl-handle-end" title="שינוי סיום"></span>' +
-        '</div>';
+        _esc(item.ex.title) + '</span></div>';
     } else {
       s += '<a class="tl-bar tl-bar-link"' + dataAttrs + ' ' + _spaBarLink('exercise', { id: item.ex.id }) +
         ' style="' + barStyle + 'text-decoration:none">' +
