@@ -279,12 +279,24 @@ function _addUserToExerciseMap(userExMap, userId, exId) {
   if (userExMap[userId].indexOf(exId) === -1) userExMap[userId].push(exId);
 }
 
+function Assignments_slotConfig() {
+  return [
+    { kind: 'commander', resp: 'מפקד צוות', count: 1 },
+    { kind: 'corps', corpsKey: 'מסייעת', resp: 'מפ מסייעת', count: 1 },
+    { kind: 'corps', corpsKey: 'חשן', resp: 'מפ חשן', count: 1 },
+    { kind: 'corps', corpsKey: 'חיר', resp: 'מפ חי״ר', count: 2 },
+    { kind: 'corps', corpsKey: 'חהן', resp: 'מפ חה״ן', count: 1 },
+    { kind: 'corps', corpsKey: 'מנהלי', resp: 'מפ מנהלי', count: 1 }
+  ];
+}
+
 function Assignments_autoAssignAll(p) {
   Auth_requireRole(p, ['admin']);
 
   const exercises  = Exercises_all();
   const allUsers   = Users_all();
   const allAssigns = Assignments_all();
+  const SLOTS = Assignments_slotConfig();
 
   function normalize(v) {
     return String(v || '').replace(/״/g, '').trim();
@@ -301,15 +313,6 @@ function Assignments_autoAssignAll(p) {
     SUP: 'מסייעת',
     ADM: 'מנהלי'
   };
-
-  const SLOTS = [
-    { kind: 'commander', resp: 'מפקד צוות', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.SUP, resp: 'מפ מסייעת', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.ARM, resp: 'מפ חשן', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.INF, resp: 'מפ חי״ר', count: 2 },
-    { kind: 'corps', corpsKey: CORPS.ENG, resp: 'מפ חה״ן', count: 1 },
-    { kind: 'corps', corpsKey: CORPS.ADM, resp: 'מפ מנהלי', count: 1 }
-  ];
 
   function priority(u) {
     let s = 0;

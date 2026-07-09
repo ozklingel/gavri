@@ -78,7 +78,10 @@ function _assignMainModuleHtml(user, sid, openSet) {
       { key: 'מסייעת', label: 'מסייעת' },
       { key: 'מנהלי', label: 'מנהלי' }
     ],
-    respOptions: _assignmentRespOptions()
+    respOptions: _assignmentRespOptions(),
+    slotConfig: Assignments_slotConfig().map(function(s) {
+      return { resp: s.resp, count: s.count };
+    })
   });
 
   return (approvedHome.length
@@ -111,11 +114,11 @@ function _assignMainModuleHtml(user, sid, openSet) {
     '<button type="button" id="assignSaveBtn" class="btn btn-primary">💾 שמירה ואישור</button>' +
     '</div></div>' +
     '<div id="assignNeedsWrap" class="assign-section-wrap">' +
-    '<div class="assign-section-label">⚠ תרגילים ללא שיבוץ — גרור חניכים לכאן</div>' +
+    '<div class="assign-section-label">⚠ תרגילים הזקוקים לשיבוץ (ריקים או חלקיים)</div>' +
     '<div id="assignNeedsBoard" class="assign-priority-board"></div>' +
     '</div>' +
     '<div class="assign-section-wrap">' +
-    '<div class="assign-section-label">🔀 לוח שיבוץ</div>' +
+    '<div class="assign-section-label">✓ תרגילים משובצים במלואם + חניכים לשיבוץ</div>' +
     '<div id="assignBoard" class="assign-main-board"></div>' +
     '</div>' +
     '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">' +
@@ -198,6 +201,36 @@ function _assignBoardJs() {
 
   function exAssigneeCount(exId) {
     return (data.exMap[exId] || []).length;
+  }
+
+  function exerciseFillStatus(exId) {
+    var slots = data.slotConfig || [];
+    var byResp = {};
+    (data.exMap[exId] || []).forEach(function(a) {
+      var r = String(a.resp || '').trim();
+      if (r) byResp[r] = (byResp[r] || 0) + 1;
+    });
+    var filled = 0;
+    var total = 0;
+    slots.forEach(function(s) {
+      total += s.count;
+      filled += Math.min(s.count, byResp[s.resp] || 0);
+    });
+    return {
+      filled: filled,
+      total: total,
+      isFull: total > 0 && filled >= total,
+      isEmpty: filled === 0,
+      missing: Math.max(0, total - filled)
+    };
+  }
+
+  function exerciseSubtitle(ex, status) {
+    var dates = [ex.start, ex.end].filter(Boolean).join(' — ');
+    var fill = status.filled + '/' + status.total + ' תפקידים';
+    if (status.isFull) return (dates ? dates + ' · ' : '') + fill + ' · מלא';
+    if (status.isEmpty) return (dates ? dates + ' · ' : '') + 'ללא שיבוץ · חסרים ' + status.missing;
+    return (dates ? dates + ' · ' : '') + fill + ' · חסרים ' + status.missing;
   }
 
   function isTempId(id) {
@@ -769,20 +802,33 @@ function _assignBoardJs() {
     if (board) board.innerHTML = '';
     if (needsBoard) needsBoard.innerHTML = '';
 
-    var emptyExercises = [];
-    var filledExercises = [];
+    var incompleteExercises = [];
+    var fullExercises = [];
     data.exercises.forEach(function(ex) {
-      if (exAssigneeCount(ex.id) === 0) emptyExercises.push(ex);
-      else filledExercises.push(ex);
+      var status = exerciseFillStatus(ex.id);
+      if (status.isFull) fullExercises.push(ex);
+      else incompleteExercises.push(ex);
+    });
+
+    incompleteExercises.sort(function(a, b) {
+      var sa = exerciseFillStatus(a.id);
+      var sb = exerciseFillStatus(b.id);
+      if (sa.missing !== sb.missing) return sb.missing - sa.missing;
+      if (sa.filled !== sb.filled) return sa.filled - sb.filled;
+      return String(a.title || '').localeCompare(String(b.title || ''), 'he');
     });
 
     if (needsWrap) {
-      needsWrap.style.display = emptyExercises.length ? '' : 'none';
+      needsWrap.style.display = incompleteExercises.length ? '' : 'none';
     }
 
-    emptyExercises.forEach(function(ex) {
-      var subtitle = [ex.start, ex.end].filter(Boolean).join(' — ') || 'ללא משתתפים';
-      var col = makeColumn(ex.id, ex.title, subtitle, [], { priority: true });
+    incompleteExercises.forEach(function(ex) {
+      var status = exerciseFillStatus(ex.id);
+      var parts = data.exMap[ex.id] || [];
+      var chips = parts.map(function(a) {
+        return makeChip(a.userId, a.id, a.resp, ex.id);
+      });
+      var col = makeColumn(ex.id, ex.title, exerciseSubtitle(ex, status), chips, { priority: true });
       if (needsBoard) needsBoard.appendChild(col);
     });
 
@@ -793,14 +839,13 @@ function _assignBoardJs() {
     if (board) {
       board.appendChild(makeColumn('__pool__', '👤 חניכים לשיבוץ', pool.length + ' חניכים · פחות שיבוצים למעלה', poolChips));
 
-      filledExercises.forEach(function(ex) {
+      fullExercises.forEach(function(ex) {
+        var status = exerciseFillStatus(ex.id);
         var parts = data.exMap[ex.id] || [];
         var chips = parts.map(function(a) {
           return makeChip(a.userId, a.id, a.resp, ex.id);
         });
-        var subtitle = [ex.start, ex.end].filter(Boolean).join(' — ') || '';
-        subtitle += (subtitle ? ' · ' : '') + parts.length + ' משתתפים';
-        board.appendChild(makeColumn(ex.id, ex.title, subtitle, chips));
+        board.appendChild(makeColumn(ex.id, ex.title, exerciseSubtitle(ex, status), chips));
       });
     }
 
