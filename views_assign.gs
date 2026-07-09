@@ -113,8 +113,14 @@ function _assignMainModuleHtml(user, sid, openSet) {
     '</div></div>' +
     '<div class="assign-layout">' +
     '<aside class="assign-users-col" id="assignUsersCol">' +
-    '<div class="assign-panel-head">👤 משתמשים לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
-    '<div id="assignUsersList" class="assign-users-list"></div>' +
+    '<div class="assign-users-block">' +
+    '<div class="assign-panel-head">👤 חניכים לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
+    '<div id="assignTraineesList" class="assign-users-list"></div>' +
+    '</div>' +
+    '<div class="assign-users-block assign-mm-block">' +
+    '<div class="assign-panel-head">🎖 ממ לשיבוץ <span class="assign-panel-sub">הכי משובץ למעלה</span></div>' +
+    '<div id="assignMmList" class="assign-users-list"></div>' +
+    '</div>' +
     '</aside>' +
     '<div class="assign-exercises-col">' +
     '<div class="assign-panel-head">🎯 תרגילים <span class="assign-panel-sub">חסרים למעלה</span></div>' +
@@ -146,7 +152,8 @@ function _assignBoardJs() {
 (function() {
   var data = JSON.parse(document.getElementById('assignData').textContent);
   var sid = document.getElementById('assignSid').value;
-  var usersList = document.getElementById('assignUsersList');
+  var traineesList = document.getElementById('assignTraineesList');
+  var mmList = document.getElementById('assignMmList');
   var exercisesList = document.getElementById('assignExercisesList');
   var status = document.getElementById('assignStatus');
   var leastPanel = document.getElementById('assignLeastPanel');
@@ -435,6 +442,37 @@ function _assignBoardJs() {
       return String(a.name || '').localeCompare(String(b.name || ''), 'he');
     });
     return list;
+  }
+
+  function getDepartmentCommanderPool() {
+    var list = [];
+    Object.keys(data.userMap).forEach(function(uid) {
+      var u = data.userMap[uid];
+      if (!u || u.role !== 'departmentCommander') return;
+      list.push({ id: uid, name: u.name, count: countAssignments(uid) });
+    });
+    list.sort(function(a, b) {
+      if (a.count !== b.count) return b.count - a.count;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+    });
+    return list;
+  }
+
+  function renderUserPool(listEl, pool, emptyLabel) {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    listEl.className = 'assign-users-list';
+    bindPoolDropZone(listEl);
+    if (!pool.length) {
+      var empty = document.createElement('div');
+      empty.className = 'assign-users-empty';
+      empty.textContent = emptyLabel;
+      listEl.appendChild(empty);
+      return;
+    }
+    pool.forEach(function(t) {
+      listEl.appendChild(makePoolChip(t.id, t.count));
+    });
   }
 
   function profileRow(label, val) {
@@ -803,7 +841,6 @@ function _assignBoardJs() {
 
   function render() {
     hideUserPopoverForce();
-    if (usersList) usersList.innerHTML = '';
     if (exercisesList) exercisesList.innerHTML = '';
 
     var sortedExercises = data.exercises.slice().sort(function(a, b) {
@@ -827,21 +864,8 @@ function _assignBoardJs() {
       });
     }
 
-    if (usersList) {
-      usersList.className = 'assign-users-list';
-      bindPoolDropZone(usersList);
-      var pool = getTraineePool();
-      if (!pool.length) {
-        var empty = document.createElement('div');
-        empty.className = 'assign-users-empty';
-        empty.textContent = 'אין חניכים במערכת';
-        usersList.appendChild(empty);
-      } else {
-        pool.forEach(function(t) {
-          usersList.appendChild(makePoolChip(t.id, t.count));
-        });
-      }
-    }
+    renderUserPool(traineesList, getTraineePool(), 'אין חניכים במערכת');
+    renderUserPool(mmList, getDepartmentCommanderPool(), 'אין ממ במערכת');
 
     renderChangesBar();
     renderLeastAssigned();
