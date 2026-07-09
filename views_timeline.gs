@@ -196,10 +196,19 @@ function _timelineRenderBlockBar(block, weekStartMs, weekEndMs, layout, rowTopPx
   let heightPx = layout.totalHeight - 8;
   const lane = block.lane || 'all';
   if (lane === '0' || lane === '1' || lane === '2') {
-    const typeKey = lane === '0' ? 'חיר' : lane === '1' ? 'חשן' : '900';
-    const band = layout.bandByType[typeKey];
-    topPx = rowTopPx + band.top + 4;
-    heightPx = band.height - 8;
+    const slot = parseInt(lane, 10);
+    let band = null;
+    if (layout.battalionMode && layout.bandOrder && layout.bandOrder[slot]) {
+      band = layout.bandByKey[layout.bandOrder[slot].key];
+    }
+    if (!band) {
+      const typeKey = lane === '0' ? 'חיר' : lane === '1' ? 'חשן' : '900';
+      band = layout.bandByKey['type:' + typeKey];
+    }
+    if (band) {
+      topPx = rowTopPx + band.top + 4;
+      heightPx = band.height - 8;
+    }
   }
 
   const style = 'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;width:' + widthPct + '%;' +
@@ -262,7 +271,7 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
   let s = '';
   items.forEach(function(item) {
     const ex = item.ex;
-    const typeKey = item.typeKey || _timelineNormalizeType(ex);
+    const typeKey = item.displayType || item.typeKey || _timelineNormalizeType(ex);
     const startYmd = _timelineMsToYmdLocal(item.startMs);
     const endYmd = _timelineMsToYmdLocal(item.endMs);
     const startHm = _timelineMsToHmLocal(item.startMs);
@@ -285,77 +294,148 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
   return s;
 }
 
+var TIMELINE_TYPE_ORDER = ['חיר', 'חשן', '900', 'אחר'];
+
+function _timelineBandOrder() {
+  const bn = typeof Series_getBattalionConfig === 'function' ? Series_getBattalionConfig() : null;
+  if (bn && bn.length) {
+    return bn.map(function(b) {
+      return {
+        key: 'ff:' + b.fieldForceId,
+        label: b.forceName,
+        forceType: b.forceType,
+        slot: b.slot,
+        fieldForceId: b.fieldForceId,
+        isBattalion: true
+      };
+    });
+  }
+  return TIMELINE_TYPE_ORDER.map(function(typeKey) {
+    return {
+      key: 'type:' + typeKey,
+      label: typeKey === 'חיר' ? 'חי״ר' : typeKey,
+      forceType: typeKey,
+      isBattalion: false
+    };
+  });
+}
+
+function _timelineResolveBandKey(ex, battalionConfig) {
+  if (battalionConfig && battalionConfig.length) {
+    if (ex.field_force_id) {
+      for (let i = 0; i < battalionConfig.length; i++) {
+        if (String(battalionConfig[i].fieldForceId) === String(ex.field_force_id)) {
+          return 'ff:' + battalionConfig[i].fieldForceId;
+        }
+      }
+    }
+    const slot = parseInt(ex.series_force_slot, 10);
+    if (!isNaN(slot) && slot >= 0 && slot < battalionConfig.length) {
+      return 'ff:' + battalionConfig[slot].fieldForceId;
+    }
+    if (ex.partner_battalion) {
+      for (let j = 0; j < battalionConfig.length; j++) {
+        if (String(ex.partner_battalion).trim() === String(battalionConfig[j].forceName).trim()) {
+          return 'ff:' + battalionConfig[j].fieldForceId;
+        }
+      }
+    }
+  }
+  return 'type:' + _timelineNormalizeType(ex);
+}
+
 function _timelineRangesOverlap(a, b) {
   return a.startMs < b.endMs && a.endMs > b.startMs;
 }
 
-var TIMELINE_TYPE_ORDER = ['חיר', 'חשן', '900', 'אחר'];
-
-/** Assign base type + sub-lane when exercises of the same type overlap in time. */
+/** Assign band (גדוד או סוג כוח) + sub-lane when exercises overlap in time. */
 function _timelineAssignStackedLanes(items) {
   const SUB_BAR_H = 46;
   const MIN_BAND_H = 58;
-  const bandByType = {};
-  let bandOffset = 0;
+  const battalionConfig = typeof Series_getBattalionConfig === 'function'
+    ? Series_getBattalionConfig() : null;
+  const bandOrder = _timelineBandOrder();
+  const bandByKey = {};
+  const byBand = {};
+
+  bandOrder.forEach(function(bandDef) {
+    bandByKey[bandDef.key] = {
+      top: 0,
+      height: MIN_BAND_H,
+      maxSub: 1,
+      subBarH: SUB_BAR_H,
+      def: bandDef
+    };
+  });
 
   items.forEach(function(item) {
     item.typeKey = _timelineNormalizeType(item.ex);
-    item.baseLane = TIMELINE_TYPE_LANES.hasOwnProperty(item.typeKey)
-      ? TIMELINE_TYPE_LANES[item.typeKey] : 3;
-    item.subLane = 0;
-  });
-
-  const byType = {};
-  items.forEach(function(item) {
-    const k = item.typeKey;
-    if (!byType[k]) byType[k] = [];
-    byType[k].push(item);
-  });
-
-  TIMELINE_TYPE_ORDER.forEach(function(typeKey) {
-    const group = byType[typeKey] || [];
-    let maxSub = 1;
-
-    if (group.length) {
-      group.sort(function(a, b) { return a.startMs - b.startMs; });
-      const subLanes = [];
-
-      group.forEach(function(item) {
-        let sub = -1;
-        for (let s = 0; s < subLanes.length; s++) {
-          const free = !subLanes[s].some(function(other) {
-            return _timelineRangesOverlap(item, other);
-          });
-          if (free) {
-            sub = s;
-            break;
-          }
-        }
-        if (sub < 0) {
-          sub = subLanes.length;
-          subLanes.push([]);
-        }
-        item.subLane = sub;
-        subLanes[sub].push(item);
-      });
-      maxSub = subLanes.length;
+    item.bandKey = _timelineResolveBandKey(item.ex, battalionConfig);
+    if (!bandByKey[item.bandKey]) {
+      bandByKey[item.bandKey] = {
+        top: 0,
+        height: MIN_BAND_H,
+        maxSub: 1,
+        subBarH: SUB_BAR_H,
+        def: { key: item.bandKey, label: item.typeKey, forceType: item.typeKey, isBattalion: false }
+      };
     }
+    if (!byBand[item.bandKey]) byBand[item.bandKey] = [];
+    byBand[item.bandKey].push(item);
+  });
 
-    const bandH = Math.max(MIN_BAND_H, maxSub * SUB_BAR_H);
-    bandByType[typeKey] = { top: bandOffset, height: bandH, maxSub: maxSub, subBarH: SUB_BAR_H };
-    bandOffset += bandH;
+  Object.keys(byBand).forEach(function(key) {
+    const group = byBand[key];
+    group.sort(function(a, b) { return a.startMs - b.startMs; });
+    const subLanes = [];
+    group.forEach(function(item) {
+      let sub = -1;
+      for (let s = 0; s < subLanes.length; s++) {
+        const free = !subLanes[s].some(function(other) {
+          return _timelineRangesOverlap(item, other);
+        });
+        if (free) { sub = s; break; }
+      }
+      if (sub < 0) {
+        sub = subLanes.length;
+        subLanes.push([]);
+      }
+      item.subLane = sub;
+      subLanes[sub].push(item);
+    });
+    const maxSub = Math.max(1, subLanes.length);
+    const band = bandByKey[key];
+    band.maxSub = maxSub;
+    band.height = Math.max(MIN_BAND_H, maxSub * SUB_BAR_H);
+  });
+
+  const orderedKeys = bandOrder.map(function(b) { return b.key; });
+  Object.keys(bandByKey).forEach(function(k) {
+    if (orderedKeys.indexOf(k) === -1) orderedKeys.push(k);
+  });
+  let offset = 0;
+  orderedKeys.forEach(function(key) {
+    const band = bandByKey[key];
+    if (!band) return;
+    band.top = offset;
+    offset += band.height;
   });
 
   items.forEach(function(item) {
-    item.lane = item.baseLane;
-    item.band = bandByType[item.typeKey];
+    item.band = bandByKey[item.bandKey];
+    item.baseLane = item.band && item.band.def ? item.band.def.slot : 0;
+    item.displayType = (item.band && item.band.def && item.band.def.forceType)
+      ? item.band.def.forceType : item.typeKey;
+    item.lane = item.baseLane || 0;
   });
 
   return {
-    totalHeight: bandOffset,
-    bandByType: bandByType,
+    totalHeight: offset,
+    bandByKey: bandByKey,
+    bandOrder: bandOrder,
     maxLane: 2,
-    subBarH: SUB_BAR_H
+    subBarH: SUB_BAR_H,
+    battalionMode: !!(battalionConfig && battalionConfig.length)
   };
 }
 
@@ -591,9 +671,10 @@ function Views_timeline(p) {
   const barMinH = 44;
   const trackH = Math.max(280, rowTopPx + layout.totalHeight + 12);
 
+  const labelPad = layout.battalionMode ? 92 : 48;
   s += '<div class="timeline-scroll" id="timelineScroll">';
   s += '<div id="timelineTrack" class="timeline-track" style="position:relative;height:' +
-       trackH + 'px;min-width:' + TIMELINE_MIN_WIDTH + 'px;padding-right:48px;' +
+       trackH + 'px;min-width:' + TIMELINE_MIN_WIDTH + 'px;padding-right:' + labelPad + 'px;' +
        '--tl-lane-h:' + layout.subBarH + 'px;--tl-bar-min-h:' + barMinH + 'px"' +
        ' data-week-start="' + weekStartMs + '"' +
        ' data-week-end="' + weekEndMs + '"' +
@@ -601,17 +682,18 @@ function Views_timeline(p) {
        ' data-sid-q="' + _timelineAttrEsc(sidQ) + '"' +
        ' data-can-edit="' + (canEdit ? '1' : '0') + '">';
 
-  const rowLabels = [
-    { typeKey: 'חיר', label: 'חי״ר' },
-    { typeKey: 'חשן', label: 'חשן' },
-    { typeKey: '900', label: '900' }
-  ];
+  const rowLabels = layout.bandOrder;
   rowLabels.forEach(function(row) {
-    const band = layout.bandByType[row.typeKey];
+    const band = layout.bandByKey[row.key];
+    if (!band) return;
     const labelTop = rowTopPx + band.top + Math.round(band.height / 2) - 8;
+    const labelW = layout.battalionMode ? 84 : 42;
+    const typeHint = row.forceType && layout.battalionMode
+      ? '<span style="display:block;font-size:9px;opacity:.7">' + _esc(row.forceType) + '</span>' : '';
     s += '<div class="timeline-row-label" style="position:absolute;right:4px;top:' +
       labelTop + 'px;font-family:var(--mono);font-size:10px;color:var(--muted);' +
-      'z-index:15;pointer-events:none">' + row.label + '</div>';
+      'z-index:15;pointer-events:none;max-width:' + labelW + 'px;line-height:1.25;text-align:center">' +
+      _esc(row.label) + typeHint + '</div>';
   });
 
   for (let i = 0; i <= TIMELINE_TOTAL_SLOTS; i++) {
@@ -669,7 +751,7 @@ function Views_timeline(p) {
     const band = item.band;
     const barH = band.subBarH - 8;
     const topPx = rowTopPx + band.top + (item.subLane || 0) * band.subBarH + 4;
-    const color = TIMELINE_TYPE_COLORS[item.typeKey] || COLORS[idx % COLORS.length];
+    const color = TIMELINE_TYPE_COLORS[item.displayType || item.typeKey] || COLORS[idx % COLORS.length];
     const isPast = item.endMs < nowMs;
     const exId = String(item.ex.id);
     const barDomId = 'tl-bar-' + exId.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -685,7 +767,7 @@ function Views_timeline(p) {
     const dataAttrs =
       ' id="' + _timelineAttrEsc(barDomId) + '"' +
       ' data-tl-bar="1" data-exercise-id="' + _timelineAttrEsc(exId) + '"' +
-      ' data-exercise-type="' + _timelineAttrEsc(item.typeKey || '') + '"' +
+      ' data-exercise-type="' + _timelineAttrEsc(item.displayType || item.typeKey || '') + '"' +
       ' data-lane="' + (item.baseLane || 0) + '"' +
       ' data-sub-lane="' + (item.subLane || 0) + '"' +
       ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';

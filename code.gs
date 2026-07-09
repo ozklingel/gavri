@@ -235,6 +235,8 @@ function setupSheets() {
   ensureColumn('Exercises', 'battalion_commander');
   ensureColumn('Exercises', 'start_time');
   ensureColumn('Exercises', 'end_time');
+  ensureColumn('Exercises', 'series_force_slot');
+  ensureColumn('Exercises', 'field_force_id');
   ensure('ExerciseDetails',  ['id','exercise_id','time','location','description']);
   ensure('Assignments',      ['id','exercise_id','user_id','status','score','responsibility','feedback']);
   ensureColumn('Assignments', 'responsibility');

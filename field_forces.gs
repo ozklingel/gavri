@@ -27,6 +27,33 @@ function FieldForces_displayLabels() {
   return FieldForces_all().map(FieldForces_displayLabel).filter(Boolean);
 }
 
+/** גדוד = תפקיד «גדוד» או שם כוח שמכיל «גדוד». */
+function FieldForces_isBattalion(f) {
+  if (!f) return false;
+  const role = String(f.role || '').trim();
+  const name = String(f.force_name || '').trim();
+  return role === 'גדוד' || role.indexOf('גדוד') !== -1 ||
+    name.indexOf('גדוד') !== -1;
+}
+
+function FieldForces_battalions() {
+  return FieldForces_all().filter(FieldForces_isBattalion);
+}
+
+/** אפשרויות לבחירת גדוד בבניית סדרה — [id, label]. */
+function FieldForces_battalionSelectOptions() {
+  const items = FieldForces_battalions().slice().sort(function(a, b) {
+    return FieldForces_displayLabel(a).localeCompare(FieldForces_displayLabel(b), 'he');
+  });
+  const opts = [['', '— בחר גדוד —']];
+  items.forEach(function(f) {
+    const label = FieldForces_displayLabel(f);
+    const ft = String(f.force_type || '').trim();
+    opts.push([f.id, label + (ft ? ' · ' + ft : '')]);
+  });
+  return opts;
+}
+
 function FieldForces_create(p) {
   Auth_requireRole(p, ['admin']);
   const role          = String(p.role || '').trim();

@@ -288,7 +288,9 @@ function Exercises_all() {
     exercise_type:       r[7]  == null ? '' : String(r[7]),
     partner_battalion:   r[8]  == null ? '' : String(r[8]),
     camp:                r[9]  == null ? '' : String(r[9]),
-    battalion_commander: r[10] == null ? '' : String(r[10])
+    battalion_commander: r[10] == null ? '' : String(r[10]),
+    series_force_slot:   r[13] == null ? '' : String(r[13]),
+    field_force_id:      r[14] == null ? '' : String(r[14])
   }));
 }
 
@@ -513,7 +515,8 @@ function Exercises_duplicate(p) {
   _append('Exercises', [newId, orig.title + ' (עותק)', orig.description, u.id,
     orig.rawStartDate, orig.rawEndDate, orig.act, orig.exercise_type,
     orig.partner_battalion, orig.camp, orig.battalion_commander,
-    orig.rawStartTime || '', orig.rawEndTime || '']);
+    orig.rawStartTime || '', orig.rawEndTime || '',
+    orig.series_force_slot || '', orig.field_force_id || '']);
 
   // PERF: batch-append all detail rows at once
   const details = Exercises_details(orig.id);

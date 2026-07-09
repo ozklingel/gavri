@@ -99,22 +99,59 @@ function _seriesLocationsForVariant(variantLabel, locations) {
   });
 }
 
-/** שלושה כוחות בסדרה + סה"כ תרגילים — חלוקה שווה (±1) לכל כוח. */
-function _seriesQueueFromParams(p) {
-  const forces = [
-    _seriesNormalizeForceType(p.series_force_1),
-    _seriesNormalizeForceType(p.series_force_2),
-    _seriesNormalizeForceType(p.series_force_3)
-  ];
-  for (let i = 0; i < forces.length; i++) {
-    if (!forces[i]) {
-      throw new Error('יש לבחור סוג כוח לכוח ' + (i + 1) + ' (חיר / חשן / 900).');
-    }
+/** שלושה גדודים מכוחות בשטח — סוג התרגיל נגזר מ־force_type של כל גדוד. */
+function Series_saveBattalionConfig(slots) {
+  PropertiesService.getScriptProperties().setProperty(
+    'series_battalions',
+    JSON.stringify(slots || [])
+  );
+}
+
+function Series_getBattalionConfig() {
+  const raw = PropertiesService.getScriptProperties().getProperty('series_battalions');
+  if (!raw) return null;
+  try {
+    const arr = JSON.parse(raw);
+    return arr && arr.length ? arr : null;
+  } catch (e) {
+    return null;
   }
+}
+
+function _seriesBattalionsFromParams(p) {
+  const keys = ['series_ff_1', 'series_ff_2', 'series_ff_3'];
+  const slots = [];
+  for (let i = 0; i < 3; i++) {
+    const id = String(p[keys[i]] || '').trim();
+    const ff = FieldForces_get(id);
+    if (!ff) {
+      throw new Error('יש לבחור 3 גדודים מכוחות בשטח (גדוד ' + (i + 1) + ').');
+    }
+    if (!FieldForces_isBattalion(ff)) {
+      throw new Error('«' + FieldForces_displayLabel(ff) + '» אינו מסוג גדוד — בחר רשומה עם תפקיד גדוד.');
+    }
+    const ft = _seriesNormalizeForceType(ff.force_type);
+    if (!ft) {
+      throw new Error('לגדוד «' + FieldForces_displayLabel(ff) + '» חסר סוג כוח תקין (חיר / חשן / 900).');
+    }
+    slots.push({
+      slot: i,
+      fieldForceId: ff.id,
+      forceName: FieldForces_displayLabel(ff),
+      forceType: ft
+    });
+  }
+  return slots;
+}
+
+/** שלושה גדודים בסדרה + סה"כ תרגילים — חלוקה שווה (±1) לכל גדוד. */
+function _seriesQueueFromParams(p) {
+  const battalions = _seriesBattalionsFromParams(p);
+  Series_saveBattalionConfig(battalions);
 
   const total = Math.max(0, parseInt(p.series_total, 10) || 0);
   if (total < 3) {
-    throw new Error('יש להזין לפחות 3 תרגילים בסדרה (מחולקים בין 3 הכוחות).');
+    throw new Error('יש להזין לפחות 3 תרגילים בסדרה (מחולקים בין 3 הגדודים).');
   }
 
   const base = Math.floor(total / 3);
@@ -124,8 +161,14 @@ function _seriesQueueFromParams(p) {
 
   const queue = [];
   for (let i = 0; i < 3; i++) {
+    const b = battalions[i];
     for (let j = 0; j < perForce[i]; j++) {
-      queue.push({ type: forces[i], forceSlot: i });
+      queue.push({
+        type: b.forceType,
+        forceSlot: i,
+        fieldForceId: b.fieldForceId,
+        forceName: b.forceName
+      });
     }
   }
   return queue;
@@ -629,7 +672,8 @@ function Series_schedule(startYmd, endYmd, queue, locations, opts) {
               const ent = entries[pe];
               placed.push({
                 type: 'חשן', forceSlot: forceSlot, variant: ent.variant,
-                location: ent.location, plan: ent.plans[0], plans: ent.plans, pairId: pairId
+                location: ent.location, plan: ent.plans[0], plans: ent.plans, pairId: pairId,
+                fieldForceId: item.fieldForceId, forceName: item.forceName
               });
               for (let pi = 0; pi < ent.plans.length; pi++) {
                 ranges.push({
@@ -661,7 +705,9 @@ function Series_schedule(startYmd, endYmd, queue, locations, opts) {
               variant: variant,
               location: location,
               plan: plans[0],
-              plans: plans
+              plans: plans,
+              fieldForceId: item.fieldForceId,
+              forceName: item.forceName
             });
             plans.forEach(function(plan) {
               ranges.push({
@@ -724,26 +770,27 @@ function Series_locationCheckboxesHtml() {
   return s;
 }
 
-function Series_forceSelectOptions() {
-  return [
-    ['', '— בחר —'],
-    ['חיר', 'חיר'],
-    ['חשן', 'חשן'],
-    ['900', '900']
-  ];
+function Series_battalionSelectOptions() {
+  return FieldForces_battalionSelectOptions();
 }
 
 function Series_buildFormHtml(sid) {
-  const forceOpts = Series_forceSelectOptions();
+  const ffOpts = Series_battalionSelectOptions();
+  const battalionCount = FieldForces_battalions().length;
+  const saved = Series_getBattalionConfig() || [];
   let s = '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">' +
-    'תזמון אוטומטי: בוחרים 3 כוחות (מותרות כפילויות), סה״כ תרגילים, ומיקומים. ' +
-    'התרגילים מתחלקים בערך שווה בין שלושת הכוחות.</p>';
+    'תזמון אוטומטי: בוחרים <b>3 גדודים</b> מכוחות בשטח — סוג התרגיל (חיר / חשן / 900) נלקח משדה «סוג כוח» של כל גדוד. ' +
+    'התרגילים מתחלקים בערך שווה בין שלושת הגדודים.</p>';
+  if (battalionCount < 3) {
+    s += '<p style="font-size:12px;color:#d97706;margin:0 0 12px;font-weight:600">' +
+      '⚠ יש רק ' + battalionCount + ' גדודים במערכת — הוסף גדודים ב<a href="#" data-spa-page="fieldForces">כוחות בשטח</a> (תפקיד: גדוד).</p>';
+  }
   s += '<p style="font-size:12px;color:#d97706;margin:0 0 12px;font-weight:600">' +
     '⚠ בניית סדרה מוחקת את כל התרגילים, השיבוצים וצירי הזמן הקיימים במערכת.</p>';
   s += '<ul style="font-size:11px;color:var(--muted);margin:0 0 14px 18px;line-height:1.6">';
   s += '<li>התחלה ביום שני הראשון בטווח, בשעה 06:00</li>';
   s += '<li>מרווח 18 שעות בין תרגילים באותו כוח (מסלול)</li>';
-  s += '<li>עד 3 תרגילים במקביל (כוחות שונים יכולים להיות מאותו סוג)</li>';
+  s += '<li>עד 3 תרגילים במקביל (גדודים שונים יכולים להיות מאותו סוג כוח)</li>';
   s += '<li>יום/לילה לפי סוג התרגיל · חשן: התקדמות ואז יבש־רטוב</li>';
   s += '<li>ללא שבת/חג · בקיץ ללא התחלה 12:00–16:00</li>';
   s += '</ul>';
@@ -760,17 +807,17 @@ function Series_buildFormHtml(sid) {
   s += '<div class="form-row" style="margin-top:8px"><label class="form-label">סה״כ תרגילים בסדרה</label>';
   s += '<input type="number" name="series_total" class="form-input" min="3" value="9" required></div>';
   s += '<div class="form-grid" style="margin-top:8px">';
-  s += '<div class="form-row"><label class="form-label">כוח 1</label>' +
-    _select('series_force_1', forceOpts, '', 'required') + '</div>';
-  s += '<div class="form-row"><label class="form-label">כוח 2</label>' +
-    _select('series_force_2', forceOpts, '', 'required') + '</div>';
-  s += '<div class="form-row"><label class="form-label">כוח 3</label>' +
-    _select('series_force_3', forceOpts, '', 'required') + '</div>';
+  s += '<div class="form-row"><label class="form-label">גדוד 1</label>' +
+    _select('series_ff_1', ffOpts, saved[0] ? saved[0].fieldForceId : '', 'required') + '</div>';
+  s += '<div class="form-row"><label class="form-label">גדוד 2</label>' +
+    _select('series_ff_2', ffOpts, saved[1] ? saved[1].fieldForceId : '', 'required') + '</div>';
+  s += '<div class="form-row"><label class="form-label">גדוד 3</label>' +
+    _select('series_ff_3', ffOpts, saved[2] ? saved[2].fieldForceId : '', 'required') + '</div>';
   s += '</div>';
   s += '<div class="form-row" style="margin-top:12px"><label class="form-label">מיקומים לשיבוץ</label>';
   s += Series_locationCheckboxesHtml() + '</div>';
   s += '<p style="font-size:11px;color:var(--muted);margin-top:8px">' +
-    'דוגמה: 10 תרגילים, כוחות 900 + 900 + חשן → 4 + 3 + 3 מקומות בלוז.</p>';
+    'דוגמה: 9 תרגילים, 3 גדודים (חיר + חשן + 900) → 3 תרגילים לכל גדוד. בציר הזמן — שורה לכל גדוד.</p>';
   s += '<button type="submit" class="btn btn-primary btn-full" ' +
     'onclick="return confirm(\'בניית סדרה תמחק את כל התרגילים, השיבוצים וצירי הזמן הקיימים. להמשיך?\')">' +
     '► בנה סדרה</button>';
@@ -808,11 +855,16 @@ function Exercises_buildSeries(p) {
   const exRows = [];
   const baseTs = Date.now();
 
+  const battalionConfig = Series_getBattalionConfig() || [];
+
   let rowIdx = 0;
   result.placed.forEach(function(item) {
     const type = item.type;
     const plans = item.plans || [item.plan];
     const location = item.location || '';
+    const slotBn = battalionConfig[item.forceSlot] || {};
+    const forceName = item.forceName || slotBn.forceName || '';
+    const fieldForceId = item.fieldForceId || slotBn.fieldForceId || '';
     plans.forEach(function(plan) {
       const slotLabel = _seriesSlotLabel(plan, item.variant ? item.variant.label : '');
       const id = 'E' + baseTs + '_' + rowIdx;
@@ -829,12 +881,13 @@ function Exercises_buildSeries(p) {
         _seriesMsToYmd(plan.endMs),
         'סדרה',
         type,
-        '',
+        forceName,
         location,
         '',
         _seriesMsToHm(plan.startMs),
         _seriesMsToHm(plan.endMs),
-        String(item.forceSlot)
+        String(item.forceSlot),
+        fieldForceId
       ]);
     });
   });
@@ -857,6 +910,11 @@ function Exercises_buildSeries(p) {
   Object.keys(byType).forEach(function(t) {
     info += ' · ' + t + ': ' + byType[t];
   });
+  if (battalionConfig.length) {
+    info += '. גדודים: ' + battalionConfig.map(function(b) {
+      return b.forceName + ' (' + b.forceType + ')';
+    }).join(', ');
+  }
   if (result.skippedCount) {
     info += '. לא נמצא מקום ל-' + result.skippedCount +
       ' (הרחב טווח, הוסף מיקומים, או הקטן כמות)';

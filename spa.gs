@@ -104,7 +104,11 @@ function _cacheWarmForPage(page, p) {
     return;
   }
   if (pg === 'timeline') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments']);
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces']);
+    return;
+  }
+  if (pg === 'exercises') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'FieldForces']);
     return;
   }
   if (pg === 'assign') {

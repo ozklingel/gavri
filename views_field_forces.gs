@@ -55,7 +55,12 @@ function Views_fieldForces(p) {
       '<div class="form-row"><label class="form-label">מקום מחנה</label>' +
       _input('camp_location', 'מקום מחנה', '', 'text', 'required') + '</div>' +
       '<div class="form-row"><label class="form-label">סוג כוח</label>' +
-      _input('force_type', 'סוג כוח', '', 'text', 'required') + '</div>' +
+      _select('force_type', [
+        ['', '— בחר —'],
+        ['חיר', 'חיר'],
+        ['חשן', 'חשן'],
+        ['900', '900']
+      ], '', 'required') + '</div>' +
       _submitBtn('צור כוח', 'btn btn-primary btn-full') +
       '</form></div></div>';
     s += '<div style="margin-top:12px">' +
@@ -110,7 +115,12 @@ function Views_fieldForce(p) {
       '<div class="form-row"><label class="form-label">מקום מחנה</label>' +
       _input('camp_location', '', item.camp_location, 'text', 'required') + '</div>' +
       '<div class="form-row"><label class="form-label">סוג כוח</label>' +
-      _input('force_type', '', item.force_type, 'text', 'required') + '</div>' +
+      _select('force_type', [
+        ['', '— בחר —'],
+        ['חיר', 'חיר'],
+        ['חשן', 'חשן'],
+        ['900', '900']
+      ], item.force_type, 'required') + '</div>' +
       '</div>' +
       _submitBtn('שמור שינויים', 'btn btn-primary') +
       '</form></div></div>';
