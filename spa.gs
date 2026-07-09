@@ -1,8 +1,8 @@
 // spa.gs — Single-page API (fixed URL, no query-string navigation)
 
 function apiRenderPage(sid, page, paramsJson) {
-  _cacheWarmAllIfNeeded();
   const p = _spaMergeParams(sid, paramsJson);
+  _cacheWarmForPage(page || 'login', p);
   try {
     return _spaEnsureWrap(_spaDispatchPage(page || 'login', p));
   } catch (err) {
@@ -73,6 +73,49 @@ function _spaMergeParams(sid, paramsJson) {
 function _spaEnsureWrap(result) {
   if (result && (result.body != null || result.ok === true)) return result;
   throw new Error('תגובת שרת לא תקינה');
+}
+
+function _cacheWarmForPage(page, p) {
+  const pg = String(page || 'login').trim();
+  if (pg === 'login') return;
+
+  if (pg === 'dashboard') {
+    const tab = String((p && p.tab) || 'search').trim();
+    const searchUserId = String((p && p.searchUserId) || '').trim();
+    if (tab === 'team' || tab === 'exercise' || tab === 'conflicts' || searchUserId) {
+      _cacheWarmAllIfNeeded();
+    } else {
+      _cacheWarmSheetsIfNeeded(DB_BOOT_SHEETS);
+    }
+    return;
+  }
+
+  if (pg === 'fieldForces' || pg === 'fieldForce') {
+    _cacheWarmSheetsIfNeeded(['Users', 'FieldForces']);
+    return;
+  }
+  if (pg === 'fireZones' || pg === 'fireZone') {
+    _cacheWarmSheetsIfNeeded(['Users', 'FireZones']);
+    return;
+  }
+  if (pg === 'homeConstraints') {
+    _cacheWarmSheetsIfNeeded(['Users', 'HomeConstraints']);
+    return;
+  }
+  if (pg === 'timeline') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks']);
+    return;
+  }
+  if (pg === 'assign') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'HomeConstraints']);
+    return;
+  }
+  if (pg === 'statistics') {
+    _cacheWarmAllIfNeeded();
+    return;
+  }
+
+  _cacheWarmAllIfNeeded();
 }
 
 function _spaDispatchPage(page, p) {

@@ -149,7 +149,7 @@ function _authUserEmail(user) {
 }
 
 function _authCompleteLogin(user) {
-  _cacheWarmAllIfNeeded();
+  _cacheWarmSheetsIfNeeded(DB_BOOT_SHEETS);
   const page = Views_dashboard({ sid: user.id });
   page.sid = user.id;
   return page;

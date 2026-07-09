@@ -32,6 +32,8 @@ var DB_SHEET_NAMES = [
   'Users', 'Credentials', 'Teams', 'Exercises', 'ExerciseDetails',
   'Assignments', 'FieldForces', 'FireZones', 'HomeConstraints', 'TimelineBlocks'
 ];
+// מינימום לעלייה — לוגין לא דורש DB; דשבורד (טאב חיפוש) רק Users+Teams
+var DB_BOOT_SHEETS = ['Users', 'Teams'];
 var DB_CACHE_TTL_SEC = 600;
 var DB_CACHE_PREFIX = 'mdb:';
 var DB_CACHE_CHUNK = 90000;
@@ -108,8 +110,8 @@ function _cacheWarmSheet(name) {
   return result;
 }
 
-function _cacheWarmAllIfNeeded() {
-  DB_SHEET_NAMES.forEach(function(name) {
+function _cacheWarmSheetsIfNeeded(names) {
+  (names || []).forEach(function(name) {
     if (_rowsCache[name]) return;
     if (_scriptCacheHas(name)) {
       _rowsCache[name] = _getScriptCacheRows(name);
@@ -117,6 +119,10 @@ function _cacheWarmAllIfNeeded() {
     }
     _cacheWarmSheet(name);
   });
+}
+
+function _cacheWarmAllIfNeeded() {
+  _cacheWarmSheetsIfNeeded(DB_SHEET_NAMES);
 }
 
 function _cacheWarmAll(force) {
@@ -128,10 +134,15 @@ function _cacheWarmAll(force) {
 }
 
 function apiWarmCache(sid) {
-  if (sid) {
-    try { Auth_current({ sid: sid }); } catch (e) { /* warm גם לפני התחברות */ }
+  const s = String(sid || '').trim();
+  if (!s) return { ok: true, sheets: 0, scope: 'none' };
+  try {
+    Auth_current({ sid: s });
+  } catch (e) {
+    return { ok: true, sheets: 0, scope: 'none' };
   }
-  return _cacheWarmAll(false);
+  _cacheWarmSheetsIfNeeded(DB_BOOT_SHEETS);
+  return { ok: true, sheets: DB_BOOT_SHEETS.length, scope: 'boot' };
 }
 
 function _cacheFlush() {

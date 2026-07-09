@@ -411,10 +411,9 @@ function _appDrawer(user, sid) {
       '<span>' + _esc(item.label) + '</span></a>';
   });
 
-  const panels = _drawerDashboardPanels(user, sid);
-  const panelsHtml = panels
-    ? '<div class="app-drawer-panels">' + panels + '</div>'
-    : '';
+  const panelsHtml =
+    '<div class="app-drawer-panels" id="appDrawerPanels">' +
+    '<div data-spa-module="drawer.panels" data-spa-module-loaded="0"></div></div>';
 
   return '<div class="app-drawer-overlay" id="appDrawerOverlay" hidden></div>' +
     '<aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="תפריט ראשי">' +

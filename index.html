@@ -1890,7 +1890,6 @@ body {
     function showSplashStatus(msg) {
       clearTimeout(safetyTimer);
       setStatusText(msg || MSGS[0]);
-      safetyTimer = setTimeout(hide, 20000);
     }
     function hideSplash() {
       if (!splash || splashDone) return;
@@ -1922,9 +1921,8 @@ body {
       clearInterval(msgTimer);
       clearTimeout(safetyTimer);
       loader.classList.remove('visible');
-      hideSplash();
     }
-    return { show: show, hide: hide, showSplashStatus: showSplashStatus, labelFor: labelFor, MSGS: MSGS };
+    return { show: show, hide: hide, hideSplash: hideSplash, showSplashStatus: showSplashStatus, labelFor: labelFor, MSGS: MSGS };
   })();
   window.MapimSpaShowLoader = function(msg) { MapimLoader.show(msg); };
   window.MapimSpaHideLoader = function() { MapimLoader.hide(); };
@@ -1978,6 +1976,15 @@ body {
     var loading = false;
     var reqId = 0;
     var initialBoot = true;
+    var splashBoot = true;
+
+    function finishBootUi() {
+      MapimLoader.hide();
+      if (splashBoot) {
+        splashBoot = false;
+        MapimLoader.hideSplash();
+      }
+    }
 
     function parseSpaParams(el) {
       var raw = el.getAttribute('data-spa-params');
@@ -2066,6 +2073,8 @@ body {
           overlay.classList.add('open');
         });
         document.body.classList.add('drawer-open');
+        var panelsSlot = document.querySelector('#appDrawerPanels [data-spa-module="drawer.panels"]');
+        if (panelsSlot && window.MapimModules) MapimModules.loadSlot(panelsSlot);
       }
 
       function closeDrawer() {
@@ -2123,12 +2132,12 @@ body {
         afterRender();
       }
       if (result.title) document.title = result.title;
-      MapimLoader.hide();
+      finishBootUi();
       loading = false;
     }
 
     function fail(err) {
-      MapimLoader.hide();
+      finishBootUi();
       loading = false;
       alert(err && err.message ? err.message : String(err));
     }
@@ -2189,17 +2198,19 @@ body {
 
     function boot() {
       var sid = getSid();
-      if (typeof MapimLoader !== 'undefined' && MapimLoader.showSplashStatus) {
-        MapimLoader.showSplashStatus('טוען נתונים...');
+      MapimLoader.showSplashStatus('טוען...');
+      if (!sid) {
+        navigate('login', {});
+        return;
       }
       google.script.run
         .withSuccessHandler(function() {
-          navigate(sid ? 'dashboard' : 'login', {});
+          navigate('dashboard', {});
         })
         .withFailureHandler(function() {
-          navigate(sid ? 'dashboard' : 'login', {});
+          navigate('dashboard', {});
         })
-        .apiWarmCache(sid || '');
+        .apiWarmCache(sid);
     }
 
     function isLocalUiClick(el) {
