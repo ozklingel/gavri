@@ -453,13 +453,16 @@ body {
       padding: 10px 16px;
       font-family: var(--mono);
       font-size: 13px;
-      color: var(--muted);
+      color: var(--text);
       text-decoration: none;
       border-bottom: 2px solid transparent;
       margin-bottom: -2px;
       white-space: nowrap;
       transition: color 0.15s, border-color 0.15s;
       flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 6px 6px 0 0;
     }
     button.dashboard-tab,
     button.lazy-tab-btn,
@@ -477,8 +480,10 @@ body {
       color: var(--text2);
     }
     .dashboard-tab.active {
-      color: var(--green);
+      color: var(--green3);
       border-bottom-color: var(--green);
+      border-color: var(--green);
+      background: var(--green-dim);
       font-weight: bold;
     }
     .dashboard-tab-panel {
@@ -486,28 +491,32 @@ body {
     }
     /* דשבורד — רקע בהיר לניגודיות מול תמונת הרקע */
     .page-dashboard .spa-tabs-bar.tabs {
-      background: var(--glass-strong) !important;
+      background: rgba(255, 255, 255, 0.94) !important;
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       border: 1px solid var(--border2);
       border-bottom: none;
       border-radius: var(--radius) var(--radius) 0 0;
-      padding: 6px 8px 0;
+      padding: 8px 10px 0;
       margin-bottom: 0;
+      box-shadow: var(--shadow);
     }
     .page-dashboard .spa-tabs-bar .tab-link {
-      background: var(--glass);
+      background: rgba(255, 255, 255, 0.88) !important;
+      border: 1px solid var(--border) !important;
       border-radius: 6px 6px 0 0;
       margin-inline: 2px;
       padding: 10px 14px;
+      color: var(--text) !important;
     }
     .page-dashboard .spa-tabs-bar .tab-link.active {
-      background: var(--glass-heavy);
-      color: var(--green);
-      border-bottom-color: var(--green);
+      background: var(--green-dim) !important;
+      color: var(--green3) !important;
+      border-color: var(--green) !important;
+      border-bottom-color: var(--green-dim) !important;
     }
     .page-dashboard .dashboard-shell {
-      background: var(--glass-strong);
+      background: rgba(255, 255, 255, 0.92);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border2);
@@ -1022,21 +1031,38 @@ body {
       margin-top: 2px;
     }
 
-    .team-matrix-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .team-matrix-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+    }
     .team-matrix-tab {
       padding: 8px 14px;
       border: 1px solid var(--border2);
       border-radius: 8px;
-      background: var(--bg3);
+      background: rgba(255, 255, 255, 0.95) !important;
       color: var(--text);
       font-family: var(--mono);
       font-size: 12px;
+      font-weight: 600;
       cursor: pointer;
+      box-shadow: 0 1px 2px rgba(30, 60, 40, 0.06);
+    }
+    .team-matrix-tab:hover {
+      border-color: var(--green2);
+      color: var(--green3);
     }
     .team-matrix-tab.active {
       border-color: var(--green);
-      background: var(--bg4);
+      background: var(--green-dim) !important;
+      color: var(--green3);
       font-weight: bold;
+      box-shadow: 0 1px 4px rgba(21, 128, 61, 0.15);
     }
     .team-matrix-stats {
       display: grid;
@@ -1191,20 +1217,79 @@ body {
       cursor: help;
     }
 
-    /* ── TABS (simulated via hash) ── */
-    .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 14px; }
+    /* ── TABS — ניגודיות גבוהה על רקע התמונה ── */
+    .spa-tabs-bar.tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: stretch;
+      background: rgba(255, 255, 255, 0.94) !important;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border2);
+      border-bottom: 2px solid var(--border2);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 8px 10px 0;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      box-shadow: var(--shadow);
+    }
+    .spa-tabs-bar .tab-link {
+      padding: 10px 16px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text) !important;
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.88) !important;
+      border: 1px solid var(--border) !important;
+      border-bottom: none !important;
+      border-radius: 6px 6px 0 0;
+      margin-bottom: -1px;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .spa-tabs-bar .tab-link:hover {
+      color: var(--green3) !important;
+      background: #fff !important;
+      border-color: var(--green2) !important;
+    }
+    .spa-tabs-bar .tab-link.active {
+      color: var(--green3) !important;
+      background: var(--green-dim) !important;
+      border-color: var(--green) !important;
+      border-bottom: 2px solid var(--green-dim) !important;
+      font-weight: 700;
+      box-shadow: 0 -1px 0 var(--green);
+    }
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border2);
+      margin-bottom: 14px;
+      overflow-x: auto;
+    }
     .tab-link {
       padding: 8px 16px;
       font-family: var(--mono);
       font-size: 12px;
-      color: var(--muted);
+      color: var(--text);
       text-decoration: none;
       border-bottom: 2px solid transparent;
       margin-bottom: -2px;
       transition: all 0.15s;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 6px 6px 0 0;
     }
-    .tab-link:hover { color: var(--text2); }
-    .tab-link.active { color: var(--green); border-bottom-color: var(--green); }
+    .tab-link:hover { color: var(--green3); background: #fff; }
+    .tab-link.active {
+      color: var(--green3);
+      border-bottom-color: var(--green);
+      background: var(--green-dim);
+      font-weight: 700;
+    }
 
     /* ── RESPONSIVE ── */
     @media (max-width: 640px) {
@@ -1608,24 +1693,35 @@ body {
     }
     .timeline-side-tabs {
       display: flex;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg3);
+      gap: 4px;
+      padding: 6px 6px 0;
+      border-bottom: 2px solid var(--border2);
+      background: rgba(255, 255, 255, 0.94) !important;
     }
     .timeline-side-tab {
       flex: 1;
       padding: 9px 6px;
       font-size: 11px;
-      font-weight: 600;
-      border: none;
-      background: transparent;
-      color: var(--muted);
+      font-weight: 700;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      background: rgba(255, 255, 255, 0.8) !important;
+      color: var(--text);
       cursor: pointer;
-      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+    }
+    .timeline-side-tab:hover {
+      color: var(--green3);
+      border-color: var(--green2);
+      background: #fff !important;
     }
     .timeline-side-tab.active {
-      color: var(--green);
-      border-bottom-color: var(--green);
-      background: rgba(74, 222, 128, 0.06);
+      color: var(--green3);
+      border-color: var(--green);
+      border-bottom: 2px solid var(--green-dim);
+      background: var(--green-dim) !important;
+      box-shadow: 0 -1px 0 var(--green);
     }
     .timeline-side-panel-body {
       padding: 12px;
@@ -1925,8 +2021,9 @@ body {
     .stats-seg-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
     .stats-seg {
       border: 1px solid var(--border2);
-      background: var(--glass);
+      background: rgba(255, 255, 255, 0.92) !important;
       color: var(--text);
+      font-weight: 600;
       border-radius: 999px;
       padding: 6px 12px;
       font-size: 11px;
@@ -2042,6 +2139,17 @@ body {
     .stats-tbl th,
     .stats-tbl td {
       background-color: rgba(255, 255, 255, 0.55) !important;
+    }
+    /* טאבים — לא לדרוס ברקע זכוכית שקוף */
+    .spa-tabs-bar.tabs,
+    .spa-tabs-bar .tab-link,
+    .timeline-side-tabs,
+    .timeline-side-tab,
+    .team-matrix-tabs,
+    .team-matrix-tab,
+    .stats-seg-tabs .stats-seg {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
     }
     .tbl tr:hover td {
       background-color: var(--bg4) !important;
