@@ -107,17 +107,40 @@ function _composeDetailTime(dateYmd, timeHm) {
 
 // Returns "HH:MM" from a time string or empty
 function _rawTime(val) {
-  if (!val) return '';
-  const s = String(val).trim();
-  // Already HH:MM
-  if (/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5, '0');
-  // Date object from Sheets time column (fraction of day)
+  if (val == null || val === '') return '';
   if (val instanceof Date) {
-    const h = String(val.getHours()).padStart(2,'0');
-    const m = String(val.getMinutes()).padStart(2,'0');
+    if (isNaN(val.getTime())) return '';
+    const h = String(val.getHours()).padStart(2, '0');
+    const m = String(val.getMinutes()).padStart(2, '0');
     return h + ':' + m;
   }
+  if (typeof val === 'number' && !isNaN(val)) {
+    if (val >= 0 && val < 1) {
+      const mins = Math.round(val * 24 * 60);
+      const h = Math.floor(mins / 60) % 24;
+      const m = mins % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    }
+    return '';
+  }
+  const s = String(val).trim();
+  if (!s) return '';
+  if (/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5, '0');
+  const tp = s.match(/^(\d{1,2}):(\d{2})/);
+  if (tp) return String(+tp[1]).padStart(2, '0') + ':' + tp[2];
   return s;
+}
+
+function _ymdPlusDays(ymd, days) {
+  const parts = String(ymd || '').split('-').map(Number);
+  if (parts.length !== 3) return ymd;
+  const d = new Date(parts[0], parts[1] - 1, parts[2] + (days || 0), 12, 0, 0, 0);
+  return Exercise_msToYmd(d.getTime());
+}
+
+function _exerciseDurationHFromDescription(desc) {
+  const m = String(desc || '').match(/(\d+)\s*שעות/);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
 function _hebrewMonths() {
@@ -181,20 +204,32 @@ function _exerciseTimeRange(ex) {
   const DAY_MS  = 86400000;
   const HOUR_MS = 3600000;
   const startYmd = ex.rawStartDate || _ymdFromCellValue(ex.date) || '';
-  const endYmd = ex.rawEndDate || startYmd;
+  let endYmd = ex.rawEndDate || startYmd;
   if (!startYmd) return null;
 
-  const startMs = Exercise_msFromYmdHm(startYmd, ex.rawStartTime || '00:00');
+  const startTime = ex.rawStartTime || '00:00';
+  const startMs = Exercise_msFromYmdHm(startYmd, startTime);
   if (isNaN(startMs)) return null;
 
   let endMs;
   if (ex.rawEndTime) {
     endMs = Exercise_msFromYmdHm(endYmd, ex.rawEndTime);
+    if (!isNaN(endMs) && endMs <= startMs) {
+      endMs = Exercise_msFromYmdHm(_ymdPlusDays(endYmd, 1), ex.rawEndTime);
+      endYmd = _ymdPlusDays(endYmd, 1);
+    }
   } else {
     endMs = Exercise_msFromYmdHm(endYmd, '23:59');
     if (isNaN(endMs)) endMs = startMs + DAY_MS;
   }
-  if (endMs <= startMs) endMs = startMs + (ex.rawStartTime ? HOUR_MS : DAY_MS);
+  if (endMs <= startMs) {
+    const durH = _exerciseDurationHFromDescription(ex.description);
+    if (durH > 0) {
+      endMs = startMs + durH * HOUR_MS;
+    } else {
+      endMs = startMs + (ex.rawStartTime ? HOUR_MS : DAY_MS);
+    }
+  }
   return { startMs: startMs, endMs: endMs };
 }
 
@@ -239,6 +274,43 @@ function Exercise_msFromYmdHm(dateYmd, timeHm) {
   return new Date(parts[0], parts[1] - 1, parts[2], tp[0] || 0, tp[1] || 0, 0, 0).getTime();
 }
 
+/** 0 = ראשון — אסור לשבץ תרגילים ביום זה. */
+var EXERCISE_BLOCKED_WEEKDAYS = { 0: true };
+
+function Exercise_msToYmd(ms) {
+  const d = new Date(ms);
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+/** מעבר על כל ימי הלוח שבין startMs ל-endMs (end בלעדי). */
+function Exercise_eachDayYmdInRange(startMs, endMs, fn) {
+  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return;
+  let cur = Exercise_msToYmd(startMs);
+  const last = Exercise_msToYmd(endMs - 1);
+  while (cur <= last) {
+    fn(cur);
+    const parts = cur.split('-').map(Number);
+    const next = new Date(parts[0], parts[1] - 1, parts[2] + 1, 12, 0, 0, 0);
+    cur = Exercise_msToYmd(next.getTime());
+  }
+}
+
+/** null = תקין; אחרת הודעת שגיאה בעברית. */
+function Exercise_validateBlockedWeekdays(startMs, endMs) {
+  if (isNaN(startMs) || isNaN(endMs)) return null;
+  let blocked = false;
+  Exercise_eachDayYmdInRange(startMs, endMs, function(ymd) {
+    const wd = new Date(Exercise_msFromYmdHm(ymd, '12:00')).getDay();
+    if (EXERCISE_BLOCKED_WEEKDAYS[wd]) blocked = true;
+  });
+  if (blocked) {
+    return 'אסור לקבוע תרגיל ביום ראשון (כולל תרגיל שנמשך אליו).';
+  }
+  return null;
+}
+
 /** חיר: חלק יבש/רטוב מתוך יבש־רטוב — נבדק כבלוק בבניית סדרה, לא לפי שעת החלק. */
 function Exercise_isChirSplitPartTitle(title) {
   const s = String(title || '');
@@ -268,6 +340,16 @@ function Exercise_validateNameAgainstTimes(title, startMs, endMs) {
   }
 
   return null;
+}
+
+function Exercises_appendRows(rows) {
+  if (!rows || !rows.length) return;
+  const sh = _sheet('Exercises');
+  const last = sh.getLastRow();
+  sh.getRange(last + 1, 1, rows.length, rows[0].length).setValues(rows);
+  sh.getRange(last + 1, 5, rows.length, 2).setNumberFormat('@');
+  sh.getRange(last + 1, 12, rows.length, 2).setNumberFormat('@');
+  _cacheInvalidate('Exercises');
 }
 
 function Exercises_all() {
@@ -411,6 +493,8 @@ function Exercises_create(p) {
   const endMs = Exercise_msFromYmdHm(endDate, endTime);
   const slotErr = Exercise_validateNameAgainstTimes(title, startMs, endMs);
   if (slotErr) throw new Error(slotErr);
+  const dayErr = Exercise_validateBlockedWeekdays(startMs, endMs);
+  if (dayErr) throw new Error(dayErr);
 
   _append('Exercises', [
     id, title, description, u.id,
@@ -448,6 +532,8 @@ function Exercises_edit(p) {
   const endMs = Exercise_msFromYmdHm(p.end_date, p.end_time);
   const slotErr = Exercise_validateNameAgainstTimes(title, startMs, endMs);
   if (slotErr) throw new Error(slotErr);
+  const dayErr = Exercise_validateBlockedWeekdays(startMs, endMs);
+  if (dayErr) throw new Error(dayErr);
 
   const validated = Exercises_validateCampAndPartner(p);
 
@@ -487,6 +573,8 @@ function Exercises_updateTimes(p) {
   const endMs = Exercise_msFromYmdHm(p.end_date, p.end_time);
   const slotErr = Exercise_validateNameAgainstTimes(ex ? ex.title : '', startMs, endMs);
   if (slotErr) throw new Error(slotErr);
+  const dayErr = Exercise_validateBlockedWeekdays(startMs, endMs);
+  if (dayErr) throw new Error(dayErr);
 
   const sh = _sheet('Exercises');
   sh.getRange(row, 5).setValue(String(p.start_date || '').trim());

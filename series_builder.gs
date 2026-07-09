@@ -2,12 +2,8 @@
 // בניית סדרה לפי סוגי כוח + סוגי תרגילים מוגדרים מראש לכל כוח.
 
 var SERIES_GAP_MS = 18 * 3600000;
-var SERIES_DRY_WET_GAP_MS = 6 * 3600000;
-/** מרווח בין התקדמות ליבש־רטוב באותו כוח חשן. */
-var SERIES_CHASHAN_ADV_TO_DRY_MS = 4 * 3600000;
 var SERIES_MAX_CONCURRENT = 3;
 var SERIES_FIRST_DAY_HOUR = 6;
-var SERIES_STEP_MS = 30 * 60000;
 var SERIES_SUMMER_MONTHS = [6, 7, 8, 9];
 var SERIES_HEAT_START_H = 12;
 var SERIES_HEAT_END_H = 16;
@@ -34,6 +30,7 @@ var SERIES_LOCATION_FORM_KEYS = {
 };
 
 var SERIES_VARIANTS_BY_FORCE = {
+  /** סוג כוח → וריאנטים (תווית, משך שעות, יום/לילה) — מקור אמת לבניית סדרה */
   'חיר': [
     { label: 'יבש רטוב יום', durationH: 8, slotKind: 'day' },
     { label: 'יבש רטוב לילה', durationH: 12, slotKind: 'night' }
@@ -204,76 +201,62 @@ function _seriesSlotPlan(startMs, variant) {
   };
 }
 
-function _seriesIsDryWetSplit(exType, variant) {
-  return exType === 'חיר' && String(variant.label || '').indexOf('יבש רטוב') !== -1;
+function _seriesSlotKindForVariant(variant) {
+  return Exercise_slotKindFromName(variant.label || '') || variant.slotKind || 'day';
 }
 
-function _seriesDayWindowEndMs(startMs) {
-  const d = new Date(startMs);
-  d.setHours(SERIES_DAY_END_H, 0, 0, 0);
-  return d.getTime();
+function _seriesNextDayYmd(ymd) {
+  const parts = String(ymd).split('-').map(Number);
+  const d = new Date(parts[0], parts[1] - 1, parts[2] + 1, 12, 0, 0, 0);
+  return _seriesMsToYmd(d.getTime());
 }
 
-/** מרווח יבש–רטוב: ביום מצומצם כדי שהזוג נכנס בין 06:00–18:00. */
-function _seriesDryWetGapMs(startMs, variant) {
-  const halfMs = ((variant.durationH || 0) / 2) * 3600000;
-  const kind = Exercise_slotKindFromName(variant.label || '') || variant.slotKind || 'day';
-  if (kind !== 'day') return SERIES_DRY_WET_GAP_MS;
-  const maxSpan = _seriesDayWindowEndMs(startMs) - startMs;
-  const ideal = 2 * halfMs + SERIES_DRY_WET_GAP_MS;
-  if (maxSpan >= ideal) return SERIES_DRY_WET_GAP_MS;
-  return Math.max(0, maxSpan - 2 * halfMs);
-}
-
-function _seriesIsChirSplitPart(plan) {
-  const v = String(plan.variantLabel || '');
-  if (v.indexOf('יבש רטוב') !== -1) return false;
-  return v === 'יבש' || v === 'רטוב' || v.indexOf('יבש ') === 0 || v.indexOf('רטוב ') === 0;
-}
-
-/** חיר יבש+רטוב: בדיקת יום/לילה על כל הבלוק (לא על כל חלק בנפרד). */
-function _seriesBundleMatchesNameSlot(parentLabel, plans) {
-  const kind = Exercise_slotKindFromName(parentLabel || '');
-  if (!kind || !plans.length) return true;
-  const start = plans[0].startMs;
-  const end = plans[plans.length - 1].endMs;
-  if (!Exercise_msInSlotKind(start, kind)) return false;
-  if (kind === 'day' && end > _seriesDayWindowEndMs(start)) return false;
-  return true;
-}
-
-/** חיר: יבש רטוב → יבש + רטוב; משך כל חלק = חצי מהמקורי. */
-function _seriesDryWetPlans(startMs, variant) {
-  const totalH = variant.durationH || 0;
-  const halfH = totalH / 2;
-  const halfMs = halfH * 3600000;
-  const slotKind = variant.slotKind || 'day';
-  const gapMs = _seriesDryWetGapMs(startMs, variant);
-  const dryEnd = startMs + halfMs;
-  const wetStart = dryEnd + gapMs;
-  return [
-    {
-      startMs: startMs,
-      endMs: dryEnd,
-      slotKind: slotKind,
-      variantLabel: 'יבש',
-      durationH: halfH
-    },
-    {
-      startMs: wetStart,
-      endMs: wetStart + halfMs,
-      slotKind: slotKind,
-      variantLabel: 'רטוב',
-      durationH: halfH
+/** שעת התחלה קנונית (>= ms): תרגיל יום → 06:00, תרגיל לילה → 18:00 */
+function _seriesSnapToSlotStart(ms, slotKind) {
+  if (isNaN(ms)) return ms;
+  let guard = 0;
+  while (guard++ < 400) {
+    const ymd = _seriesMsToYmd(ms);
+    if (slotKind === 'day') {
+      const dayStart = _seriesYmdToMs(ymd, SERIES_DAY_START_H, 0);
+      const dayEnd = _seriesYmdToMs(ymd, SERIES_DAY_END_H, 0);
+      if (ms <= dayStart) return dayStart;
+      if (ms >= dayEnd) {
+        ms = _seriesYmdToMs(_seriesNextDayYmd(ymd), SERIES_DAY_START_H, 0);
+        continue;
+      }
+      const d = new Date(ms);
+      if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) {
+        d.setMinutes(0, 0, 0);
+        d.setHours(d.getHours() + 1);
+        ms = d.getTime();
+        if (ms >= dayEnd) {
+          ms = _seriesYmdToMs(_seriesNextDayYmd(ymd), SERIES_DAY_START_H, 0);
+          continue;
+        }
+      }
+      return ms;
     }
-  ];
+    if (slotKind === 'night') {
+      const evening = _seriesYmdToMs(ymd, SERIES_DAY_END_H, 0);
+      const morning = _seriesYmdToMs(ymd, SERIES_DAY_START_H, 0);
+      if (ms < morning) {
+        if (ms <= evening) return evening;
+      } else if (ms < evening) {
+        return evening;
+      }
+      ms = _seriesYmdToMs(_seriesNextDayYmd(ymd), SERIES_DAY_END_H, 0);
+      continue;
+    }
+    return ms;
+  }
+  return ms;
 }
 
 function _seriesPlansForPlacement(startMs, exType, variant) {
-  if (_seriesIsDryWetSplit(exType, variant)) {
-    return _seriesDryWetPlans(startMs, variant);
-  }
-  return [_seriesSlotPlan(startMs, variant)];
+  const kind = _seriesSlotKindForVariant(variant);
+  const snapped = _seriesSnapToSlotStart(startMs, kind);
+  return [_seriesSlotPlan(snapped, variant)];
 }
 
 function _seriesIsSummerMonth(ms) {
@@ -294,7 +277,6 @@ function _seriesStartMatchesSlotKind(ms, slotKind) {
 }
 
 function _seriesPlanMatchesNameSlot(plan) {
-  if (_seriesIsChirSplitPart(plan)) return true;
   const kind = Exercise_slotKindFromName(plan.variantLabel || '');
   if (!kind) return true;
   if (!Exercise_msInSlotKind(plan.startMs, kind)) return false;
@@ -349,12 +331,11 @@ function _seriesDayBlocked(ymd, holyDays) {
 }
 
 function _seriesTouchesBlockedDay(plan, holyDays) {
-  let t = plan.startMs;
-  while (t < plan.endMs) {
-    if (_seriesDayBlocked(_seriesMsToYmd(t), holyDays)) return true;
-    t += 86400000;
-  }
-  return false;
+  let blocked = false;
+  Exercise_eachDayYmdInRange(plan.startMs, plan.endMs, function(ymd) {
+    if (_seriesDayBlocked(ymd, holyDays)) blocked = true;
+  });
+  return blocked;
 }
 
 function _seriesForceSlotNum(ex) {
@@ -395,12 +376,18 @@ function _seriesOverlapInfo(plan, forceSlot, ranges, location) {
   return { count: count, sameForceSlot: sameForceSlot, sameLocation: sameLocation };
 }
 
-function _seriesCanPlace(plan, forceSlot, holyDays, ranges, slotLastEndMs, rangeEndMs, minGapMs, location, isChirSplitPart) {
+function _seriesCanPlace(plan, forceSlot, holyDays, ranges, slotLastEndMs, rangeEndMs, minGapMs, location) {
   if (!plan || plan.endMs > rangeEndMs) return false;
   if (_seriesStartForbidden(plan.startMs)) return false;
-  if (!isChirSplitPart) {
-    if (!_seriesStartMatchesSlotKind(plan.startMs, plan.slotKind)) return false;
-    if (!_seriesPlanMatchesNameSlot(plan)) return false;
+  if (!_seriesStartMatchesSlotKind(plan.startMs, plan.slotKind)) return false;
+  if (!_seriesPlanMatchesNameSlot(plan)) return false;
+  const startD = new Date(plan.startMs);
+  if (plan.slotKind === 'day') {
+    if (startD.getMinutes() !== 0 || startD.getSeconds() !== 0) return false;
+    if (startD.getHours() < SERIES_DAY_START_H || startD.getHours() >= SERIES_DAY_END_H) return false;
+  } else if (plan.slotKind === 'night') {
+    if (startD.getMinutes() !== 0 || startD.getSeconds() !== 0) return false;
+    if (startD.getHours() !== SERIES_DAY_END_H) return false;
   }
   if (_seriesTouchesBlockedDay(plan, holyDays)) return false;
   if (slotLastEndMs != null) {
@@ -415,27 +402,13 @@ function _seriesCanPlace(plan, forceSlot, holyDays, ranges, slotLastEndMs, range
   return true;
 }
 
-function _seriesCanPlacePlans(plans, forceSlot, holyDays, ranges, slotLastEndMs, rangeEndMs, location, firstPlanGapMs, parentVariantLabel) {
+function _seriesCanPlacePlans(plans, forceSlot, holyDays, ranges, slotLastEndMs, rangeEndMs, location, firstPlanGapMs) {
   if (!plans.length) return false;
-  const isChirBundle = parentVariantLabel && plans.length > 1 &&
-    String(parentVariantLabel).indexOf('יבש רטוב') !== -1;
-  if (isChirBundle && !_seriesBundleMatchesNameSlot(parentVariantLabel, plans)) {
-    return false;
-  }
   const simRanges = ranges.slice();
   let prevEnd = slotLastEndMs;
-  const gapBetweenParts = isChirBundle && plans.length > 1
-    ? _seriesDryWetGapMs(plans[0].startMs, {
-      label: parentVariantLabel,
-      slotKind: plans[0].slotKind,
-      durationH: (plans[0].durationH || 0) * 2
-    })
-    : SERIES_DRY_WET_GAP_MS;
   for (let i = 0; i < plans.length; i++) {
-    let gap = (i > 0) ? gapBetweenParts : firstPlanGapMs;
-    if (gap === undefined) gap = null;
-    const splitPart = isChirBundle && _seriesIsChirSplitPart(plans[i]);
-    if (!_seriesCanPlace(plans[i], forceSlot, holyDays, simRanges, prevEnd, rangeEndMs, gap, location, splitPart)) {
+    const gap = (i > 0) ? SERIES_GAP_MS : firstPlanGapMs;
+    if (!_seriesCanPlace(plans[i], forceSlot, holyDays, simRanges, prevEnd, rangeEndMs, gap, location)) {
       return false;
     }
     simRanges.push({
@@ -487,99 +460,10 @@ function _seriesVariantsForType(exType) {
   ];
 }
 
-function _seriesLabelIsDryWet(label) {
-  return String(label || '').indexOf('יבש רטוב') !== -1;
-}
-
-function _seriesLabelIsAdvancement(label) {
-  return String(label || '').indexOf('התקדמות') !== -1;
-}
-
-/**
- * חשן: התקדמות (נוטרה) ואז יבש־רטוב (חפר/שיפון).
- * firstPlanGapMs מאפשר 4 שעות בין השניים (לא 18).
- */
-function _seriesScheduleChashanAdvThenDry(
-  dryVariant, searchMs, forceSlot, locations, holyDays, ranges,
-  forceSlotLastEnd, rangeEndMs, rangeStartMs
-) {
-  const advVariants = (SERIES_VARIANTS_BY_FORCE['חשן'] || []).filter(function(v) {
-    return _seriesLabelIsAdvancement(v.label) &&
-      _seriesLocationsForVariant(v.label, locations).length > 0;
-  });
-  const dryLocs = _seriesLocationsForVariant(dryVariant.label, locations);
-  if (!advVariants.length || !dryLocs.length) return null;
-
-  const preferKind = dryVariant.slotKind || 'day';
-  advVariants.sort(function(a, b) {
-    return (a.slotKind === preferKind ? 0 : 1) - (b.slotKind === preferKind ? 0 : 1);
-  });
-
-  const slotEnd = forceSlotLastEnd[forceSlot];
-
-  for (let step = 0; step < 96; step++) {
-    const probeMs = searchMs + step * SERIES_STEP_MS;
-    if (probeMs >= rangeEndMs) break;
-
-    const dryProbe = _seriesPlansForPlacement(probeMs, 'חשן', dryVariant);
-    const dryStartTarget = dryProbe[0].startMs;
-
-    for (let av = 0; av < advVariants.length; av++) {
-      const advVar = advVariants[av];
-      const advLocs = _seriesLocationsForVariant(advVar.label, locations);
-      const advDurMs = (advVar.durationH || 0) * 3600000;
-      let advStart = dryStartTarget - SERIES_CHASHAN_ADV_TO_DRY_MS - advDurMs;
-
-      for (let back = 0; back < 64; back++) {
-        if (advStart < rangeStartMs) break;
-
-        const advPlans = [_seriesSlotPlan(advStart, advVar)];
-        const dryPlans = _seriesPlansForPlacement(
-          advPlans[0].endMs + SERIES_CHASHAN_ADV_TO_DRY_MS, 'חשן', dryVariant
-        );
-
-        for (let ai = 0; ai < advLocs.length; ai++) {
-          for (let di = 0; di < dryLocs.length; di++) {
-            if (!_seriesCanPlacePlans(
-              advPlans, forceSlot, holyDays, ranges, slotEnd, rangeEndMs, advLocs[ai]
-            )) continue;
-
-            const sim = ranges.slice();
-            advPlans.forEach(function(p) {
-              sim.push({
-                startMs: p.startMs, endMs: p.endMs, type: 'חשן',
-                forceSlot: forceSlot, location: advLocs[ai]
-              });
-            });
-            const advEnd = advPlans[advPlans.length - 1].endMs;
-            if (!_seriesCanPlacePlans(
-              dryPlans, forceSlot, holyDays, sim, advEnd, rangeEndMs, dryLocs[di],
-              SERIES_CHASHAN_ADV_TO_DRY_MS
-            )) continue;
-
-            return {
-              advVariant: advVar,
-              advPlans: advPlans,
-              advLocation: advLocs[ai],
-              dryPlans: dryPlans,
-              dryLocation: dryLocs[di]
-            };
-          }
-        }
-        advStart -= SERIES_STEP_MS;
-      }
-    }
-  }
-  return null;
-}
-
 function _seriesVariantsToTry(item, variantIdxBySlot, locations) {
-  let variants = _seriesVariantsForType(item.type).filter(function(v) {
+  const variants = _seriesVariantsForType(item.type).filter(function(v) {
     return _seriesLocationsForVariant(v.label, locations).length > 0;
   });
-  if (item.type === 'חשן') {
-    variants = variants.filter(function(v) { return !_seriesLabelIsAdvancement(v.label); });
-  }
   const key = item.type + '_' + item.forceSlot;
   const start = variantIdxBySlot[key] || 0;
   const ordered = [];
@@ -601,11 +485,7 @@ function _seriesSlotLabel(plan, parentVariantLabel) {
   const parentKind = Exercise_slotKindFromName(parentVariantLabel || '');
   const nameKind = parentKind || Exercise_slotKindFromName(plan.variantLabel || '');
   const base = nameKind === 'night' ? 'לילה' : (nameKind === 'day' ? 'יום' : (plan.slotKind === 'night' ? 'לילה' : 'יום'));
-  let label = plan.variantLabel || '';
-  if (parentVariantLabel && (label === 'יבש' || label === 'רטוב')) {
-    label = (parentVariantLabel.indexOf('יבש רטוב') !== -1 ? parentVariantLabel : label) +
-      ' — ' + plan.variantLabel;
-  }
+  const label = plan.variantLabel || '';
   return label ? (label + ' (' + base + ')') : ('תרגיל ' + base);
 }
 
@@ -646,58 +526,25 @@ function Series_schedule(startYmd, endYmd, queue, locations, opts) {
     }
 
     let found = false;
-    let steps = 0;
     const variantsToTry = _seriesVariantsToTry(item, variantIdxBySlot, locations);
 
     while (!found && searchMs < rangeEndMs) {
       if (!variantsToTry.length) break;
       for (let vi = 0; vi < variantsToTry.length && !found; vi++) {
         const variant = variantsToTry[vi];
+        const kind = _seriesSlotKindForVariant(variant);
+        const probeMs = _seriesSnapToSlotStart(searchMs, kind);
+        if (probeMs >= rangeEndMs) continue;
         const locCandidates = _seriesSortLocationsByAvailability(
           _seriesLocationsForVariant(variant.label, locations),
           locationLastEnd
         );
-        if (exType === 'חשן' && _seriesLabelIsDryWet(variant.label)) {
-          const pair = _seriesScheduleChashanAdvThenDry(
-            variant, searchMs, forceSlot, locations, holyDays, ranges,
-            forceSlotLastEnd, rangeEndMs, rangeStartMs
-          );
-          if (pair) {
-            const pairId = 'CP' + placed.length;
-            const entries = [
-              { variant: pair.advVariant, location: pair.advLocation, plans: pair.advPlans },
-              { variant: variant, location: pair.dryLocation, plans: pair.dryPlans }
-            ];
-            for (let pe = 0; pe < entries.length; pe++) {
-              const ent = entries[pe];
-              placed.push({
-                type: 'חשן', forceSlot: forceSlot, variant: ent.variant,
-                location: ent.location, plan: ent.plans[0], plans: ent.plans, pairId: pairId,
-                fieldForceId: item.fieldForceId, forceName: item.forceName
-              });
-              for (let pi = 0; pi < ent.plans.length; pi++) {
-                ranges.push({
-                  startMs: ent.plans[pi].startMs, endMs: ent.plans[pi].endMs,
-                  type: 'חשן', forceSlot: forceSlot, location: ent.location
-                });
-              }
-              forceSlotLastEnd[forceSlot] = ent.plans[ent.plans.length - 1].endMs;
-              locationLastEnd[ent.location] = ent.plans[ent.plans.length - 1].endMs;
-            }
-            variantIdxBySlot[exType + '_' + forceSlot] =
-              (variantIdxBySlot[exType + '_' + forceSlot] || 0) + 1;
-            found = true;
-            scheduledCount++;
-          }
-          continue;
-        }
-
+        if (!locCandidates.length) continue;
         for (let li = 0; li < locCandidates.length && !found; li++) {
           const location = locCandidates[li];
-          const plans = _seriesPlansForPlacement(searchMs, exType, variant);
+          const plans = _seriesPlansForPlacement(probeMs, exType, variant);
           if (_seriesCanPlacePlans(
-            plans, forceSlot, holyDays, ranges, forceSlotLastEnd[forceSlot], rangeEndMs, location,
-            null, variant.label
+            plans, forceSlot, holyDays, ranges, forceSlotLastEnd[forceSlot], rangeEndMs, location
           )) {
             placed.push({
               type: exType,
@@ -727,15 +574,8 @@ function Series_schedule(startYmd, endYmd, queue, locations, opts) {
           }
         }
       }
-      searchMs += SERIES_STEP_MS;
-      steps++;
-      // קפיצה יומית אם נתקע — מחפש מהר יותר חלון יום/לילה מתאים
-      if (!found && steps > 0 && steps % 48 === 0) {
-        const d = new Date(searchMs);
-        d.setDate(d.getDate() + 1);
-        d.setHours(SERIES_FIRST_DAY_HOUR, 0, 0, 0);
-        searchMs = d.getTime();
-      }
+      const ymd = _seriesMsToYmd(searchMs);
+      searchMs = _seriesYmdToMs(_seriesNextDayYmd(ymd), SERIES_FIRST_DAY_HOUR, 0);
     }
   });
 
@@ -745,6 +585,23 @@ function Series_schedule(startYmd, endYmd, queue, locations, opts) {
     skippedCount: queue.length - scheduledCount,
     holyDayCount: Object.keys(holyDays).length
   };
+}
+
+function Series_variantsRulesHtml() {
+  const forceOrder = ['חיר', '900', 'חשן'];
+  let s = '<p style="font-size:11px;color:var(--muted);margin:0 0 6px"><b>סוגי תרגיל ומשך</b> (לפי סוג כוח של הגדוד)</p>';
+  s += '<table class="tbl" style="font-size:11px;margin:0 0 12px"><thead><tr>' +
+    '<th>סוג כוח</th><th>תרגיל</th><th style="text-align:left">משך</th></tr></thead><tbody>';
+  forceOrder.forEach(function(ft) {
+    const variants = SERIES_VARIANTS_BY_FORCE[ft] || [];
+    variants.forEach(function(v, i) {
+      s += '<tr><td>' + (i === 0 ? '<b>' + ft + '</b>' : '') + '</td><td>' +
+        _esc(v.label) + '</td><td class="mono" style="text-align:left">' +
+        v.durationH + ' שעות</td></tr>';
+    });
+  });
+  s += '</tbody></table>';
+  return s;
 }
 
 function Series_locationRulesHtml() {
@@ -791,9 +648,11 @@ function Series_buildFormHtml(sid) {
   s += '<li>התחלה ביום שני הראשון בטווח, בשעה 06:00</li>';
   s += '<li>מרווח 18 שעות בין תרגילים באותו כוח (מסלול)</li>';
   s += '<li>עד 3 תרגילים במקביל (גדודים שונים יכולים להיות מאותו סוג כוח)</li>';
-  s += '<li>יום/לילה לפי סוג התרגיל · חשן: התקדמות ואז יבש־רטוב</li>';
-  s += '<li>ללא שבת/חג · בקיץ ללא התחלה 12:00–16:00</li>';
+  s += '<li>תרגילי יום מתחילים ב־06:00 · תרגילי לילה ב־18:00</li>';
+  s += '<li>ללא שבת/חג/יום ראשון · בקיץ ללא התחלה 12:00–16:00</li>';
   s += '</ul>';
+  s += Series_variantsRulesHtml();
+  s += '<p style="font-size:11px;color:var(--muted);margin:0 0 6px"><b>מיקומים מותרים</b></p>';
   s += Series_locationRulesHtml();
   s += _formOpen();
   s += '<input type="hidden" name="action" value="buildSeries">';
@@ -871,11 +730,10 @@ function Exercises_buildSeries(p) {
       rowIdx++;
       const locPart = location ? (' · ' + location) : '';
 
-      const pairNote = item.pairId ? (' · pair=' + item.pairId) : '';
       exRows.push([
         id,
         type + ' — ' + slotLabel + locPart + ' ' + rowIdx,
-        'נוצר בבניית סדרה (' + slotLabel + locPart + ', ' + plan.durationH + ' שעות)' + pairNote,
+        'נוצר בבניית סדרה (' + slotLabel + locPart + ', ' + plan.durationH + ' שעות)',
         u.id,
         _seriesMsToYmd(plan.startMs),
         _seriesMsToYmd(plan.endMs),
@@ -892,16 +750,13 @@ function Exercises_buildSeries(p) {
     });
   });
 
-  if (exRows.length) _appendBatch('Exercises', exRows);
+  if (exRows.length) Exercises_appendRows(exRows);
 
   const createdCount = exRows.length;
   const scheduledCount = result.requestedCount - result.skippedCount;
   let info = '✅';
   if (removedCount) info += ' נוקו ' + removedCount + ' תרגילים קיימים ·';
-  info += ' שובצו ' + scheduledCount + ' מקומות בלוז · נוצרו ' + createdCount + ' רשומות תרגיל';
-  if (createdCount > scheduledCount) {
-    info += ' (פיצולי יבש/רטוב לחיר · זוגות התקדמות+יבש־רטוב לחשן)';
-  }
+  info += ' שובצו ' + scheduledCount + ' מקומות בלוז · נוצרו ' + createdCount + ' תרגילים';
   const byType = {};
   exRows.forEach(function(row) {
     const t = row[7];
