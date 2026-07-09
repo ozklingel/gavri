@@ -418,13 +418,12 @@ function _appDrawer(user, sid) {
   return '<div class="app-drawer-overlay" id="appDrawerOverlay" hidden></div>' +
     '<aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="תפריט ראשי">' +
     '<div class="app-drawer-head">' +
-    '<div class="app-drawer-brand"><span class="star">★</span><div>' +
-    '<span>סדרת השטח</span>' +
-    '<span class="sub">TRAINING CMD SYS // CLASSIFIED</span></div></div>' +
+    '<div class="app-drawer-identity">' +
+    '<div class="app-drawer-user-name">' + _esc(user.name) + '</div>' +
+    '<div class="app-drawer-user-role">' + _esc(_roleHe(user.role)) + '</div>' +
+    '</div>' +
     '<button type="button" class="app-drawer-close" id="appDrawerClose" aria-label="סגור">✕</button>' +
     '</div>' +
-    '<div class="app-drawer-user">👤 <b>' + _esc(user.name) + '</b><br>' +
-    '<span style="color:var(--muted)">' + _esc(_roleHe(user.role)) + '</span></div>' +
     '<div class="app-drawer-scroll">' +
     '<nav class="app-drawer-nav">' + nav + '</nav>' +
     panelsHtml +

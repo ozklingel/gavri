@@ -16,7 +16,7 @@ function Roles_label(role) {
     tutor: 'חונך',
     trainee: 'חניך'
   };
-  return map[r] || r;
+  return map[r] || 'משתמש';
 }
 
 function Roles_allValid() {
