@@ -379,25 +379,21 @@ function _checkboxRow(name, label, checked) {
 function _drawerNavItems(user) {
   const items = [{ page: 'dashboard', label: 'לוח בקרה', icon: '⊞' }];
   if (Roles_hasAdminAccess(user.role)) {
+    items.push({ page: 'exercises', label: 'תרגילים', icon: '🎯' });
     items.push(
       { page: 'assign', label: 'לוח שיבוץ', icon: '🔀' },
       { page: 'timeline', label: 'ציר זמן', icon: '📅' },
-      { page: 'users', label: 'משתמשים וצוותים', icon: '👤', params: { tab: 'users' } }
+      { page: 'users', label: 'משתמשים וצוותים', icon: '👤', params: { tab: 'users' } },
+      { page: 'statistics', label: 'סטטיסטיקות', icon: '📊' }
     );
   } else if (Roles_hasTimelineAccess(user.role)) {
     items.push({ page: 'timeline', label: 'ציר זמן', icon: '📅' });
-  }
-  if (Roles_hasAdminAccess(user.role)) {
-    items.push({ page: 'statistics', label: 'סטטיסטיקות', icon: '📊' });
   }
   items.push(
     { page: 'homeConstraints', label: 'אילוצי בית', icon: '🏠' },
     { page: 'fieldForces', label: 'כוחות בשטח', icon: '⚔' },
     { page: 'fireZones', label: 'שטחי אש', icon: '🔥' }
   );
-  if (Roles_hasAdminAccess(user.role)) {
-    items.push({ page: 'exercises', label: 'תרגילים', icon: '🎯' });
-  }
   return items;
 }
 
