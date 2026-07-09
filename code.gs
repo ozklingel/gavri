@@ -114,8 +114,12 @@ function _cacheWarmSheetsIfNeeded(names) {
   (names || []).forEach(function(name) {
     if (_rowsCache[name]) return;
     if (_scriptCacheHas(name)) {
-      _rowsCache[name] = _getScriptCacheRows(name);
-      return;
+      const cached = _getScriptCacheRows(name);
+      if (cached && cached.data) {
+        _rowsCache[name] = cached;
+        return;
+      }
+      _cacheInvalidate(name);
     }
     _cacheWarmSheet(name);
   });
@@ -229,6 +233,8 @@ function setupSheets() {
   ensureColumn('Exercises', 'partner_battalion');
   ensureColumn('Exercises', 'camp');
   ensureColumn('Exercises', 'battalion_commander');
+  ensureColumn('Exercises', 'start_time');
+  ensureColumn('Exercises', 'end_time');
   ensure('ExerciseDetails',  ['id','exercise_id','time','location','description']);
   ensure('Assignments',      ['id','exercise_id','user_id','status','score','responsibility','feedback']);
   ensureColumn('Assignments', 'responsibility');

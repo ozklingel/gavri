@@ -1433,6 +1433,10 @@ body {
     .timeline-track .tl-bar {
       height: calc(var(--tl-bar-min-h, 48px));
       min-height: calc(var(--tl-bar-min-h, 48px));
+      box-shadow: 0 1px 4px rgba(30, 60, 40, 0.12);
+    }
+    .timeline-track .tl-bar-link:hover {
+      filter: brightness(0.97);
     }
     .timeline-track .tl-bar-label {
       flex: 1;
@@ -2003,6 +2007,11 @@ body {
       background-color: var(--glass) !important;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
+    }
+    .timeline-track .tl-bar,
+    .timeline-track .tl-slot-bar {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
     }
     .stats-kpi,
     .stats-kpi-blue,

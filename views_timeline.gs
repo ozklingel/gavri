@@ -1,10 +1,13 @@
 // views_timeline.gs — Weekly timeline RTL + week picker + edit mode (admin)
 
+var TIMELINE_WEEK_MIN = -12;
+var TIMELINE_WEEK_MAX = 12;
+
 function _timelineWeekOffset(p) {
   let w = parseInt(p && p.week != null ? p.week : 0, 10);
   if (isNaN(w)) w = 0;
-  if (w < -3) w = -3;
-  if (w > 3) w = 3;
+  if (w < TIMELINE_WEEK_MIN) w = TIMELINE_WEEK_MIN;
+  if (w > TIMELINE_WEEK_MAX) w = TIMELINE_WEEK_MAX;
   return w;
 }
 
@@ -208,23 +211,9 @@ function _timelineRenderBlockBar(block, weekStartMs, weekEndMs, laneHeight, rowT
 }
 
 function _timelineParseExercise(ex) {
-  const DAY_MS  = 86400000;
-  const HOUR_MS = 3600000;
-  let startMs = _parseRawDate(ex.rawStartDate);
-  let endMs = _parseRawDate(ex.rawEndDate || ex.rawStartDate);
-  if (isNaN(startMs)) return null;
-  if (isNaN(endMs)) endMs = startMs + DAY_MS;
-  if (ex.rawStartTime) {
-    const parts = ex.rawStartTime.split(':').map(Number);
-    startMs += parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
-  }
-  if (ex.rawEndTime) {
-    const parts = ex.rawEndTime.split(':').map(Number);
-    endMs = _parseRawDate(ex.rawEndDate || ex.rawStartDate) +
-      parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
-  }
-  if (endMs <= startMs) endMs = startMs + HOUR_MS;
-  return { ex: ex, startMs: startMs, endMs: endMs };
+  const range = _exerciseTimeRange(ex);
+  if (!range) return null;
+  return { ex: ex, startMs: range.startMs, endMs: range.endMs };
 }
 
 function _timelineAttrEsc(s) {
@@ -389,6 +378,7 @@ function Views_timeline(p) {
   const weekEndMs   = weekEnd.getTime();
 
   const parsed = exercises.map(_timelineParseExercise).filter(Boolean);
+  const unparsedCount = exercises.length - parsed.length;
 
   const weekItems = parsed.filter(item =>
 
@@ -442,11 +432,11 @@ function Views_timeline(p) {
 
   s += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
 
-  if (weekOffset > -3) {
+  if (weekOffset > TIMELINE_WEEK_MIN) {
     s += '<a href="#" class="btn btn-secondary btn-sm" data-spa-page="timeline"' +
       _spaParamsAttr({ week: weekOffset - 1 }) + '>שבוע →</a>';
   }
-  if (weekOffset < 3) {
+  if (weekOffset < TIMELINE_WEEK_MAX) {
     s += '<a href="#" class="btn btn-secondary btn-sm" data-spa-page="timeline"' +
       _spaParamsAttr({ week: weekOffset + 1 }) + '>← שבוע</a>';
   }
@@ -456,7 +446,7 @@ function Views_timeline(p) {
   }
 
   s += '<select id="timelineWeekSelect" class="form-select" style="width:auto;min-width:200px;font-size:12px">';
-  for (let w = -3; w <= 3; w++) {
+  for (let w = TIMELINE_WEEK_MIN; w <= TIMELINE_WEEK_MAX; w++) {
     const wIso = _isoWeekLabel(_timelineWeekBounds(w).weekStartYmd);
     s += '<option value="' + w + '"' + (w === weekOffset ? ' selected' : '') + '>' +
       _esc(_timelineWeekLabel(w) + ' · ' + wIso) + '</option>';
@@ -469,6 +459,15 @@ function Views_timeline(p) {
 
   s += '</div>';
   s += '</div>';
+
+  if (unparsedCount > 0) {
+    s += '<div class="flash flash-error" style="margin-bottom:12px">⚠ ' +
+      unparsedCount + ' תרגילים ללא תאריך תקין — לא ניתן להציג בלוח. עדכן תאריכי התחלה/סיום.</div>';
+  } else if (exercises.length && !weekItems.length) {
+    s += '<div class="flash flash-info" style="margin-bottom:12px">ℹ יש ' + exercises.length +
+      ' תרגילים במערכת, אך אין תרגילים ב' + _esc(_timelineWeekLabel(weekOffset)) +
+      '. השתמש בבורר השבועות למעלה כדי לנווט לשבוע הרלוונטי.</div>';
+  }
 
   const bounds = _timelineWeekBounds(weekOffset);
   const weekBlocks = canEdit && typeof TimelineBlocks_inWeek === 'function'
@@ -613,8 +612,8 @@ function Views_timeline(p) {
     const barStyle =
       'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;' +
       'width:' + Math.max(widthPct, 1.5) + '%;' +
-      'background:' + color + '22;border:1px solid ' + color + ';border-radius:8px;' +
-      'padding:4px 6px;overflow:hidden;color:var(--text);opacity:' + (isPast ? '0.55' : '1') + ';' +
+      'background:' + color + '55;border:1px solid ' + color + ';border-radius:8px;' +
+      'padding:4px 6px;overflow:hidden;color:#1a2e22;font-weight:600;opacity:' + (isPast ? '0.72' : '1') + ';' +
       'z-index:' + (10 + (item.lane || 0)) + ';display:flex;align-items:stretch;box-sizing:border-box';
 
     const dataAttrs =

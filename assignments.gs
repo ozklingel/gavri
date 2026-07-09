@@ -226,28 +226,6 @@ function _matchesCorps(value, corps) {
   return false;
 }
 
-function _exerciseTimeRange(ex) {
-  const DAY_MS  = 86400000;
-  const HOUR_MS = 3600000;
-
-  let startMs = _parseRawDate(ex.rawStartDate);
-  let endMs   = _parseRawDate(ex.rawEndDate || ex.rawStartDate);
-  if (isNaN(startMs)) return null;
-  if (isNaN(endMs)) endMs = startMs + DAY_MS;
-
-  if (ex.rawStartTime) {
-    const parts = ex.rawStartTime.split(':').map(Number);
-    startMs += parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
-  }
-  if (ex.rawEndTime) {
-    const parts = ex.rawEndTime.split(':').map(Number);
-    endMs = _parseRawDate(ex.rawEndDate || ex.rawStartDate) +
-      parts[0] * HOUR_MS + (parts[1] || 0) * 60000;
-  }
-  if (endMs <= startMs) endMs = startMs + DAY_MS;
-  return { startMs: startMs, endMs: endMs };
-}
-
 function _timesOverlap(r1, r2) {
   if (!r1 || !r2) return false;
   return r1.startMs < r2.endMs && r2.startMs < r1.endMs;

@@ -120,22 +120,82 @@ function _rawTime(val) {
   return s;
 }
 
-function _rawDate(val) {
-  if (!val) return '';
-  const d = (val instanceof Date) ? val : new Date(val);
-  if (isNaN(d.getTime())) return '';
-  const y  = d.getFullYear();
-  const m  = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + dd;
+function _hebrewMonths() {
+  return ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 }
 
-// Parse a raw "YYYY-MM-DD" string → UTC timestamp (ms). Returns NaN if invalid.
+/** Normalizes sheet / display values → YYYY-MM-DD (local calendar). */
+function _ymdFromCellValue(val) {
+  if (val == null || val === '') return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    const y  = val.getFullYear();
+    const m  = String(val.getMonth() + 1).padStart(2, '0');
+    const dd = String(val.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+  }
+
+  const s = String(val).trim();
+  if (!s) return '';
+
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+
+  const dmy = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+  if (dmy) {
+    return dmy[3] + '-' + String(+dmy[2]).padStart(2, '0') + '-' + String(+dmy[1]).padStart(2, '0');
+  }
+
+  const months = _hebrewMonths();
+  for (let mi = 0; mi < months.length; mi++) {
+    const re = new RegExp('(\\d{1,2})\\s+ב?' + months[mi] + '\\s+(\\d{4})');
+    const m = s.match(re);
+    if (m) {
+      return m[2] + '-' + String(mi + 1).padStart(2, '0') + '-' + String(+m[1]).padStart(2, '0');
+    }
+  }
+
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+  return '';
+}
+
+function _rawDate(val) {
+  return _ymdFromCellValue(val);
+}
+
+// Parse YYYY-MM-DD (or flexible date) → local midnight ms. Returns NaN if invalid.
 function _parseRawDate(str) {
-  if (!str) return NaN;
-  const parts = String(str).split('-');
-  if (parts.length !== 3) return NaN;
-  return Date.UTC(+parts[0], +parts[1]-1, +parts[2]);
+  const ymd = _ymdFromCellValue(str);
+  if (!ymd) return NaN;
+  return Exercise_msFromYmdHm(ymd, '00:00');
+}
+
+/** Schedule range for an exercise record (used by timeline, conflicts, series). */
+function _exerciseTimeRange(ex) {
+  const DAY_MS  = 86400000;
+  const HOUR_MS = 3600000;
+  const startYmd = ex.rawStartDate || _ymdFromCellValue(ex.date) || '';
+  const endYmd = ex.rawEndDate || startYmd;
+  if (!startYmd) return null;
+
+  const startMs = Exercise_msFromYmdHm(startYmd, ex.rawStartTime || '00:00');
+  if (isNaN(startMs)) return null;
+
+  let endMs;
+  if (ex.rawEndTime) {
+    endMs = Exercise_msFromYmdHm(endYmd, ex.rawEndTime);
+  } else {
+    endMs = Exercise_msFromYmdHm(endYmd, '23:59');
+    if (isNaN(endMs)) endMs = startMs + DAY_MS;
+  }
+  if (endMs <= startMs) endMs = startMs + (ex.rawStartTime ? HOUR_MS : DAY_MS);
+  return { startMs: startMs, endMs: endMs };
 }
 
 var EXERCISE_DAY_START_H = 6;
