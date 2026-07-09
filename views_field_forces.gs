@@ -11,7 +11,6 @@ function Views_fieldForces(p) {
   let s = _topbar(user, sid) + '<div class="page">' + _flash(p);
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<h1 class="page-title" style="margin:0">⚔ כוחות בשטח</h1>' +
-    _a('page=dashboard', '← לוח בקרה', 'btn btn-ghost btn-sm') +
     '</div>';
 
   s += '<div class="card"><div class="card-header"><div class="card-title">📋 רשימה (' + items.length + ')</div></div>';
@@ -82,7 +81,6 @@ function Views_fieldForce(p) {
     '<div class="page-title" style="margin:0">⚔ ' + _esc(item.force_name || item.role) + '</div>' +
     '<div style="display:flex;gap:6px">' +
     _a('page=fieldForces', '← רשימה', 'btn btn-ghost btn-sm') +
-    _a('page=dashboard', '← לוח בקרה', 'btn btn-ghost btn-sm') +
     '</div></div>';
 
   s += '<div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">פרטים</span></div>' +

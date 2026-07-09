@@ -444,7 +444,6 @@ function Views_statistics(p) {
   s += '<div class="page">' + _flash(p);
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
   s += '<h1 class="page-title" style="margin:0">📊 סטטיסטיקות — סגל</h1>';
-  s += _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
   s += '</div>';
   s += _adminStatisticsContent(sid, activeSection);
   s += '</div>';

@@ -22,7 +22,6 @@ function Views_exercises(p) {
     '<div class="page">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
       '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
-      _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
     '</div>' +
     s +
     '</div>';

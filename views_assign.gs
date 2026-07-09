@@ -12,10 +12,8 @@ function Views_assign(p) {
     '<div class="page page-assign">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<div class="page-title" style="margin:0">🔀 לוח שיבוץ</div>' +
-    '<div style="display:flex;gap:6px;align-items:center">' +
     '<span id="assignStatus" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></span>' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm') +
-    '</div></div>' +
+    '</div>' +
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
     '// ימין: חניכים לשיבוץ · שמאל: תרגילים (חסרים למעלה) · גרור לתרגיל · שינויים נשמרים בלחיצה על «שמירה ואישור»' +
     '</div>' +

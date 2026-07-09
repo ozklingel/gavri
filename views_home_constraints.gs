@@ -96,7 +96,6 @@ function Views_homeConstraints(p) {
   let s = _topbar(user, sid) + '<div class="page">' + _flash(p);
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<h1 class="page-title" style="margin:0">🏠 אילוצי זמן בית</h1>' +
-    _a('page=dashboard', '← לוח בקרה', 'btn btn-ghost btn-sm') +
     '</div>';
 
   if (pendingApproval.length) {

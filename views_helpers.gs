@@ -433,12 +433,18 @@ function _appDrawer(user, sid) {
     '</div></aside>';
 }
 
+function _spaBackBtn(cls) {
+  cls = cls || 'btn btn-ghost btn-sm';
+  return '<button type="button" class="' + cls + '" data-spa-back title="חזרה">← חזרה</button>';
+}
+
 function _topbar(user, sid) {
   if (!user) return '';
   return _appDrawer(user, sid) +
     '<nav class="topbar">' +
     '<div class="topbar-start">' +
     '<button type="button" class="btn btn-ghost btn-sm topbar-menu-btn" id="appDrawerOpen" aria-label="פתח תפריט">☰</button>' +
+    '<button type="button" class="btn btn-ghost btn-sm topbar-back-btn" id="appTopbarBack" data-spa-back title="חזרה" hidden>← חזרה</button>' +
     '<a href="#" class="topbar-brand" data-spa-page="dashboard"' + _spaParamsAttr({}) + '>' +
     '<span class="star">★</span>' +
     '<div><span>סדרת השטח</span><span class="sub">TRAINING CMD</span></div>' +
@@ -447,10 +453,6 @@ function _topbar(user, sid) {
 
 // ─────────── ERROR ───────────
 function Views_error(msg, p) {
-  const sid = (p && p.sid) ? p.sid : '';
-  const back = sid
-    ? _a('page=dashboard&sid=' + encodeURIComponent(sid), '← לוח בקרה', 'btn btn-secondary')
-    : _a('page=login', '← התחברות', 'btn btn-secondary');
   const body =
     '<div class="login-wrap">' +
     '<div class="login-box">' +
@@ -458,7 +460,7 @@ function Views_error(msg, p) {
     '<div class="login-title" style="color:#f87171">שגיאה</div></div>' +
     '<div class="login-body">' +
     '<p style="color:#fca5a5;margin-bottom:16px">' + _esc(msg) + '</p>' +
-    back + '</div></div></div>';
+    _spaBackBtn('btn btn-secondary') + '</div></div></div>';
   return _wrapPage(body, 'שגיאה');
 }
 

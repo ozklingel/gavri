@@ -153,6 +153,12 @@ body {
       min-width: 44px;
       min-height: 44px;
     }
+    .topbar-back-btn {
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: nowrap;
+    }
     a.topbar-brand {
       text-decoration: none;
       color: inherit;
@@ -2182,6 +2188,39 @@ body {
     var reqId = 0;
     var initialBoot = true;
     var splashBoot = true;
+    var currentRoute = null;
+    var navStack = [];
+
+    function routeKey(route) {
+      if (!route) return '';
+      return route.page + '::' + JSON.stringify(route.params || {});
+    }
+
+    function canGoBack() {
+      if (navStack.length) return true;
+      if (!currentRoute) return false;
+      var pg = currentRoute.page;
+      return pg !== 'dashboard' && pg !== 'login';
+    }
+
+    function updateBackButton() {
+      var btn = document.getElementById('appTopbarBack');
+      if (!btn) return;
+      btn.hidden = !canGoBack();
+    }
+
+    function goBack() {
+      if (navStack.length) {
+        var prev = navStack.pop();
+        navigate(prev.page, prev.params || {}, { fromBack: true });
+        return;
+      }
+      if (currentRoute && currentRoute.page !== 'dashboard' && getSid()) {
+        navigate('dashboard', {}, { fromBack: true, replace: true });
+      } else if (currentRoute && currentRoute.page !== 'login') {
+        navigate('login', {}, { fromBack: true, replace: true });
+      }
+    }
 
     function finishBootUi() {
       MapimLoader.hide();
@@ -2255,6 +2294,7 @@ body {
       if (typeof initDatePickers === 'function') initDatePickers();
       initFlatpickr();
       initAppDrawer();
+      updateBackButton();
       if (typeof initTimelineWeek === 'function') initTimelineWeek();
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
@@ -2324,10 +2364,16 @@ body {
       if (result.clearSid) {
         setSid('');
         setMfaToken('');
+        navStack = [];
+        currentRoute = { page: 'login', params: {} };
       }
       if (result.sid) {
         setSid(result.sid);
         setMfaToken('');
+        if (!result.mfaToken) {
+          navStack = [];
+          currentRoute = { page: 'dashboard', params: {} };
+        }
       }
       if (result.mfaToken) setMfaToken(result.mfaToken);
       var app = document.getElementById('app-content');
@@ -2347,18 +2393,31 @@ body {
       alert(err && err.message ? err.message : String(err));
     }
 
-    function navigate(page, params) {
+    function navigate(page, params, options) {
+      options = options || {};
+      params = params || {};
+      page = String(page || 'login').trim();
+      var prevRoute = currentRoute;
+      var nextRoute = { page: page, params: params };
       var myReq = ++reqId;
       loading = true;
       var booting = initialBoot;
       if (booting) initialBoot = false;
-      var loadLabel = MapimLoader.labelFor('page=' + (page || ''));
+      var loadLabel = MapimLoader.labelFor('page=' + page);
       if (booting) MapimLoader.showSplashStatus(loadLabel);
       else MapimLoader.show(loadLabel);
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
+          if (!options.fromBack && !options.replace && prevRoute) {
+            if (routeKey(prevRoute) !== routeKey(nextRoute)) {
+              navStack.push(prevRoute);
+            }
+          }
+          if (options.replace) navStack = [];
+          currentRoute = nextRoute;
           applyResult(result);
+          updateBackButton();
         })
         .withFailureHandler(function(err) {
           if (myReq !== reqId) return;
@@ -2434,6 +2493,12 @@ body {
     document.addEventListener('click', function(e) {
       if (isLocalUiClick(e.target)) return;
 
+      if (e.target.closest('[data-spa-back]')) {
+        e.preventDefault();
+        goBack();
+        return;
+      }
+
       var el = e.target.closest('[data-spa-page]');
       if (el) {
         e.preventDefault();
@@ -2471,7 +2536,8 @@ body {
     }, true);
 
     return {
-      navigate: navigate, runAction: runAction, getSid: getSid, setSid: setSid,
+      navigate: navigate, runAction: runAction, goBack: goBack, canGoBack: canGoBack,
+      getSid: getSid, setSid: setSid,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();

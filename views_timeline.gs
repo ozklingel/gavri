@@ -467,7 +467,6 @@ function Views_timeline(p) {
     s += '<button type="button" id="timelineEditToggle" class="btn btn-ghost btn-sm">✏ מצב עריכה</button>';
   }
 
-  s += _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
   s += '</div>';
   s += '</div>';
 

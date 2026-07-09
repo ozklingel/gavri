@@ -45,9 +45,7 @@ function Views_exercise(p) {
   // Page header with action buttons
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<div class="page-title" style="margin:0">' + _esc(ex.title) + '</div>' +
-    '<div style="display:flex;gap:6px">' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
-
+    '<div style="display:flex;gap:6px">';
   if (Roles_hasAdminAccess(user.role)) {
     s += _a('action=duplicateExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ, '⎘ שכפל', 'btn btn-ghost btn-sm');
 s += _confirmDelete(
@@ -295,8 +293,7 @@ function Views_user(p) {
   // Page header
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<div class="page-title" style="margin:0">👤 ' + _esc(target.name) + '</div>' +
-    '<div style="display:flex;gap:6px">' +
-    _a('page=dashboard&sid=' + sidQ, '← לוח בקרה', 'btn btn-ghost btn-sm');
+    '<div style="display:flex;gap:6px">';
   if (isAdmin) {
     s += _a('page=users&sid=' + sidQ, '← משתמשים', 'btn btn-ghost btn-sm');
   }
