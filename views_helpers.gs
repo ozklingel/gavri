@@ -425,7 +425,7 @@ function _appDrawer(user, sid) {
     panelsHtml +
     '</div>' +
     '<div class="app-drawer-foot">' +
-    _a('action=logout', '⏻ יציאה', 'btn btn-danger btn-full') +
+    _confirmAction('action=logout', '⏻ יציאה', 'האם אתה בטוח שברצונך לצאת?', 'btn btn-danger btn-full') +
     '</div></aside>';
 }
 
