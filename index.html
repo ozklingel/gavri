@@ -37,6 +37,8 @@
       --radius:    6px;
       --shadow:    0 4px 24px rgba(30, 60, 40, 0.12);
       --shadow-lg: 0 8px 32px rgba(30, 60, 40, 0.18);
+      --heading-on-bg: #ffffff;
+      --heading-on-bg-shadow: 0 1px 4px rgba(20, 45, 30, 0.85), 0 0 14px rgba(20, 45, 30, 0.4);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -550,7 +552,8 @@ body {
     .page-title {
       font-family: var(--mono);
       font-size: 20px;
-      color: var(--green);
+      color: var(--heading-on-bg);
+      text-shadow: var(--heading-on-bg-shadow);
       margin-bottom: 16px;
       display: flex;
       align-items: center;
@@ -558,7 +561,8 @@ body {
     }
     .page-title::before {
       content: '▌';
-      color: var(--green2);
+      color: var(--green-dim);
+      text-shadow: var(--heading-on-bg-shadow);
     }
 
     /* ── ASSIGNMENT BOARD ── */
@@ -1992,7 +1996,12 @@ body {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 10px; gap: 8px;
     }
-    .stats-section-title { font-weight: 700; font-size: 15px; color: var(--text); }
+    .stats-section-title {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--heading-on-bg);
+      text-shadow: var(--heading-on-bg-shadow);
+    }
     .stats-cohort-badge {
       font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
     }
