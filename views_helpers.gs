@@ -415,7 +415,7 @@ function _appDrawer(user, sid) {
     '<aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="תפריט ראשי">' +
     '<div class="app-drawer-head">' +
     '<div class="app-drawer-identity">' +
-    '<div class="app-drawer-user-name">' + _esc(user.name) + '</div>' +
+    '<div class="app-drawer-user-name">' + _userLink(user.id, user.name, '') + '</div>' +
     '<div class="app-drawer-user-role">' + _esc(_roleHe(user.role)) + '</div>' +
     '</div>' +
     '<button type="button" class="app-drawer-close" id="appDrawerClose" aria-label="סגור">✕</button>' +

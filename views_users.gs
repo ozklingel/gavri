@@ -137,7 +137,8 @@ function _teamsTab(sid, openSet) {
         '<b>' + _esc(t.name) + '</b> <span class="mono" style="font-size:11px;color:var(--muted)">' + t.id + '</span>' +
         _confirmDelete('action=deleteTeam&teamId=' + encodeURIComponent(t.id), 'למחוק את הצוות ' + t.name + '?') +
         '</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">מפקד: ' + _esc(cmd ? cmd.name : '—') + ' · ' + members.length + ' חברים</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">מפקד: ' +
+        (cmd ? _userLink(cmd.id, cmd.name, '') : '—') + ' · ' + members.length + ' חברים</div>' +
         _formOpen('form-inline') +
         '<input type="hidden" name="action" value="renameTeam">' +
         '<input type="hidden" name="teamId" value="' + _esc(t.id) + '">' +
@@ -159,7 +160,7 @@ function _teamsTab(sid, openSet) {
             sub = ' <span class="mono" style="font-size:10px">' + _esc(m.id) + '</span>';
           }
           s += '<li style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
-            '<span>' + _esc(m.name) + sub + '</span>' +
+            '<span>' + _userLink(m.id, m.name, '') + sub + '</span>' +
             _formOpen('form-inline') +
             '<input type="hidden" name="action" value="removeMember">' +
             '<input type="hidden" name="userId" value="' + _esc(m.id) + '">' +

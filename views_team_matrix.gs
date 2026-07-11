@@ -178,6 +178,11 @@ function _teamMatrixJs() {
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function userLinkHtml(userId, userName) {
+    if (window.MapimSpa && MapimSpa.userLinkHtml) return MapimSpa.userLinkHtml(userId, userName);
+    return '<b>' + esc(userName) + '</b>';
+  }
+
   function isMpRole(r) {
     r = String(r || '').trim();
     if (!r) return false;
@@ -320,7 +325,7 @@ function _teamMatrixJs() {
 
     var body = '';
     members.forEach(function(m) {
-      body += '<tr><td class="team-matrix-sticky team-matrix-name"><div class="team-matrix-user-name">' + esc(m.name) + '</div>' +
+      body += '<tr><td class="team-matrix-sticky team-matrix-name"><div class="team-matrix-user-name">' + userLinkHtml(m.id, m.name) + '</div>' +
         '<div class="team-matrix-user-sub">' + esc(rowSummary(m, exIds)) + '</div></td>';
       var row = (data.cells[currentTeam] && data.cells[currentTeam][m.id]) || {};
       exIds.forEach(function(exId) {

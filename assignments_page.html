@@ -241,7 +241,8 @@ function makePersonCard(uid, exId) {
   card.innerHTML =
     '<div class="person-avatar" style="color:' + roleColor(u.role) + '">' + roleEmoji(u.role) + '</div>' +
     '<div class="person-info">' +
-      '<div class="person-name">' + u.name + '</div>' +
+      '<div class="person-name"><a href="#" class="user-name-link" data-spa-page="user" data-spa-params="' +
+        JSON.stringify({ id: uid }).replace(/"/g, '&quot;') + '" onclick="event.stopPropagation()">' + u.name + '</a></div>' +
       '<div class="person-role" style="color:' + roleColor(u.role) + '">' + roleHe(u.role) +
         (u.unit ? ' · ' + u.unit : '') + '</div>' +
     '</div>' +

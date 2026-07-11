@@ -133,6 +133,11 @@ function _statisticsPageJs() {
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function userLinkHtml(userId, userName) {
+    if (window.MapimSpa && MapimSpa.userLinkHtml) return MapimSpa.userLinkHtml(userId, userName);
+    return '<b>' + esc(userName) + '</b>';
+  }
+
   var teamChart, compareChart, typeChart;
   var selectedTeams = [];
   var compareMode = 'team';
@@ -272,7 +277,7 @@ function _statisticsPageJs() {
     if (!tbody) return;
     var rows = traineeRowsFiltered();
     tbody.innerHTML = rows.map(function(r, i) {
-      return '<tr><td>' + (i + 1) + '</td><td><b>' + esc(r.name) + '</b></td>' +
+      return '<tr><td>' + (i + 1) + '</td><td>' + userLinkHtml(r.id, r.name) + '</td>' +
         '<td><span class="stats-rank-badge">' + esc(r.rank) + '</span></td>' +
         '<td>' + esc(r.teamName) + '</td>' +
         '<td><span class="stats-ex-count ' + exerciseCountClass(r.exercises) + '">' + r.exercises + '</span></td></tr>';

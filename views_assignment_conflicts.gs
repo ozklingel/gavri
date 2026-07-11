@@ -7,7 +7,7 @@ function _assignmentConflictsListHtml(items, emptyText) {
   let s = '<ul style="margin:0;padding:0 18px 0 0;list-style:disc">';
   items.forEach(function(item) {
     s += '<li style="margin:6px 0;line-height:1.5;font-size:12px">' +
-      '<b>' + _esc(item.user_name) + '</b> — ' +
+      _userLink(item.user_id, item.user_name, '') + ' — ' +
       _esc(item.exercise_a_title) + ' ↔ ' + _esc(item.exercise_b_title);
     if (item.type === 'procedure') {
       s += ' <span class="badge badge-yellow" style="font-size:10px">' +

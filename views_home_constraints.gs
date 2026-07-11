@@ -22,6 +22,14 @@ function _homeConstraintsRowActions(item, user, canApprove) {
     '</form></div>';
 }
 
+function _homeConstraintsSupervisorCell(item) {
+  const supId = String(item.supervisor_id || '').trim();
+  if (!supId) return _esc(HomeConstraints_supervisorLabel(item));
+  const sup = Users_get(supId);
+  if (!sup) return _esc(HomeConstraints_supervisorLabel(item));
+  return 'מפקצ — ' + _userLink(sup.id, sup.name, '');
+}
+
 function _homeConstraintsTableRows(items, user, opts) {
   opts = opts || {};
   let s = '';
@@ -29,13 +37,13 @@ function _homeConstraintsTableRows(items, user, opts) {
     const submitter = Users_get(item.user_id);
     const canApprove = HomeConstraints_canApprove(user, item);
     s += '<tr>' +
-      '<td style="white-space:nowrap"><b>' + _esc(submitter ? submitter.name : item.user_id) + '</b>' +
+      '<td style="white-space:nowrap">' + _userLink(item.user_id, submitter ? submitter.name : item.user_id, '') +
       (submitter ? '<div style="font-size:11px;color:var(--muted)">' + _esc(Roles_label(submitter.role)) + '</div>' : '') +
       '</td>' +
       '<td style="font-size:12px;white-space:nowrap">' + _esc(HomeConstraints_formatRange(item)) + '</td>' +
       '<td>' + _esc(item.notes || '—') + '</td>';
     if (opts.showApprover) {
-      s += '<td style="font-size:12px">' + _esc(HomeConstraints_supervisorLabel(item)) + '</td>';
+      s += '<td style="font-size:12px">' + _homeConstraintsSupervisorCell(item) + '</td>';
     }
     s += '<td>' + _homeConstraintStatusBadge(item.status) + '</td>';
     if (opts.showActions) {

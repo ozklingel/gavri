@@ -176,6 +176,23 @@ function _assignBoardJs() {
       .replace(/"/g, '&quot;');
   }
 
+  function userLinkHtml(userId, userName) {
+    if (window.MapimSpa && MapimSpa.userLinkHtml) return MapimSpa.userLinkHtml(userId, userName);
+    return '<b>' + escHtml(userName) + '</b>';
+  }
+
+  function createUserNameLink(userId, userName, style) {
+    var a = document.createElement('a');
+    a.href = '#';
+    a.className = 'user-name-link';
+    a.setAttribute('data-spa-page', 'user');
+    a.setAttribute('data-spa-params', JSON.stringify({ id: userId }));
+    a.textContent = userName || userId;
+    a.style.cssText = style || 'color:var(--blue);text-decoration:underline';
+    a.addEventListener('click', function(e) { e.stopPropagation(); });
+    return a;
+  }
+
   function setStatus(msg, color) {
     if (!status) return;
     status.textContent = msg;
@@ -309,18 +326,18 @@ function _assignBoardJs() {
 
   function changeLabel(ch) {
     var u = data.userMap[ch.userId];
-    var name = u ? u.name : ch.userId;
+    var nameHtml = userLinkHtml(ch.userId, u ? u.name : ch.userId);
     if (ch.type === 'add') {
-      return '+ שיבוץ ' + name + ' → ' + getExTitle(ch.exId) + (ch.resp ? ' (' + ch.resp + ')' : '');
+      return '+ שיבוץ ' + nameHtml + ' → ' + escHtml(getExTitle(ch.exId)) + (ch.resp ? ' (' + escHtml(ch.resp) + ')' : '');
     }
     if (ch.type === 'remove') {
-      return '− הסרת ' + name + ' מ־' + getExTitle(ch.exId);
+      return '− הסרת ' + nameHtml + ' מ־' + escHtml(getExTitle(ch.exId));
     }
     if (ch.type === 'move') {
-      return '↔ העברת ' + name + ' ל־' + getExTitle(ch.toExId);
+      return '↔ העברת ' + nameHtml + ' ל־' + escHtml(getExTitle(ch.toExId));
     }
     if (ch.type === 'resp') {
-      return '✎ תפקיד ' + name + ': ' + (ch.oldResp || '—') + ' → ' + ch.resp;
+      return '✎ תפקיד ' + nameHtml + ': ' + escHtml(ch.oldResp || '—') + ' → ' + escHtml(ch.resp);
     }
     return '';
   }
@@ -340,7 +357,7 @@ function _assignBoardJs() {
     changes.forEach(function(ch, idx) {
       var li = document.createElement('li');
       li.className = 'assign-change-item assign-change-' + ch.type;
-      li.textContent = (idx + 1) + '. ' + changeLabel(ch);
+      li.innerHTML = (idx + 1) + '. ' + changeLabel(ch);
       changesList.appendChild(li);
     });
     setStatus('● ' + changes.length + ' שינויים ממתינים לשמירה', '#fbbf24');
@@ -476,7 +493,7 @@ function _assignBoardJs() {
 
   function buildProfileHtml(u, uid) {
     if (!u) return '';
-    var h = '<div style="font-weight:700;margin-bottom:8px;font-size:12px">' + escHtml(u.name) +
+    var h = '<div style="font-weight:700;margin-bottom:8px;font-size:12px">' + userLinkHtml(uid, u.name) +
       ' <span style="font-weight:400;color:var(--muted)">' + escHtml(uid || '') + '</span></div>';
     h += profileRow('תפקיד', ROLE_LABELS[u.role] || u.role);
     h += profileRow('צוות', u.teamName);
@@ -576,8 +593,8 @@ function _assignBoardJs() {
     dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (ROLE_COLORS[u.role] || '#888');
 
     var txt = document.createElement('span');
-    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-    txt.textContent = u.name;
+    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0';
+    txt.appendChild(createUserNameLink(userId, u.name, 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit;text-decoration:underline'));
 
     var badge = document.createElement('span');
     badge.className = 'assign-count-badge';
@@ -619,16 +636,24 @@ function _assignBoardJs() {
     dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (ROLE_COLORS[u.role] || '#888');
 
     var txt = document.createElement('span');
-    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-    txt.textContent = u.name + (resp ? ' · ' + resp : '');
+    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;min-width:0;gap:0';
+    txt.appendChild(createUserNameLink(userId, u.name, 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1;color:inherit;text-decoration:underline'));
 
-    if (assignId && exId && exId !== '__pool__') {
-      txt.style.cursor = 'pointer';
-      txt.title = 'לחץ לשינוי תפקיד';
-      txt.onclick = function(e) {
-        e.stopPropagation();
-        openRespEditor(div, assignId, exId, userId, resp, u.name);
-      };
+    if (resp) {
+      var sep = document.createElement('span');
+      sep.textContent = ' · ';
+      txt.appendChild(sep);
+      var respEl = document.createElement('span');
+      respEl.textContent = resp;
+      if (assignId && exId && exId !== '__pool__') {
+        respEl.style.cursor = 'pointer';
+        respEl.title = 'לחץ לשינוי תפקיד';
+        respEl.onclick = function(e) {
+          e.stopPropagation();
+          openRespEditor(div, assignId, exId, userId, resp, u.name);
+        };
+      }
+      txt.appendChild(respEl);
     }
 
     var del = document.createElement('span');
@@ -822,7 +847,7 @@ function _assignBoardJs() {
       } else {
         var pick = candidates[0];
         body.style.cssText = 'font-family:var(--mono);font-size:12px;color:var(--text1)';
-        body.innerHTML = '<b>' + escHtml(pick.name) + '</b><br><span style="font-size:10px;color:var(--muted)">' +
+        body.innerHTML = userLinkHtml(pick.id, pick.name) + '<br><span style="font-size:10px;color:var(--muted)">' +
           escHtml(pick.id) + ' · ' + pick.count + ' תרגילים</span>';
       }
       card.appendChild(lbl);

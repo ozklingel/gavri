@@ -201,7 +201,7 @@ s += _confirmDelete(
       const u = Users_get(a.user_id);
       const isSelf = String(a.user_id) === String(user.id);
       pHtml += '<tr' + (isSelf ? ' style="background:rgba(74,222,128,0.06)"' : '') + '>' +
-        '<td>' + (isSelf ? '<b>' + _esc(u ? u.name : a.user_id) + '</b>' : _esc(u ? u.name : a.user_id)) + '</td>' +
+        '<td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
         '<td>' + _esc(a.responsibility) + '</td>' +
         '</tr>';
     });
@@ -312,7 +312,7 @@ function Views_user(p) {
     '<tr><td style="width:140px;color:var(--muted);font-family:var(--mono);font-size:12px">מספר אישי</td>' +
     '<td><span style="font-family:var(--mono);color:var(--green)">' + _esc(target.id) + '</span></td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">שם</td>' +
-    '<td><b>' + _esc(target.name) + '</b></td></tr>' +
+    '<td>' + _userLink(target.id, target.name, '') + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">תפקיד</td>' +
     '<td>' + _badge(_roleHe(target.role), _roleBadgeType(target.role)) + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">צוות</td>' +

@@ -274,7 +274,7 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
 
   let s = '<div class="card" style="margin-bottom:16px" id="dashboardUserExerciseResults">';
   s += '<div class="card-header" style="flex-wrap:wrap;gap:8px">' +
-    '<span class="card-title">🎯 תרגילים — ' + _esc(target.name) + '</span>' +
+    '<span class="card-title">🎯 תרגילים — ' + _userLink(target.id, target.name, '') + '</span>' +
     '<a href="#" data-spa-page="user"' + _spaParamsAttr({ id: target.id }) +
     ' class="btn btn-ghost btn-sm">פרופיל מלא</a>' +
     '</div>';
@@ -442,7 +442,7 @@ function _tutorDashboardPanels(user, sid) {
       const a = row.assign;
       const t = row.trainee;
       s += '<tr>' +
-        '<td><b>' + _esc(t.name) + '</b></td>' +
+        '<td>' + _userLink(t.id, t.name, '') + '</td>' +
         '<td>' + _esc(a.responsibility || '—') + '</td>' +
         '<td>' + _statusBadge(a.status) + '</td>' +
         '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +

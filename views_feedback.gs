@@ -39,7 +39,8 @@ function Views_feedback(p) {
   s += '<div class="card" style="margin-bottom:14px"><div class="card-body">';
   s += '<div style="display:flex;gap:20px;flex-wrap:wrap;font-family:var(--mono);font-size:12px">';
   s += '<div><span style="color:var(--muted)">תרגיל</span><br><b>' + _esc(ex.title) + '</b></div>';
-  s += '<div><span style="color:var(--muted)">חניך</span><br><b>' + _esc(traineeName) + '</b></div>';
+  s += '<div><span style="color:var(--muted)">חניך</span><br>' +
+    (trainee ? _userLink(trainee.id, traineeName, '') : '<b>' + _esc(traineeName) + '</b>') + '</div>';
   s += '<div><span style="color:var(--muted)">תפקיד בתרגיל</span><br><b>' + _esc(assignment.responsibility || '—') + '</b></div>';
   s += '</div></div></div>';
 

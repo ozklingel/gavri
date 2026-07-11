@@ -209,6 +209,12 @@ function _exerciseMatrixJs() {
   var activeCell = null;
   var editorActiveIdx = -1;
 
+  function userLinkHtml(userId, userName) {
+    if (window.MapimSpa && MapimSpa.userLinkHtml) return MapimSpa.userLinkHtml(userId, userName);
+    var safe = String(userName == null ? '' : userName).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return '<b>' + safe + '</b>';
+  }
+
   function cellHtml(exId, role, c) {
     var cls = 'ex-matrix-assign-cell' + (c ? ' filled' : '') + (canEdit ? ' editable' : '');
     var attrs = ' class="' + cls + '" data-ex-id="' + esc(exId) + '" data-role="' + esc(role) + '"';
@@ -216,7 +222,7 @@ function _exerciseMatrixJs() {
     if (canEdit) attrs += ' title="לחץ לעריכת שיבוץ" tabindex="0"';
     var inner = '';
     if (c) {
-      inner += '<div class="ex-matrix-person"><div class="ex-matrix-person-name">' + esc(c.name) + '</div>';
+      inner += '<div class="ex-matrix-person"><div class="ex-matrix-person-name">' + userLinkHtml(c.userId, c.name) + '</div>';
       if (c.phone) inner += '<div class="ex-matrix-person-phone">' + esc(c.phone) + '</div>';
       inner += '</div>';
     } else if (canEdit) {
@@ -357,7 +363,7 @@ function _exerciseMatrixJs() {
     if (cell && current) {
       current.hidden = false;
       current.innerHTML = '<span class="ex-matrix-cell-editor-current-label">משובץ:</span> ' +
-        '<b>' + esc(cell.name) + '</b>' +
+        userLinkHtml(cell.userId, cell.name) +
         (cell.phone ? ' <span class="ex-matrix-cell-editor-current-phone">' + esc(cell.phone) + '</span>' : '');
     } else if (current) {
       current.hidden = true;
