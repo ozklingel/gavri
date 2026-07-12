@@ -251,6 +251,34 @@ function _dashExerciseTime(ex) {
   return start || end || '—';
 }
 
+function _dashboardProcedurePanelHtml(ex, details) {
+  if (!ex) {
+    return '<div class="dash-proc-empty" style="padding:12px 14px;color:var(--muted);font-size:12px">אין נתוני תרגיל</div>';
+  }
+  if (!details || !details.length) {
+    return '<div class="dash-proc-empty" style="padding:12px 14px;color:var(--muted);font-size:12px">' +
+      'אין לוז נוה"ק לתרגיל זה.</div>';
+  }
+  let html = '<div class="dash-proc-panel">' +
+    '<div class="dash-proc-head">' +
+    '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)">⚔ נוהל קרב — ' +
+    _esc(ex.title) + ' <span style="color:var(--muted);font-weight:600">(' + details.length + ')</span></span>' +
+    '<a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: ex.id }) +
+    ' class="btn btn-ghost btn-sm">↗ דף תרגיל מלא</a>' +
+    '</div>' +
+    '<div style="overflow-x:auto">' +
+    '<table class="tbl dash-proc-tbl"><thead><tr>' +
+    '<th>תאריך ושעה</th><th>מיקום</th><th>תיאור</th>' +
+    '</tr></thead><tbody>';
+  details.forEach(function(d) {
+    html += '<tr><td class="mono" style="font-size:11px;white-space:nowrap">' + _esc(d.time) + '</td>' +
+      '<td style="font-size:11px">' + _esc(d.location) + '</td>' +
+      '<td style="font-size:11px">' + _esc(d.description) + '</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
 function _dashboardUserCalendarEvents(assigns) {
   const events = [];
   assigns.forEach(function(a) {
@@ -258,6 +286,7 @@ function _dashboardUserCalendarEvents(assigns) {
     if (!ex) return;
     const range = _exerciseTimeRange(ex);
     if (!range || isNaN(range.startMs) || isNaN(range.endMs)) return;
+    const details = Exercises_details(ex.id);
     events.push({
       id: String(ex.id),
       title: String(ex.title || ''),
@@ -266,7 +295,8 @@ function _dashboardUserCalendarEvents(assigns) {
       location: _dashExerciseLocation(ex),
       responsibility: String(a.responsibility || ''),
       status: String(a.status || ''),
-      type: String(ex.exercise_type || '')
+      type: String(ex.exercise_type || ''),
+      procedureCount: details.length
     });
   });
   events.sort(function(a, b) { return a.startMs - b.startMs; });
@@ -353,13 +383,22 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
     s += '<div class="empty">אין תרגילים משויכים למשתמש זה</div>';
   } else {
     s += '<div class="card-body" style="padding:0;overflow-x:auto">' +
-      '<table class="tbl"><thead><tr>' +
-      '<th>תרגיל</th><th>שבוע לועזי</th><th>מיקום</th><th>זמן</th><th>תפקיד בתרגיל</th><th>סוג תרגיל</th><th>סטטוס</th>' +
+      '<table class="tbl" id="dashboardUserExTable"><thead><tr>' +
+      '<th>תרגיל</th><th>שבוע לועזי</th><th>מיקום</th><th>זמן</th><th>תפקיד בתרגיל</th><th>סוג תרגיל</th><th>סטטוס</th><th>נוה"ק</th>' +
       '</tr></thead><tbody>';
     assigns.forEach(function(a) {
       const ex = Exercises_get(a.exercise_id);
       const title = ex ? ex.title : a.exercise_id;
-      s += '<tr>' +
+      const details = ex ? Exercises_details(ex.id) : [];
+      const exId = ex ? String(ex.id) : '';
+      let procCell = '<span style="color:var(--muted);font-size:11px">—</span>';
+      if (ex && details.length) {
+        procCell = '<button type="button" class="btn btn-ghost btn-sm dash-proc-btn" ' +
+          'data-dash-proc="' + _esc(exId) + '" data-proc-count="' + details.length + '" ' +
+          'aria-expanded="false" title="הצג לוז נוהל קרב">' +
+          '📋 נוה"ק (' + details.length + ')</button>';
+      }
+      s += '<tr class="dash-ex-row">' +
         '<td style="white-space:nowrap">' +
         (ex ? _exerciseLink(ex.id, title) : _esc(title)) + '</td>' +
         '<td style="font-size:12px;white-space:nowrap">' +
@@ -369,7 +408,13 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
         '<td>' + _dashCell(a.responsibility) + '</td>' +
         '<td>' + (ex && ex.exercise_type ? _badge(ex.exercise_type, 'muted') : _dashCell('')) + '</td>' +
         '<td>' + _statusBadge(a.status) + '</td>' +
+        '<td style="white-space:nowrap">' + procCell + '</td>' +
         '</tr>';
+      if (ex && details.length) {
+        s += '<tr class="dash-proc-row" id="dash-proc-row-' + _esc(exId) + '" hidden>' +
+          '<td colspan="8" style="padding:0;background:rgba(245,158,11,0.06);border-top:1px solid var(--border)">' +
+          _dashboardProcedurePanelHtml(ex, details) + '</td></tr>';
+      }
     });
     s += '</tbody></table></div>';
   }

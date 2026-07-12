@@ -625,6 +625,29 @@ body {
         color: var(--green);
       }
     }
+    .dash-proc-panel {
+      padding: 10px 14px 12px;
+    }
+    .dash-proc-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .dash-proc-tbl th,
+    .dash-proc-tbl td {
+      font-size: 11px;
+    }
+    .dash-proc-btn.active {
+      border-color: #d97706;
+      color: #b45309;
+      background: rgba(245, 158, 11, 0.14);
+    }
+    .dash-proc-open-btn {
+      margin-top: 6px;
+    }
     .dashboard-tabs {
       display: flex;
       gap: 0;
@@ -2744,6 +2767,7 @@ body {
       if (typeof initTimelineWeek === 'function') initTimelineWeek();
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
       if (typeof initDashboardUserCalendar === 'function') initDashboardUserCalendar();
+      if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
         try { openPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (x) {}
@@ -2934,6 +2958,11 @@ body {
         el.closest('#page-loader') ||
         el.closest('#timelineWeekSelect') ||
         el.closest('#timelineEditToggle') ||
+        el.closest('#timelineProcedureToggle') ||
+        el.closest('#dashboardCalExportIcs') ||
+        el.closest('.dash-proc-btn') ||
+        el.closest('.dash-proc-open-btn') ||
+        el.closest('[data-user-cal-nav]') ||
         el.closest('.tl-handle') ||
         (el.closest('.timeline-track.edit-mode .tl-bar') && !el.closest('.exercise-name-link'));
     }
@@ -3220,7 +3249,10 @@ body {
             fmtClock(ev.startMs) + ' – ' + fmtClock(ev.endMs) +
             (ev.location ? ' · ' + ev.location : '') +
             (ev.responsibility ? ' · ' + ev.responsibility : '') +
-            '</div></div>';
+            '</div>' +
+            (ev.procedureCount ? ('<button type="button" class="btn btn-ghost btn-sm dash-proc-open-btn" data-dash-proc-open="' +
+              ev.id + '">📋 נוה"ק (' + ev.procedureCount + ')</button>') : '') +
+            '</div>';
         }).join('');
       dayDetail.hidden = false;
     }
@@ -3363,6 +3395,59 @@ body {
   }
 
   window.initDashboardUserCalendar = initDashboardUserCalendar;
+
+  function initDashboardProcedurePeek() {
+    var root = document.getElementById('dashboardUserExerciseResults');
+    if (!root || root._procBound) return;
+    root._procBound = true;
+
+    function setOpen(exId, open) {
+      var row = document.getElementById('dash-proc-row-' + exId);
+      var btn = root.querySelector('[data-dash-proc="' + exId + '"]');
+      if (!row || !btn) return false;
+      row.hidden = !open;
+      btn.classList.toggle('active', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.textContent = open ? '▴ סגור נוה"ק' : ('📋 נוה"ק (' + (btn.getAttribute('data-proc-count') || '0') + ')');
+      return true;
+    }
+
+    function toggleProcedure(exId) {
+      var row = document.getElementById('dash-proc-row-' + exId);
+      if (!row) return false;
+      var willOpen = row.hidden;
+      root.querySelectorAll('.dash-proc-row').forEach(function(r) {
+        if (!r.hidden && r.id !== 'dash-proc-row-' + exId) {
+          var otherId = r.id.replace('dash-proc-row-', '');
+          setOpen(otherId, false);
+        }
+      });
+      setOpen(exId, willOpen);
+      if (willOpen) {
+        try { row.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { /* ignore */ }
+      }
+      return true;
+    }
+
+    window.openDashboardProcedure = toggleProcedure;
+
+    root.addEventListener('click', function(e) {
+      var openBtn = e.target.closest('[data-dash-proc-open]');
+      if (openBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleProcedure(openBtn.getAttribute('data-dash-proc-open'));
+        return;
+      }
+      var btn = e.target.closest('.dash-proc-btn');
+      if (!btn || !root.contains(btn)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggleProcedure(btn.getAttribute('data-dash-proc'));
+    });
+  }
+
+  window.initDashboardProcedurePeek = initDashboardProcedurePeek;
 
   // Inline edit-panel toggle for user rows
   function toggleEditPanel(btn) {
