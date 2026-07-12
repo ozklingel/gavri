@@ -1092,6 +1092,12 @@ function Views_timeline(p) {
 
   const procedureEvents = _timelineProcedureEventsForWeek(viewItems, viewStartMs, viewEndMs);
 
+  const procCountByEx = {};
+  _rows('ExerciseDetails').data.forEach(function(r) {
+    const exId = String(r[1]);
+    procCountByEx[exId] = (procCountByEx[exId] || 0) + 1;
+  });
+
   viewItems.forEach(function(item, idx) {
     const startPct = ((item.startMs - viewStartMs) / viewSpanMs) * 100;
     const widthPct = ((item.endMs - item.startMs) / viewSpanMs) * 100;
@@ -1115,6 +1121,7 @@ function Views_timeline(p) {
       ' id="' + _timelineAttrEsc(barDomId) + '"' +
       ' data-tl-bar="1" data-exercise-id="' + _timelineAttrEsc(exId) + '"' +
       ' data-exercise-type="' + _timelineAttrEsc(item.displayType || item.typeKey || '') + '"' +
+      ' data-procedure-count="' + (procCountByEx[exId] || 0) + '"' +
       ' data-lane="' + (item.baseLane || 0) + '"' +
       ' data-sub-lane="' + (item.subLane || 0) + '"' +
       ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';

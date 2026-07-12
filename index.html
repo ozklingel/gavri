@@ -533,7 +533,7 @@ body {
       padding: 4px 0;
     }
     .user-cal-day {
-      min-height: 72px;
+      min-height: 84px;
       border: 1px solid var(--border2);
       border-radius: 6px;
       padding: 4px;
@@ -574,9 +574,9 @@ body {
       color: var(--green);
     }
     .user-cal-event {
-      font-size: 9px;
-      line-height: 1.2;
-      padding: 2px 4px;
+      font-size: 8px;
+      line-height: 1.15;
+      padding: 1px 3px;
       border-radius: 4px;
       white-space: nowrap;
       overflow: hidden;
@@ -593,6 +593,19 @@ body {
       color: var(--muted);
       font-family: var(--mono);
       padding: 0 2px;
+    }
+    .proc-add-panel {
+      border-bottom: 1px solid var(--border);
+      background: rgba(74, 222, 128, 0.04);
+    }
+    .proc-add-panel[hidden] {
+      display: none;
+    }
+    .proc-tbl .proc-edit-row[hidden] {
+      display: none;
+    }
+    .proc-tbl .proc-edit-row td {
+      border-top: none;
     }
     .user-cal-day-detail {
       margin-top: 12px;
@@ -2769,6 +2782,8 @@ body {
       if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
       if (typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+      if (typeof initExerciseProcedurePanel === 'function') initExerciseProcedurePanel();
+      if (typeof initExerciseEditShiftPrompt === 'function') initExerciseEditShiftPrompt();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
         try { openPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (x) {}
@@ -2965,6 +2980,9 @@ body {
         el.closest('[data-app-cal-nav]') ||
         el.closest('.dash-proc-btn') ||
         el.closest('.dash-proc-open-btn') ||
+        el.closest('#proc-add-toggle') ||
+        el.closest('.proc-edit-btn') ||
+        el.closest('.proc-edit-cancel') ||
         el.closest('.tl-handle') ||
         (el.closest('.timeline-track.edit-mode .tl-bar') && !el.closest('.exercise-name-link'));
     }
@@ -3290,12 +3308,12 @@ body {
         var cls = 'user-cal-day' + (isToday ? ' today' : '') + (dayEvents.length ? ' has-events' : '');
         html += '<div class="' + cls + '" data-cal-day="' + day + '">' +
           '<div class="user-cal-day-num">' + day + '</div>';
-        dayEvents.slice(0, 2).forEach(function(ev) {
+        dayEvents.slice(0, 3).forEach(function(ev) {
           html += '<div class="user-cal-event ' + eventTypeClass(ev.type) + '" title="' +
             ev.title.replace(/"/g, '&quot;') + '">' + ev.title + '</div>';
         });
-        if (dayEvents.length > 2) {
-          html += '<div class="user-cal-more">+' + (dayEvents.length - 2) + ' נוספים</div>';
+        if (dayEvents.length > 3) {
+          html += '<div class="user-cal-more">+' + (dayEvents.length - 3) + ' נוספים</div>';
         }
         html += '</div>';
         cell++;
@@ -3555,6 +3573,85 @@ body {
   // ── Hebrew Date Picker ──
   const HEB_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
   const HEB_DAYS_SHORT = ['א','ב','ג','ד','ה','ו','ש']; // Sun..Sat
+
+  function initExerciseProcedurePanel() {
+    var card = document.getElementById('exercise-procedure-card');
+    if (!card || card._procPanelBound) return;
+    card._procPanelBound = true;
+
+    var toggle = document.getElementById('proc-add-toggle');
+    var panel = document.getElementById('proc-add-panel');
+    if (toggle && panel) {
+      toggle.addEventListener('click', function() {
+        var open = panel.hidden;
+        panel.hidden = !open;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.textContent = open ? '➕ הוסף אירוע' : '▾ הסתר הוספה';
+        if (open && typeof initDatePickers === 'function') initDatePickers();
+        if (open && typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+      });
+    }
+
+    card.addEventListener('click', function(e) {
+      var editBtn = e.target.closest('.proc-edit-btn');
+      if (editBtn) {
+        e.preventDefault();
+        var id = editBtn.getAttribute('data-detail-id');
+        var row = document.getElementById('proc-edit-' + id);
+        if (!row) return;
+        var wasHidden = row.hidden;
+        card.querySelectorAll('.proc-edit-row').forEach(function(r) { r.hidden = true; });
+        row.hidden = !wasHidden;
+        if (!row.hidden) {
+          if (typeof initDatePickers === 'function') initDatePickers();
+          if (typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+          row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
+      }
+      var cancelBtn = e.target.closest('.proc-edit-cancel');
+      if (cancelBtn) {
+        e.preventDefault();
+        var cid = cancelBtn.getAttribute('data-detail-id');
+        var crow = document.getElementById('proc-edit-' + cid);
+        if (crow) crow.hidden = true;
+      }
+    });
+  }
+  window.initExerciseProcedurePanel = initExerciseProcedurePanel;
+
+  function initExerciseEditShiftPrompt() {
+    document.querySelectorAll('form.exercise-edit-form').forEach(function(form) {
+      if (form._shiftBound) return;
+      form._shiftBound = true;
+      form.addEventListener('submit', function(e) {
+        if (form._shiftConfirmed) {
+          form._shiftConfirmed = false;
+          return;
+        }
+        var origDate = form.getAttribute('data-orig-start-date') || '';
+        var origTime = form.getAttribute('data-orig-start-time') || '';
+        var procCount = parseInt(form.getAttribute('data-procedure-count') || '0', 10);
+        var fd = new FormData(form);
+        var newDate = String(fd.get('start_date') || '').trim();
+        var newTime = String(fd.get('start_time') || '').trim();
+        var timeChanged = origDate !== newDate || origTime !== newTime;
+        if (!timeChanged || procCount <= 0) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var yes = confirm(
+          'שינית את זמן התחלת התרגיל.\n\nלעדכן את לוז נוהל הקרב בהתאם (הזזת כל האירועים באותו הפרש)?'
+        );
+        var inp = form.querySelector('input[name="shift_procedure"]');
+        if (inp) inp.value = yes ? '1' : '';
+        form._shiftConfirmed = true;
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }, true);
+    });
+  }
+  window.initExerciseEditShiftPrompt = initExerciseEditShiftPrompt;
 
   function initTimeHalfInputs() {
     function normalizeTimeHm(s) {
@@ -4099,6 +4196,15 @@ body {
 
       var s = msToParts(startMs);
       var e = msToParts(endMs);
+      var procCount = parseInt(bar.getAttribute('data-procedure-count') || '0', 10);
+      var startChanged = startMs !== origStart;
+      var shiftProcedure = false;
+      if (startChanged && procCount > 0) {
+        shiftProcedure = confirm(
+          'שינית את זמן התחלת התרגיל.\n\nלעדכן את לוז נוהל הקרב בהתאם (הזזת כל האירועים באותו הפרש)?'
+        );
+      }
+
       bar.classList.add('tl-saving');
       MapimSpa.showLoader('// SAVING...');
       google.script.run
@@ -4119,7 +4225,8 @@ body {
           MapimSpa.getSid(),
           exerciseId,
           s.date, s.time, e.date, e.time,
-          track.dataset.weekOffset || '0'
+          track.dataset.weekOffset || '0',
+          shiftProcedure
         );
     }
 

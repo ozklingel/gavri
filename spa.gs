@@ -11,7 +11,7 @@ function apiRenderPage(sid, page, paramsJson) {
 }
 
 // Direct update for participant row save (explicit params — reliable in HtmlService iframe)
-function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, endTime, week) {
+function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, endTime, week, shiftProcedure) {
   const p = {
     sid: String(sid || '').trim(),
     id: String(exerciseId || '').trim(),
@@ -20,6 +20,7 @@ function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, 
     end_date: String(endDate || '').trim(),
     end_time: endTime == null ? '' : String(endTime),
     week: week == null ? '0' : String(week),
+    shift_procedure: shiftProcedure ? '1' : '',
     timelineInline: true
   };
   try {
@@ -158,6 +159,8 @@ function _spaDispatchAction(action, p) {
     case 'duplicateExercise':  return Exercises_duplicate(p);
     case 'deleteExercise':     return Exercises_delete(p);
     case 'addDetail':          return Exercises_addDetail(p);
+    case 'updateDetail':       return Exercises_updateDetail(p);
+    case 'deleteDetail':       return Exercises_deleteDetail(p);
     case 'generateTimeline':   return Exercises_generateTimeline(p);
     case 'assign':             return Assignments_assign(p);
     case 'assignTeam':         return Assignments_assignTeamAction(p);

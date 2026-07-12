@@ -88,13 +88,13 @@ s += _confirmDelete(
   // ── Two-column layout for timeline + participants ──
   s += '<div class="grid-2" style="margin-bottom:14px">';
 
-  // Timeline
+  // Timeline (נוהל קרב)
   const details = Exercises_details(ex.id);
   const tlProfile = ExerciseTimeline_profile(ex);
   const tlProfileLabel = ExerciseTimeline_profileLabel(tlProfile);
-  let tlHtml = '<div class="card">' +
+  let tlHtml = '<div class="card" id="exercise-procedure-card">' +
     '<div class="card-header" style="flex-wrap:wrap;gap:8px">' +
-    '<span class="card-title">🕐 ציר זמן (' + details.length + ')</span>' +
+    '<span class="card-title">⚔ נוהל קרב (' + details.length + ')</span>' +
     '<span style="font-size:11px;color:var(--muted)">תבנית: ' + _esc(tlProfileLabel) + '</span>';
 
   if (Roles_hasAdminAccess(user.role)) {
@@ -104,24 +104,14 @@ s += _confirmDelete(
     const genAction = 'action=generateTimeline&id=' + encodeURIComponent(ex.id) +
       '&exerciseId=' + encodeURIComponent(ex.id) + (details.length ? '&replace=true' : '');
     tlHtml += _confirmAction(genAction, '📅 צור תבנית נוה"ק', genMsg, 'btn btn-secondary btn-sm');
-    tlHtml += '<button class="btn btn-ghost btn-sm" onclick="toggleCollapsible(\'add-detail\')">➕ הוסף</button>';
+    tlHtml += '<button type="button" class="btn btn-ghost btn-sm" id="proc-add-toggle" aria-expanded="true">➕ הוסף אירוע</button>';
   }
   tlHtml += '</div>';
 
-  if (!details.length) {
-    tlHtml += '<div class="empty">אין רישומים</div>';
-  } else {
-    tlHtml += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr><th>תאריך ושעה</th><th>מיקום</th><th>תיאור</th></tr></thead><tbody>';
-    details.forEach(function(d) {
-      tlHtml += '<tr><td class="mono">' + _esc(d.time) + '</td><td>' + _esc(d.location) + '</td><td>' + _esc(d.description) + '</td></tr>';
-    });
-    tlHtml += '</tbody></table></div>';
-  }
-
   if (Roles_hasAdminAccess(user.role)) {
-    tlHtml += '<div id="add-detail" style="display:none">' +
-      '<div class="card-body" style="border-top:1px solid var(--border)">' +
-      _formOpen() +
+    tlHtml += '<div id="proc-add-panel" class="proc-add-panel">' +
+      '<div class="card-body" style="padding:10px 14px">' +
+      _formOpen('proc-add-form') +
       '<input type="hidden" name="action" value="addDetail">' +
       '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
       '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
@@ -129,14 +119,67 @@ s += _confirmDelete(
       '<div class="form-row"><label class="form-label">תאריך</label>' +
       _dateInput('detail_date', ex.rawStartDate || ex.rawDate || '') + '</div>' +
       '<div class="form-row"><label class="form-label">שעה</label>' +
-      _input('detail_time', '', ex.rawStartTime || '08:00', 'time', 'required') + '</div>' +
-      '</div>' +
+      _timeInputHalfHour('detail_time', ex.rawStartTime || '08:00') + '</div>' +
       '<div class="form-row"><label class="form-label">מיקום</label>' +
       _input('location', 'שם מיקום', '', 'text') + '</div>' +
-      '<div class="form-row"><label class="form-label">תיאור</label>' + _input('detailDescription', 'תיאור הפעילות', '', 'text') + '</div>' +
-      _submitBtn('➕ הוסף רישום', 'btn btn-primary btn-sm') +
+      '</div>' +
+      '<div class="form-row"><label class="form-label">תיאור</label>' +
+      _input('detailDescription', 'תיאור הפעילות', '', 'text') + '</div>' +
+      _submitBtn('➕ הוסף לנוה"ק', 'btn btn-primary btn-sm') +
       '</form></div></div>';
   }
+
+  if (!details.length) {
+    tlHtml += '<div class="empty">אין רישומים — הוסף אירוע או צור תבנית נוה"ק</div>';
+  } else {
+    const showActions = Roles_hasAdminAccess(user.role);
+    tlHtml += '<div class="card-body" style="padding:0"><table class="tbl proc-tbl"><thead><tr>' +
+      '<th>תאריך ושעה</th><th>מיקום</th><th>תיאור</th>' +
+      (showActions ? '<th style="width:88px">פעולות</th>' : '') +
+      '</tr></thead><tbody>';
+    details.forEach(function(d) {
+      const parsed = _parseDetailDateHm(d.rawTime);
+      const shortDesc = String(d.description || d.location || 'רישום').substring(0, 40);
+      tlHtml += '<tr class="proc-row" data-detail-id="' + _esc(d.id) + '">' +
+        '<td class="mono">' + _esc(d.time) + '</td>' +
+        '<td>' + _esc(d.location) + '</td>' +
+        '<td>' + _esc(d.description) + '</td>';
+      if (showActions) {
+        tlHtml += '<td style="white-space:nowrap;display:flex;gap:4px">' +
+          '<button type="button" class="btn btn-ghost btn-sm proc-edit-btn" data-detail-id="' + _esc(d.id) + '" title="עריכה">✏️</button>' +
+          '<a href="#" class="btn btn-danger btn-sm btn-icon" data-spa-action="deleteDetail"' +
+          _spaParamsAttr({ sid: sid, detailId: d.id, exerciseId: ex.id }) +
+          ' data-confirm="למחוק את «' + _esc(shortDesc) + '» מנוהל הקרב?" onclick="return confirmDelete(this)" title="מחיקה">✕</a>' +
+          '</td>';
+      }
+      tlHtml += '</tr>';
+      if (showActions) {
+        tlHtml += '<tr class="proc-edit-row" id="proc-edit-' + _esc(d.id) + '" hidden>' +
+          '<td colspan="4" style="background:var(--bg2);padding:12px 14px">' +
+          _formOpen('proc-edit-form') +
+          '<input type="hidden" name="action" value="updateDetail">' +
+          '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+          '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
+          '<input type="hidden" name="detailId" value="' + _esc(d.id) + '">' +
+          '<div class="form-grid">' +
+          '<div class="form-row"><label class="form-label">תאריך</label>' +
+          _dateInput('detail_date', parsed.date || ex.rawStartDate || '') + '</div>' +
+          '<div class="form-row"><label class="form-label">שעה</label>' +
+          _timeInputHalfHour('detail_time', parsed.time || '08:00') + '</div>' +
+          '<div class="form-row"><label class="form-label">מיקום</label>' +
+          _input('location', 'שם מיקום', d.location, 'text') + '</div>' +
+          '</div>' +
+          '<div class="form-row"><label class="form-label">תיאור</label>' +
+          _input('detailDescription', 'תיאור הפעילות', d.description, 'text') + '</div>' +
+          '<div style="display:flex;gap:6px;margin-top:8px">' +
+          _submitBtn('💾 שמור', 'btn btn-primary btn-sm') +
+          '<button type="button" class="btn btn-ghost btn-sm proc-edit-cancel" data-detail-id="' + _esc(d.id) + '">ביטול</button>' +
+          '</div></form></td></tr>';
+      }
+    });
+    tlHtml += '</tbody></table></div>';
+  }
+
   tlHtml += '</div>';
   s += tlHtml;
 
@@ -402,11 +445,15 @@ function _exerciseEditPanelHtml(p) {
   const ex = Exercises_get(exId);
   if (!ex) return '<div class="empty">תרגיל לא נמצא</div>';
   const sid = user.id;
+  const procCount = Exercises_details(ex.id).length;
   return '<div class="card"><div class="card-body">' +
-    _formOpen() +
+    '<form class="spa-form exercise-edit-form" data-orig-start-date="' + _esc(ex.rawStartDate || '') + '"' +
+    ' data-orig-start-time="' + _esc(ex.rawStartTime || '') + '"' +
+    ' data-procedure-count="' + procCount + '">' +
     '<input type="hidden" name="action" value="editExercise">' +
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
     '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
+    '<input type="hidden" name="shift_procedure" value="">' +
     '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', '', ex.title, 'text', 'required') + '</div>' +
     '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', '', ex.description) + '</div>' +
     '<div class="form-grid">' +

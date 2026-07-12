@@ -124,6 +124,106 @@ function _composeDetailTime(dateYmd, timeHm) {
   return date + ' ' + hm;
 }
 
+function _parseDetailDateHm(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return { date: '', time: '' };
+
+  const canon = s.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})/);
+  if (canon) return { date: canon[1], time: canon[2] };
+
+  const sortMs = _exerciseDetailSortMs(s);
+  if (sortMs < Number.MAX_SAFE_INTEGER - 2) {
+    const ymd = Exercise_msToYmd(sortMs);
+    const d = new Date(sortMs);
+    const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return { date: ymd, time: hm };
+  }
+  return { date: '', time: '' };
+}
+
+function _shiftSingleDetailTimePart(part, deltaMs, anchorYmd) {
+  part = String(part || '').trim();
+  if (!part || !deltaMs) return part;
+
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}$/.test(part)) {
+    const sortMs = _exerciseDetailSortMs(part);
+    if (sortMs >= Number.MAX_SAFE_INTEGER - 2) return part;
+    const newMs = sortMs + deltaMs;
+    const ymd = Exercise_msToYmd(newMs);
+    const d = new Date(newMs);
+    const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return _composeDetailTime(ymd, hm);
+  }
+
+  if (/^\d{1,2}:\d{2}$/.test(part) && anchorYmd) {
+    const baseMs = Exercise_msFromYmdHm(anchorYmd, part);
+    if (isNaN(baseMs)) return part;
+    const d = new Date(baseMs + deltaMs);
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  const sortMs = _exerciseDetailSortMs(part);
+  if (sortMs >= Number.MAX_SAFE_INTEGER - 2) return part;
+  const newMs = sortMs + deltaMs;
+  const ymd = Exercise_msToYmd(newMs);
+  const d = new Date(newMs);
+  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  return _fmtDateTimeFull(ymd, hm);
+}
+
+function _shiftExerciseDetailTime(raw, deltaMs) {
+  if (!deltaMs || raw == null || raw === '') return raw;
+  let s = String(raw).trim();
+  let note = '';
+  const noteMatch = s.match(/^(.+?)\s+\((.+)\)$/);
+  if (noteMatch) {
+    s = noteMatch[1].trim();
+    note = noteMatch[2];
+  }
+
+  if (s.indexOf(' — ') !== -1) {
+    const parts = s.split(' — ');
+    const startPart = parts[0].trim();
+    const startParsed = _parseDetailDateHm(startPart);
+    const anchorYmd = startParsed.date || '';
+    const shifted = parts.map(function(p, idx) {
+      return _shiftSingleDetailTimePart(p.trim(), deltaMs, idx > 0 ? anchorYmd : '');
+    });
+    const out = shifted.join(' — ');
+    return note ? out + ' (' + note + ')' : out;
+  }
+
+  const shifted = _shiftSingleDetailTimePart(s, deltaMs, '');
+  return note ? shifted + ' (' + note + ')' : shifted;
+}
+
+function Exercises_shiftAllDetails(exerciseId, deltaMs) {
+  if (!deltaMs) return 0;
+  const sh = _sheet('ExerciseDetails');
+  const data = _rows('ExerciseDetails').data;
+  let count = 0;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][1]) !== String(exerciseId)) continue;
+    const raw = data[i][2];
+    const shifted = _shiftExerciseDetailTime(raw, deltaMs);
+    if (shifted !== raw) {
+      sh.getRange(i + 2, 3).setValue(shifted);
+      count++;
+    }
+  }
+  if (count) _cacheInvalidate('ExerciseDetails');
+  return count;
+}
+
+function Exercises_shiftDetailsByStartDelta(exerciseId, oldEx, newStartDate, newStartTime) {
+  const oldMs = Exercise_msFromYmdHm(oldEx.rawStartDate, oldEx.rawStartTime || '00:00');
+  const newMs = Exercise_msFromYmdHm(newStartDate, newStartTime || '00:00');
+  if (isNaN(oldMs) || isNaN(newMs)) return 0;
+  const deltaMs = newMs - oldMs;
+  if (!deltaMs) return 0;
+  return Exercises_shiftAllDetails(exerciseId, deltaMs);
+}
+
 // Returns "HH:MM" from a time string or empty
 function _rawTime(val) {
   if (val == null || val === '') return '';
@@ -555,6 +655,7 @@ function Exercises_edit(p) {
   Auth_requireRole(p, ['admin']);
   const row = _findRowIndex('Exercises', p.id);
   if (row < 0) throw new Error('התרגיל לא נמצא.');
+  const ex = Exercises_get(p.id);
 
   const title = String(p.title || '').trim();
   const startMs = Exercise_msFromYmdHm(p.start_date, p.start_time);
@@ -586,7 +687,16 @@ function Exercises_edit(p) {
     p.end_time            || ''
   ]]);
   _cacheInvalidate('Exercises');
-  return Views_exercise({ sid: p.sid, id: p.id, info: 'התרגיל עודכן בהצלחה.' });
+
+  let info = 'התרגיל עודכן בהצלחה.';
+  if (_parseBool(p.shift_procedure) && ex) {
+    const shifted = Exercises_shiftDetailsByStartDelta(
+      p.id, ex, String(p.start_date || '').trim(), String(p.start_time || '').trim()
+    );
+    if (shifted) info += ' לוז נוה"ק עודכן (' + shifted + ' רשומות).';
+  }
+
+  return Views_exercise({ sid: p.sid, id: p.id, info: info });
 }
 
 // Update only schedule fields (timeline drag / resize)
@@ -612,8 +722,16 @@ function Exercises_updateTimes(p) {
   sh.getRange(row, 13).setValue(String(p.end_time != null ? p.end_time : '').trim());
   _cacheInvalidate('Exercises');
 
+  let shiftInfo = '';
+  if (_parseBool(p.shift_procedure) && ex) {
+    const shifted = Exercises_shiftDetailsByStartDelta(
+      id, ex, String(p.start_date || '').trim(), String(p.start_time || '').trim()
+    );
+    if (shifted) shiftInfo = ' לוז נוה"ק עודכן (' + shifted + ' רשומות).';
+  }
+
   if (p.timelineInline) {
-    return { ok: true, info: 'זמני התרגיל עודכנו.' };
+    return { ok: true, info: 'זמני התרגיל עודכנו.' + shiftInfo };
   }
 
   const week = p.week != null ? String(p.week) : '0';
@@ -622,7 +740,7 @@ function Exercises_updateTimes(p) {
     week: week,
     range: p.range != null ? String(p.range) : 'week',
     pos: p.pos != null ? String(p.pos) : undefined,
-    info: 'זמני התרגיל עודכנו.'
+    info: 'זמני התרגיל עודכנו.' + shiftInfo
   });
 }
 
@@ -659,19 +777,70 @@ function Exercises_addDetail(p) {
   if (!Exercises_get(exId)) throw new Error('התרגיל לא נמצא.');
 
   const dateYmd = String(p.detail_date || p.date || '').trim();
-  const timeHm  = String(p.detail_time || p.time || '').trim();
+  const timeHm  = _rawTime(String(p.detail_time || p.time || '').trim());
   const location = String(p.location || '').trim();
   const description = String(p.detailDescription || p.description || '').trim();
 
   if (!dateYmd) throw new Error('חובה לבחור תאריך.');
   if (isNaN(_parseRawDate(dateYmd))) throw new Error('תאריך לא תקין.');
   if (!timeHm) throw new Error('חובה לבחור שעה.');
-  if (!/^\d{1,2}:\d{2}$/.test(timeHm)) throw new Error('שעה לא תקינה.');
 
   const timeStored = _composeDetailTime(dateYmd, timeHm);
   const did = 'D' + new Date().getTime();
   _exerciseDetailsInsertSorted(exId, [did, exId, timeStored, location, description]);
   return Views_exercise({ sid: p.sid, id: exId, info: 'רישום ציר הזמן נוסף וסודר לפי תאריך ושעה.' });
+}
+
+function Exercises_updateDetail(p) {
+  Auth_requireRole(p, ['admin']);
+  const detailId = String(p.detailId || '').trim();
+  const exId = String(p.exerciseId || '').trim();
+  if (!detailId) throw new Error('חסר מזהה רישום.');
+  if (!Exercises_get(exId)) throw new Error('התרגיל לא נמצא.');
+
+  const dateYmd = String(p.detail_date || p.date || '').trim();
+  const timeHm  = _rawTime(String(p.detail_time || p.time || '').trim());
+  const location = String(p.location || '').trim();
+  const description = String(p.detailDescription || p.description || '').trim();
+
+  if (!dateYmd) throw new Error('חובה לבחור תאריך.');
+  if (isNaN(_parseRawDate(dateYmd))) throw new Error('תאריך לא תקין.');
+  if (!timeHm) throw new Error('חובה לבחור שעה.');
+
+  const rowIdx = _findRowIndex('ExerciseDetails', detailId);
+  if (rowIdx < 0) throw new Error('רישום לא נמצא.');
+
+  const sh = _sheet('ExerciseDetails');
+  const rowData = sh.getRange(rowIdx, 1, 1, 5).getValues()[0];
+  if (String(rowData[1]) !== String(exId)) throw new Error('רישום לא שייך לתרגיל.');
+
+  const timeStored = _composeDetailTime(dateYmd, timeHm);
+  sh.deleteRow(rowIdx);
+  _cacheInvalidate('ExerciseDetails');
+  _exerciseDetailsInsertSorted(exId, [detailId, exId, timeStored, location, description]);
+  return Views_exercise({ sid: p.sid, id: exId, info: 'רישום נוה"ק עודכן.' });
+}
+
+function Exercises_deleteDetail(p) {
+  Auth_requireRole(p, ['admin']);
+  const detailId = String(p.detailId || '').trim();
+  const exId = String(p.exerciseId || '').trim();
+  if (!detailId) throw new Error('חסר מזהה רישום.');
+
+  const rowIdx = _findRowIndex('ExerciseDetails', detailId);
+  if (rowIdx < 0) throw new Error('רישום לא נמצא.');
+
+  const sh = _sheet('ExerciseDetails');
+  const rowData = sh.getRange(rowIdx, 1, 1, 5).getValues()[0];
+  if (exId && String(rowData[1]) !== String(exId)) throw new Error('רישום לא שייך לתרגיל.');
+
+  sh.deleteRow(rowIdx);
+  _cacheInvalidate('ExerciseDetails');
+  return Views_exercise({
+    sid: p.sid,
+    id: exId || String(rowData[1]),
+    info: 'רישום נמחק מנוהל הקרב.'
+  });
 }
 
 /** מוחק את כל התרגילים + הקצאות + פרטי ציר זמן (לא נוגע ב-TimelineBlocks). */
