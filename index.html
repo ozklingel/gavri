@@ -496,6 +496,135 @@ body {
     #dashboardUserExerciseResults {
       width: 100%;
     }
+    .user-cal-body {
+      padding: 14px 16px;
+    }
+    .user-cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .user-cal-month-label {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text2);
+      min-width: 140px;
+      text-align: center;
+    }
+    .user-cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 4px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.55);
+    }
+    .user-cal-dow {
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 4px 0;
+    }
+    .user-cal-day {
+      min-height: 72px;
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 4px;
+      background: var(--bg3);
+      cursor: default;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+    }
+    .user-cal-day.empty {
+      background: transparent;
+      border-color: transparent;
+      pointer-events: none;
+    }
+    .user-cal-day.other-month {
+      opacity: 0.45;
+    }
+    .user-cal-day.today {
+      border-color: var(--green);
+      box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.35);
+    }
+    .user-cal-day.has-events {
+      cursor: pointer;
+    }
+    .user-cal-day.has-events:hover {
+      border-color: var(--green);
+      background: rgba(74, 222, 128, 0.06);
+    }
+    .user-cal-day-num {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text2);
+      line-height: 1.2;
+    }
+    .user-cal-day.today .user-cal-day-num {
+      color: var(--green);
+    }
+    .user-cal-event {
+      font-size: 9px;
+      line-height: 1.2;
+      padding: 2px 4px;
+      border-radius: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .user-cal-event.type-green { background: rgba(74, 222, 128, 0.35); border-color: #22c55e; color: #14532d; }
+    .user-cal-event.type-blue { background: rgba(96, 165, 250, 0.35); border-color: #3b82f6; color: #1e3a8a; }
+    .user-cal-event.type-yellow { background: rgba(251, 191, 36, 0.4); border-color: #f59e0b; color: #78350f; }
+    .user-cal-event.type-muted { background: rgba(148, 163, 184, 0.3); border-color: #94a3b8; color: #334155; }
+    .user-cal-more {
+      font-size: 9px;
+      color: var(--muted);
+      font-family: var(--mono);
+      padding: 0 2px;
+    }
+    .user-cal-day-detail {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg3);
+    }
+    .user-cal-day-detail h4 {
+      margin: 0 0 8px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text2);
+    }
+    .user-cal-detail-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border2);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .user-cal-detail-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    @media (max-width: 700px) {
+      .user-cal-day { min-height: 56px; }
+      .user-cal-event { display: none; }
+      .user-cal-day.has-events .user-cal-day-num::after {
+        content: ' •';
+        color: var(--green);
+      }
+    }
     .dashboard-tabs {
       display: flex;
       gap: 0;
@@ -2614,6 +2743,7 @@ body {
       updateBackButton();
       if (typeof initTimelineWeek === 'function') initTimelineWeek();
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
+      if (typeof initDashboardUserCalendar === 'function') initDashboardUserCalendar();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
         try { openPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (x) {}
@@ -3023,6 +3153,216 @@ body {
     }
   }
   window.initDashboardUserSearch = initDashboardUserSearch;
+
+  function initDashboardUserCalendar() {
+    var root = document.getElementById('dashboardUserCalendar');
+    var grid = document.getElementById('userCalGrid');
+    var monthLabel = document.getElementById('userCalMonthLabel');
+    var dayDetail = document.getElementById('userCalDayDetail');
+    var exportBtn = document.getElementById('dashboardCalExportIcs');
+    var dataEl = document.getElementById('dashboardUserCalData');
+    if (!root || !grid || !dataEl || root._calBound) return;
+    root._calBound = true;
+
+    var payload = { events: [], userName: '' };
+    try { payload = JSON.parse(dataEl.textContent || '{}'); } catch (e) { /* ignore */ }
+    var events = Array.isArray(payload.events) ? payload.events : [];
+    if (!events.length) return;
+
+    var HEB_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+      'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+    var HEB_DOW = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+    var cur = new Date();
+    cur.setDate(1);
+    cur.setHours(0, 0, 0, 0);
+
+    function dayStartMs(y, m, d) {
+      return new Date(y, m, d, 0, 0, 0, 0).getTime();
+    }
+
+    function eventTypeClass(type) {
+      var t = String(type || '').replace(/״/g, '');
+      if (t === 'חיר' || t.indexOf('חיר') !== -1) return 'type-green';
+      if (t === 'חשן' || t.indexOf('חשן') !== -1) return 'type-blue';
+      if (t === '900' || t.indexOf('900') !== -1) return 'type-yellow';
+      return 'type-muted';
+    }
+
+    function eventsForDay(y, m, d) {
+      var start = dayStartMs(y, m, d);
+      var end = dayStartMs(y, m, d + 1);
+      return events.filter(function(ev) {
+        return (+ev.startMs) < end && (+ev.endMs) > start;
+      });
+    }
+
+    function fmtClock(ms) {
+      var dt = new Date(+ms);
+      return String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+    }
+
+    function showDayDetail(y, m, d) {
+      if (!dayDetail) return;
+      var list = eventsForDay(y, m, d);
+      if (!list.length) {
+        dayDetail.hidden = true;
+        dayDetail.innerHTML = '';
+        return;
+      }
+      var title = d + ' ב' + HEB_MONTHS[m] + ' ' + y;
+      dayDetail.innerHTML = '<h4>תרגילים ב-' + title + '</h4>' +
+        list.map(function(ev) {
+          var link = window.MapimSpa && MapimSpa.exerciseLinkHtml
+            ? MapimSpa.exerciseLinkHtml(ev.id, ev.title)
+            : ('<b>' + ev.title + '</b>');
+          return '<div class="user-cal-detail-item">' + link +
+            '<div style="font-size:11px;color:var(--muted);margin-top:4px">' +
+            fmtClock(ev.startMs) + ' – ' + fmtClock(ev.endMs) +
+            (ev.location ? ' · ' + ev.location : '') +
+            (ev.responsibility ? ' · ' + ev.responsibility : '') +
+            '</div></div>';
+        }).join('');
+      dayDetail.hidden = false;
+    }
+
+    function renderCalendar() {
+      var year = cur.getFullYear();
+      var month = cur.getMonth();
+      if (monthLabel) monthLabel.textContent = HEB_MONTHS[month] + ' ' + year;
+
+      var firstDow = new Date(year, month, 1).getDay();
+      var daysInMonth = new Date(year, month + 1, 0).getDate();
+      var today = new Date();
+      var html = '';
+      HEB_DOW.forEach(function(d) { html += '<div class="user-cal-dow">' + d + '</div>'; });
+
+      var cell = 0;
+      for (var i = 0; i < firstDow; i++) {
+        html += '<div class="user-cal-day empty"></div>';
+        cell++;
+      }
+      for (var day = 1; day <= daysInMonth; day++) {
+        var dayEvents = eventsForDay(year, month, day);
+        var isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+        var cls = 'user-cal-day' + (isToday ? ' today' : '') + (dayEvents.length ? ' has-events' : '');
+        html += '<div class="' + cls + '" data-cal-day="' + day + '">' +
+          '<div class="user-cal-day-num">' + day + '</div>';
+        dayEvents.slice(0, 2).forEach(function(ev) {
+          html += '<div class="user-cal-event ' + eventTypeClass(ev.type) + '" title="' +
+            ev.title.replace(/"/g, '&quot;') + '">' + ev.title + '</div>';
+        });
+        if (dayEvents.length > 2) {
+          html += '<div class="user-cal-more">+' + (dayEvents.length - 2) + ' נוספים</div>';
+        }
+        html += '</div>';
+        cell++;
+      }
+      while (cell % 7 !== 0) {
+        html += '<div class="user-cal-day empty"></div>';
+        cell++;
+      }
+      grid.innerHTML = html;
+
+      grid.querySelectorAll('[data-cal-day]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          showDayDetail(year, month, +el.getAttribute('data-cal-day'));
+        });
+      });
+    }
+
+    root.addEventListener('click', function(e) {
+      var nav = e.target.closest('[data-user-cal-nav]');
+      if (!nav) return;
+      var action = nav.getAttribute('data-user-cal-nav');
+      if (action === 'prev') cur.setMonth(cur.getMonth() - 1);
+      else if (action === 'next') cur.setMonth(cur.getMonth() + 1);
+      else if (action === 'today') {
+        cur = new Date();
+        cur.setDate(1);
+        cur.setHours(0, 0, 0, 0);
+      }
+      if (dayDetail) dayDetail.hidden = true;
+      renderCalendar();
+    });
+
+    function icsEscape(s) {
+      return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;')
+        .replace(/,/g, '\\,').replace(/\n/g, '\\n').replace(/\r/g, '');
+    }
+
+    function msToIcsLocal(ms) {
+      var d = new Date(+ms);
+      return String(d.getFullYear()) +
+        String(d.getMonth() + 1).padStart(2, '0') +
+        String(d.getDate()).padStart(2, '0') + 'T' +
+        String(d.getHours()).padStart(2, '0') +
+        String(d.getMinutes()).padStart(2, '0') +
+        String(d.getSeconds()).padStart(2, '0');
+    }
+
+    function msToIcsUtc(ms) {
+      return new Date(+ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z/, 'Z');
+    }
+
+    function downloadIcs() {
+      var stamp = msToIcsUtc(Date.now());
+      var lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Mapim//User Exercises//HE',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH'
+      ];
+      events.forEach(function(ev, idx) {
+        var desc = [];
+        if (ev.responsibility) desc.push('תפקיד: ' + ev.responsibility);
+        if (ev.status) desc.push('סטטוס: ' + ev.status);
+        if (ev.type) desc.push('סוג: ' + ev.type);
+        lines.push('BEGIN:VEVENT');
+        lines.push('UID:mapim-ex-' + ev.id + '@mapim');
+        lines.push('DTSTAMP:' + stamp);
+        lines.push('DTSTART;TZID=Asia/Jerusalem:' + msToIcsLocal(ev.startMs));
+        lines.push('DTEND;TZID=Asia/Jerusalem:' + msToIcsLocal(ev.endMs));
+        lines.push('SUMMARY;CHARSET=UTF-8:' + icsEscape(ev.title));
+        if (ev.location) lines.push('LOCATION;CHARSET=UTF-8:' + icsEscape(ev.location));
+        if (desc.length) lines.push('DESCRIPTION;CHARSET=UTF-8:' + icsEscape(desc.join(' | ')));
+        lines.push('END:VEVENT');
+      });
+      lines.push('END:VCALENDAR');
+      var blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+      var a = document.createElement('a');
+      var safeName = String(payload.userName || 'user').replace(/[^\w\u0590-\u05FF.-]+/g, '_');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'mapim-exercises-' + safeName + '.ics';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }, 0);
+    }
+
+    if (exportBtn) exportBtn.addEventListener('click', downloadIcs);
+
+    var now = new Date();
+    var hasThisMonth = events.some(function(ev) {
+      var d = new Date(+ev.startMs);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+    if (!hasThisMonth) {
+      var firstMs = events.reduce(function(min, ev) {
+        return Math.min(min, +ev.startMs);
+      }, Infinity);
+      if (isFinite(firstMs)) {
+        cur = new Date(firstMs);
+        cur.setDate(1);
+        cur.setHours(0, 0, 0, 0);
+      }
+    }
+    renderCalendar();
+  }
+
+  window.initDashboardUserCalendar = initDashboardUserCalendar;
 
   // Inline edit-panel toggle for user rows
   function toggleEditPanel(btn) {

@@ -251,6 +251,56 @@ function _dashExerciseTime(ex) {
   return start || end || '—';
 }
 
+function _dashboardUserCalendarEvents(assigns) {
+  const events = [];
+  assigns.forEach(function(a) {
+    const ex = Exercises_get(a.exercise_id);
+    if (!ex) return;
+    const range = _exerciseTimeRange(ex);
+    if (!range || isNaN(range.startMs) || isNaN(range.endMs)) return;
+    events.push({
+      id: String(ex.id),
+      title: String(ex.title || ''),
+      startMs: range.startMs,
+      endMs: range.endMs,
+      location: _dashExerciseLocation(ex),
+      responsibility: String(a.responsibility || ''),
+      status: String(a.status || ''),
+      type: String(ex.exercise_type || '')
+    });
+  });
+  events.sort(function(a, b) { return a.startMs - b.startMs; });
+  return events;
+}
+
+function _dashboardUserCalendarHtml(target, events) {
+  if (!events.length) return '';
+  const json = JSON.stringify({
+    userId: String(target.id),
+    userName: String(target.name || ''),
+    events: events
+  }).replace(/</g, '\\u003c');
+
+  return '<div class="card" id="dashboardUserCalendar" style="margin-bottom:16px">' +
+    '<div class="card-header" style="flex-wrap:wrap;gap:8px;align-items:center">' +
+    '<span class="card-title">📅 לוח שנה — תרגילים</span>' +
+    '<button type="button" id="dashboardCalExportIcs" class="btn btn-secondary btn-sm">' +
+    '⬇ הורד ליומן שלי (.ics)</button>' +
+    '</div>' +
+    '<div class="card-body user-cal-body">' +
+    '<div class="user-cal-nav">' +
+    '<button type="button" class="btn btn-ghost btn-sm user-cal-nav-btn" data-user-cal-nav="prev" title="חודש קודם">&#8250;</button>' +
+    '<span class="user-cal-month-label" id="userCalMonthLabel"></span>' +
+    '<button type="button" class="btn btn-ghost btn-sm user-cal-nav-btn" data-user-cal-nav="next" title="חודש הבא">&#8249;</button>' +
+    '<button type="button" class="btn btn-ghost btn-sm user-cal-nav-btn" data-user-cal-nav="today">היום</button>' +
+    '</div>' +
+    '<div class="user-cal-grid" id="userCalGrid" aria-label="לוח שנה חודשי"></div>' +
+    '<div class="user-cal-day-detail" id="userCalDayDetail" hidden></div>' +
+    '</div>' +
+    '<script id="dashboardUserCalData" type="application/json">' + json + '</script>' +
+    '</div>';
+}
+
 function _dashboardUserExerciseResults(viewer, targetUserId) {
   const target = Users_get(targetUserId);
   if (!target) {
@@ -295,6 +345,9 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
     s += '</div></div>';
   }
   s += '</div></div>';
+
+  const calEvents = _dashboardUserCalendarEvents(assigns);
+  s += _dashboardUserCalendarHtml(target, calEvents);
 
   if (!assigns.length) {
     s += '<div class="empty">אין תרגילים משויכים למשתמש זה</div>';
