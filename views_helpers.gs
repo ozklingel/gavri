@@ -50,31 +50,35 @@ function _spaBarLink(page, params) {
 
 // ── Core building blocks ──
 
-function _a(query, label, cls) {
+function _a(query, label, cls, title) {
   cls = cls || 'btn btn-secondary btn-sm';
+  title = title || label;
+  const titleAttr = ' title="' + _esc(title) + '"';
   const parsed = _spaParseQuery(query);
   if (parsed.page) {
-    return '<a href="#" class="' + cls + '" data-spa-page="' + _esc(parsed.page) + '"' +
+    return '<a href="#" class="' + cls + '"' + titleAttr + ' data-spa-page="' + _esc(parsed.page) + '"' +
       _spaParamsAttr(parsed.params) + '>' + label + '</a>';
   }
   if (parsed.action) {
-    return '<a href="#" class="' + cls + '" data-spa-action="' + _esc(parsed.action) + '"' +
+    return '<a href="#" class="' + cls + '"' + titleAttr + ' data-spa-action="' + _esc(parsed.action) + '"' +
       _spaParamsAttr(parsed.params) + '>' + label + '</a>';
   }
-  return '<a href="#" class="' + cls + '">' + label + '</a>';
+  return '<a href="#" class="' + cls + '"' + titleAttr + '>' + label + '</a>';
 }
 
-function _confirmDelete(query, msg) {
+function _confirmDelete(query, msg, title) {
   const parsed = _spaParseQuery(query);
-  return '<a href="#" class="btn btn-danger btn-sm" data-spa-action="' + _esc(parsed.action) + '"' +
+  title = title || msg || 'מחיקה — נדרש אישור לפני ביצוע';
+  return '<a href="#" class="btn btn-danger btn-sm" title="' + _esc(title) + '" data-spa-action="' + _esc(parsed.action) + '"' +
     _spaParamsAttr(parsed.params) +
     ' data-confirm="' + _esc(msg) + '" onclick="return confirmDelete(this)">🗑 מחק</a>';
 }
 
-function _confirmAction(query, label, msg, cls) {
+function _confirmAction(query, label, msg, cls, title) {
   cls = cls || 'btn btn-secondary';
+  title = title || msg || label;
   const parsed = _spaParseQuery(query);
-  return '<a href="#" class="' + cls + '" data-spa-action="' + _esc(parsed.action) + '"' +
+  return '<a href="#" class="' + cls + '" title="' + _esc(title) + '" data-spa-action="' + _esc(parsed.action) + '"' +
     _spaParamsAttr(parsed.params) +
     ' data-confirm="' + _esc(msg) + '" onclick="return confirmDelete(this)">' + label + '</a>';
 }
@@ -84,9 +88,10 @@ function _formOpen(extraClass) {
   return '<form class="' + cls + '">';
 }
 
-function _submitBtn(label, cls) {
+function _submitBtn(label, cls, title) {
   cls = cls || 'btn btn-primary';
-  return '<button type="submit" class="' + cls + '">► ' + label + '</button>';
+  title = title || label;
+  return '<button type="submit" class="' + cls + '" title="' + _esc(title) + '">► ' + label + '</button>';
 }
 
 function _feedbackBtn(assignmentId, exerciseId, hasFeedback, cls) {
@@ -132,7 +137,7 @@ function _timeInputHalfHour(name, value, extra) {
     '<input type="text" name="' + _esc(name) + '" class="form-input time-half-input" ' +
     'value="' + _esc(value || '') + '" placeholder="08:00" autocomplete="off" ' +
     'inputmode="numeric" title="שעה בפורמט HH:MM" ' + extra + '>' +
-    '<button type="button" class="time-wheel-btn" tabindex="-1" aria-label="בחר שעה">▾</button>' +
+    '<button type="button" class="time-wheel-btn" tabindex="-1" aria-label="בחר שעה" title="פתיחת גלגלת שעה (חצי שעה)">▾</button>' +
     '<div class="time-wheel-popup" hidden><div class="time-wheel-list" role="listbox"></div></div>' +
     '</div>';
 }
@@ -465,7 +470,7 @@ function _appDrawer(user, sid) {
     '<div class="app-drawer-user-name">' + _userLink(user.id, user.name, '') + '</div>' +
     '<div class="app-drawer-user-role">' + _esc(_roleHe(user.role)) + '</div>' +
     '</div>' +
-    '<button type="button" class="app-drawer-close" id="appDrawerClose" aria-label="סגור">✕</button>' +
+    '<button type="button" class="app-drawer-close" id="appDrawerClose" aria-label="סגור" title="סגירת התפריט">✕</button>' +
     '</div>' +
     '<div class="app-drawer-scroll">' +
     '<nav class="app-drawer-nav">' + nav + '</nav>' +
@@ -486,7 +491,7 @@ function _topbar(user, sid) {
   return _appDrawer(user, sid) +
     '<nav class="topbar">' +
     '<div class="topbar-start">' +
-    '<button type="button" class="btn btn-ghost btn-sm topbar-menu-btn" id="appDrawerOpen" aria-label="פתח תפריט">☰</button>' +
+    '<button type="button" class="btn btn-ghost btn-sm topbar-menu-btn" id="appDrawerOpen" aria-label="פתח תפריט" title="פתיחת תפריט ניווט">☰</button>' +
     '<button type="button" class="btn btn-ghost btn-sm topbar-back-btn" id="appTopbarBack" data-spa-back title="חזרה" hidden>← חזרה</button>' +
     '<a href="#" class="topbar-brand" data-spa-page="dashboard"' + _spaParamsAttr({}) + '>' +
     '<span class="star">★</span>' +

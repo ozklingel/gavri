@@ -2921,6 +2921,7 @@ body {
       if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
       if (typeof initExerciseProcedurePanel === 'function') initExerciseProcedurePanel();
       if (typeof initExerciseEditShiftPrompt === 'function') initExerciseEditShiftPrompt();
+      if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
         try { openPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (x) {}
@@ -3671,6 +3672,263 @@ body {
     return true;
   }
 
+  function initActionButtonTooltips() {
+    var ACTION_TIPS = {
+      logout: 'יציאה מהמערכת (נדרש אישור)',
+      login: 'התחברות למערכת',
+      verifyMfa: 'אימות קוד חד-פעמי',
+      resendMfa: 'שליחה חוזרת של קוד אימות',
+      createExercise: 'יצירת תרגיל חדש',
+      buildSeries: 'בניית סדרת תרגילים אוטומטית',
+      editExercise: 'שמירת שינויים בפרטי התרגיל',
+      duplicateExercise: 'יצירת עותק של התרגיל',
+      deleteExercise: 'מחיקת התרגיל וכל השיבוצים שלו (נדרש אישור)',
+      addDetail: 'הוספת אירוע לנוהל הקרב',
+      updateDetail: 'שמירת עריכת אירוע נוהל קרב',
+      deleteDetail: 'מחיקת אירוע מנוהל הקרב (נדרש אישור)',
+      generateTimeline: 'יצירת/החלפת תבנית נוהל קרב (נדרש אישור)',
+      assign: 'שיבוץ משתמש לתרגיל',
+      assignTeam: 'שיבוץ צוות שלם לתרגיל',
+      removeAssignment: 'הסרת משתמש מהתרגיל',
+      updateAssignment: 'שמירת שינוי בשיבוץ משתתף',
+      complete: 'סימון שיבוץ כהושלם',
+      autoAssignAll: 'שיבוץ אוטומטי לכל התרגילים (נדרש אישור)',
+      clearAllAssignments: 'מחיקת כל השיבוצים במערכת (נדרש אישור)',
+      createUser: 'יצירת משתמש חדש',
+      importUsers: 'ייבוא משתמשים מקובץ',
+      deleteUser: 'מחיקת משתמש (נדרש אישור)',
+      updateRole: 'עדכון תפקיד משתמש',
+      updateProfile: 'שמירת שינויים בפרופיל',
+      createTeam: 'יצירת צוות חדש',
+      autoSplitTeams: 'חלוקה אוטומטית לצוותים',
+      renameTeam: 'שינוי שם הצוות',
+      deleteTeam: 'מחיקת צוות (נדרש אישור)',
+      setCommander: 'הגדרת מפקד הצוות',
+      addMember: 'הוספת חבר לצוות',
+      removeMember: 'הסרת חבר מהצוות',
+      saveFeedback: 'שמירת משוב על המשתתף',
+      updateExerciseTimes: 'עדכון זמני התרגיל',
+      createFieldForce: 'יצירת כוח בשטח',
+      updateFieldForce: 'שמירת שינויים בכוח בשטח',
+      deleteFieldForce: 'מחיקת כוח בשטח (נדרש אישור)',
+      createFireZone: 'יצירת שטח אש',
+      updateFireZone: 'שמירת שינויים בשטח אש',
+      deleteFireZone: 'מחיקת שטח אש (נדרש אישור)',
+      createHomeConstraint: 'שליחת אילוץ בית לאישור',
+      approveHomeConstraint: 'אישור אילוץ בית',
+      rejectHomeConstraint: 'דחיית אילוץ בית',
+      createTimelineBlock: 'הוספת משבצת לציר הזמן',
+      deleteTimelineBlock: 'מחיקת משבצת מציר הזמן (נדרש אישור)'
+    };
+
+    var PAGE_TIPS = {
+      dashboard: 'מעבר למסך הבית',
+      exercise: 'פתיחת דף תרגיל',
+      exercises: 'ניהול תרגילים',
+      users: 'ניהול משתמשים וצוותים',
+      timeline: 'ציר זמן תרגילים',
+      user: 'פרופיל משתמש',
+      assign: 'לוח שיבוץ תרגילים',
+      feedback: 'כתיבת משוב למשתתף',
+      fieldForces: 'רשימת כוחות בשטח',
+      fieldForce: 'עריכת כוח בשטח',
+      fireZones: 'רשימת שטחי אש',
+      fireZone: 'עריכת שטח אש',
+      teamMatrix: 'תצוגת מטריצה לפי צוות',
+      exerciseMatrix: 'תצוגת מטריצה לפי תרגיל',
+      homeConstraints: 'אילוצי בית',
+      statistics: 'סטטיסטיקות ודוחות',
+      login: 'דף התחברות'
+    };
+
+    var DASHBOARD_TAB_TIPS = {
+      search: 'חיפוש תרגילים לפי משתמש',
+      team: 'תצוגת מטריצה לפי צוות',
+      exercise: 'תצוגת מטריצה לפי תרגיל',
+      conflicts: 'התנגשויות שיבוץ'
+    };
+
+    var ID_TIPS = {
+      appDrawerOpen: 'פתיחת תפריט ניווט',
+      appDrawerClose: 'סגירת תפריט הניווט',
+      appTopbarBack: 'חזרה לעמוד הקודם',
+      teamMatrixExportCsv: 'ייצוא טבלת הצוות לקובץ Excel',
+      exMatrixExportCsv: 'ייצוא טבלת התרגילים לקובץ Excel',
+      exercisesCalExportIcs: 'הורדת תרגילים לקובץ יומן (.ics)',
+      dashboardCalExportIcs: 'הורדת תרגילי המשתמש ליומן (.ics)',
+      dashboardUserSearchBtn: 'חיפוש תרגילים של המשתמש',
+      assignSaveBtn: 'שמירת כל השינויים בלוח השיבוץ',
+      assignDiscardBtn: 'ביטול שינויים שלא נשמרו',
+      xlsxImportBtn: 'ייבוא משתמשים מהקובץ שנבחר',
+      timelineProcedureToggle: 'הצגה/הסתרה של נוהל קרב על ציר הזמן',
+      timelineEditToggle: 'הפעלת מצב עריכה — גרירת תרגילים לשינוי זמנים',
+      timelineToolsExpand: 'פתיחת לוח כלים בציר הזמן',
+      timelineToolsMinimize: 'מזעור לוח הכלים',
+      proc-add-toggle: 'פתיחה/סגירה של טופס הוספת אירוע לנוה"ק',
+      exMatrixCellEditorClose: 'סגירת עורך השיבוץ',
+      exMatrixCellEditorDelete: 'מחיקת השיבוץ בתא הנבחר',
+      statsCompareClear: 'ניקוי בחירת צוותים להשוואה'
+    };
+
+    var CLASS_TIPS = {
+      'proc-edit-btn': 'עריכת אירוע נוהל קרב',
+      'proc-edit-cancel': 'ביטול עריכת אירוע',
+      'collapsible-toggle': 'הצגה או הסתרה של אזור התוכן',
+      'dash-proc-btn': 'הצגת/הסתרת נוהל קרב לתרגיל',
+      'dash-proc-open-btn': 'פתיחת נוהל קרב מהלוח שנה',
+      'dp-tab': 'מעבר בין לשוניות בטופס',
+      'team-matrix-tab': 'סינון התצוגה לפי צוות או שבוע',
+      'stats-seg': 'שינוי מצב תצוגה בסטטיסטיקות',
+      'stats-chip': 'בחירת צוות להשוואה',
+      'timeline-side-tab': 'מעבר בין לשוניות בלוח הכלים',
+      'ex-matrix-tier-toggle': 'הרחבה/כיווץ של קבוצת תפקידים',
+      'user-search-item': 'בחירת משתמש מהרשימה',
+      'time-wheel-btn': 'פתיחת גלגלת בחירת שעה'
+    };
+
+    var TEXT_TIPS = [
+      ['כניסה למערכת', 'התחברות עם מספר אישי וסיסמה'],
+      ['שמור שינויים', 'שמירת השינויים בטופס'],
+      ['שמור משוב', 'שמירת המשוב לתרגיל'],
+      ['שלח לאישור', 'שליחת הבקשה לאישור מפקד'],
+      ['צור תרגיל', 'יצירת תרגיל חדש'],
+      ['שכפל תרגיל', 'פתיחת אפשרות שכפול תרגיל'],
+      ['שכפל ופתח', 'שכפול התרגיל הנבחר ופתיחת העותק'],
+      ['היום', 'מעבר לחודש הנוכחי בלוח השנה'],
+      ['Excel', 'ייצוא הטבלה לקובץ Excel'],
+      ['הורד ליומן', 'הורדת אירועים לקובץ יומן (.ics)'],
+      ['ערוך', 'עריכת הרשומה'],
+      ['מחק', 'מחיקת הרשומה (נדרש אישור)'],
+      ['ביטול', 'ביטול הפעולה או סגירת הטופס'],
+      ['חזרה', 'חזרה לעמוד הקודם'],
+      ['הוסף', 'הוספת רשומה חדשה'],
+      ['הקצה', 'שיבוץ משתמש לתרגיל'],
+      ['אשר', 'אישור הבקשה'],
+      ['דחה', 'דחיית הבקשה'],
+      ['מצב עריכה', 'גרירת תרגילים לשינוי זמנים'],
+      ['הצג נוה"ק', 'הצגת/הסתרת נוהל קרב על ציר הזמן'],
+      ['צור תבנית', 'יצירת תבנית נוהל קרב'],
+      ['💾', 'שמירת השינויים'],
+      ['✕', 'מחיקה או סגירה'],
+      ['⎘', 'שכפול'],
+      ['↗', 'מעבר לדף מלא'],
+      ['פתח', 'פתיחת הפריט'],
+      ['הצג הכל', 'הצגת כל השבועות ללא סינון']
+    ];
+
+    function normText(s) {
+      return String(s || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function btnText(el) {
+      return normText(el.textContent || '');
+    }
+
+    function parseSpaParams(el) {
+      try { return JSON.parse(el.getAttribute('data-spa-params') || '{}'); } catch (e) { return {}; }
+    }
+
+    function tipFromText(text) {
+      if (!text) return '';
+      for (var i = 0; i < TEXT_TIPS.length; i++) {
+        if (text.indexOf(TEXT_TIPS[i][0]) !== -1) return TEXT_TIPS[i][1];
+      }
+      if (text.length > 1 && text.length < 80) return text;
+      return '';
+    }
+
+    function tipFromClasses(el) {
+      for (var cls in CLASS_TIPS) {
+        if (el.classList && el.classList.contains(cls)) return CLASS_TIPS[cls];
+      }
+      return '';
+    }
+
+    function applyTip(el, tip) {
+      if (!el || !tip) return;
+      el.setAttribute('title', tip);
+      if (!el.getAttribute('aria-label')) el.setAttribute('aria-label', tip);
+    }
+
+    function resolveTip(el) {
+      if (!el || el.disabled) return '';
+
+      var id = el.id || '';
+      if (ID_TIPS[id]) return ID_TIPS[id];
+
+      var action = el.getAttribute('data-spa-action');
+      if (action && ACTION_TIPS[action]) {
+        var t = ACTION_TIPS[action];
+        if (el.getAttribute('data-confirm') && t.indexOf('אישור') === -1) t += ' (נדרש אישור)';
+        return t;
+      }
+
+      var page = el.getAttribute('data-spa-page');
+      if (page) {
+        var params = parseSpaParams(el);
+        if (page === 'dashboard' && params.tab && DASHBOARD_TAB_TIPS[params.tab]) {
+          return DASHBOARD_TAB_TIPS[params.tab];
+        }
+        if (PAGE_TIPS[page]) return PAGE_TIPS[page];
+      }
+
+      var calNav = el.getAttribute('data-app-cal-nav');
+      if (calNav === 'prev') return 'חודש קודם בלוח השנה';
+      if (calNav === 'next') return 'חודש הבא בלוח השנה';
+      if (calNav === 'today') return 'מעבר לחודש הנוכחי';
+
+      var onclick = el.getAttribute('onclick') || '';
+      if (onclick.indexOf('spaSaveAssignmentRow') !== -1) return 'שמירת שינויים בשורת המשתתף';
+      if (onclick.indexOf('duplicateExerciseFromList') !== -1) return 'שכפול התרגיל הנבחר';
+      if (onclick.indexOf('toggleCollapsible') !== -1) return 'הצגה או הסתרה של האזור';
+
+      if (el.classList && el.classList.contains('ex-matrix-assign-cell') && el.classList.contains('editable')) {
+        return 'לחץ לעריכת השיבוץ בתא זה';
+      }
+
+      var clsTip = tipFromClasses(el);
+      if (clsTip) return clsTip;
+
+      var form = el.closest && el.closest('form.spa-form');
+      if (el.type === 'submit' && form) {
+        var actInp = form.querySelector('input[name="action"]');
+        var formAction = actInp ? actInp.value : '';
+        if (formAction && ACTION_TIPS[formAction]) return ACTION_TIPS[formAction];
+      }
+
+      return tipFromText(btnText(el));
+    }
+
+    var selectors = [
+      '.btn',
+      'button[type="submit"]',
+      'a[data-spa-action]',
+      'a[data-spa-page]',
+      '.tab-link',
+      '.collapsible-toggle',
+      '.team-matrix-tab',
+      '.stats-seg',
+      '.stats-chip',
+      '.timeline-side-tab',
+      '.ex-matrix-tier-toggle',
+      '.dp-tab',
+      '.user-search-item',
+      '.time-wheel-btn',
+      '[data-app-cal-nav]',
+      '.proc-edit-btn',
+      '.proc-edit-cancel',
+      '.dash-proc-btn',
+      '.dash-proc-open-btn'
+    ].join(',');
+
+    document.querySelectorAll(selectors).forEach(function(el) {
+      if (el.getAttribute('title')) return;
+      var tip = resolveTip(el);
+      if (tip) applyTip(el, tip);
+    });
+  }
+  window.initActionButtonTooltips = initActionButtonTooltips;
+
   function initCollapsibles() {
     document.querySelectorAll('button.collapsible-toggle').forEach(function(btn) {
       if (btn._collInit) return;
@@ -3684,6 +3942,7 @@ body {
     });
   }
   initCollapsibles();
+  if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
 
   // Mini-tab switcher — uses data-target, no onclick quoting issues
   document.addEventListener('click', function(e) {
