@@ -284,12 +284,10 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
       '<td class="mono">' + _esc(startYmd) + '</td>' +
       '<td class="mono">' + _esc(startHm) + '</td>' +
       '<td class="mono">' + _esc(endYmd) + '</td>' +
-      '<td class="mono">' + _esc(endHm) + '</td>' +
-      '<td><a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: ex.id }) +
-      ' class="btn btn-secondary btn-sm">↗</a></td></tr>';
+      '<td class="mono">' + _esc(endHm) + '</td></tr>';
   });
   if (!items.length) {
-    s += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
+    s += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
   }
   return s;
 }
@@ -820,7 +818,6 @@ function Views_timeline(p) {
   s += '<th>שעה</th>';
   s += '<th>סיום</th>';
   s += '<th>שעה</th>';
-  s += '<th>פתיחה</th>';
 
   s += '</tr></thead><tbody id="timelineWeekTableBody">';
 

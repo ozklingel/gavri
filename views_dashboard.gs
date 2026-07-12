@@ -437,8 +437,6 @@ function _tutorDashboardPanels(user, sid) {
     s += '<div class="card" style="margin-bottom:12px">' +
       '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
       '<span class="card-title">🎯 ' + _exerciseLink(exId, title) + '</span>' +
-      '<a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: exId }) +
-      ' class="btn btn-secondary btn-sm">↗ פתיחה</a>' +
       '</div><div class="card-body" style="padding:0">' +
       '<table class="tbl"><thead><tr><th>חניך</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>משוב</th></tr></thead><tbody>';
 
@@ -479,7 +477,7 @@ function _traineeDashboardPanels(user, sid) {
 
   s += '<div class="card"><div class="card-body" style="padding:0">' +
     '<table class="tbl"><thead><tr>' +
-    '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>פרטים</th>' +
+    '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
     '</tr></thead><tbody>';
 
   assigns.forEach(function(a) {
@@ -490,7 +488,6 @@ function _traineeDashboardPanels(user, sid) {
       '<td>' + _esc(a.responsibility) + '</td>' +
       '<td>' + _statusBadge(a.status) + '</td>' +
       '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
-      '<td>' + _a('page=exercise&id=' + encodeURIComponent(a.exercise_id) + '&sid=' + sidQ, '↗ פתיחה', 'btn btn-secondary btn-sm') + '</td>' +
       '</tr>';
   });
 

@@ -443,7 +443,13 @@ body {
     .assign-ex-row-title .exercise-name-link:hover { color: var(--blue, #2563eb); }
     .team-matrix-ex-title .exercise-name-link { font-weight: bold; color: inherit; text-decoration: underline; }
     .team-matrix-ex-title .exercise-name-link:hover { color: var(--blue, #2563eb); }
-    .timeline-track.edit-mode .tl-bar-label .exercise-name-link { pointer-events: auto; cursor: pointer; }
+    .timeline-track.edit-mode .tl-bar-label .exercise-name-link {
+      pointer-events: auto;
+      cursor: pointer;
+      position: relative;
+      z-index: 4;
+      text-decoration: underline;
+    }
 
     /* ── LAYOUT ── */
     .page { padding: 16px 20px 40px; max-width: 1100px; margin: 0 auto; }
@@ -1573,6 +1579,11 @@ body {
       height: calc(var(--tl-bar-min-h, 48px));
       min-height: calc(var(--tl-bar-min-h, 48px));
       box-shadow: 0 1px 4px rgba(30, 60, 40, 0.12);
+    }
+    .timeline-track .tl-bar-link {
+      cursor: pointer;
+      color: inherit;
+      text-decoration: none;
     }
     .timeline-track .tl-bar-link:hover {
       filter: brightness(0.97);
@@ -2723,6 +2734,7 @@ body {
     }
 
     function isLocalUiClick(el) {
+      if (el.closest('[data-spa-page]') || el.closest('[data-spa-action]')) return false;
       return el.closest('button.collapsible-toggle') ||
         el.closest('.dp-tab') ||
         el.closest('.dp-wrap') ||
@@ -2731,8 +2743,8 @@ body {
         el.closest('#page-loader') ||
         el.closest('#timelineWeekSelect') ||
         el.closest('#timelineEditToggle') ||
-        el.closest('.tl-bar') ||
-        el.closest('.tl-handle');
+        el.closest('.tl-handle') ||
+        (el.closest('.timeline-track.edit-mode .tl-bar') && !el.closest('.exercise-name-link'));
     }
 
     document.addEventListener('click', function(e) {
@@ -3589,7 +3601,7 @@ body {
         return (+a.dataset.startMs) - (+b.dataset.startMs);
       });
       if (!bars.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">אין תרגילים בשבוע זה</td></tr>';
         return;
       }
       var typeBadge = function(t) {
@@ -3603,9 +3615,6 @@ body {
         var title = titleEl ? titleEl.textContent : '';
         var exId = bar.getAttribute('data-exercise-id') || '';
         var typeKey = bar.getAttribute('data-exercise-type') || '';
-        var open = '<a href="#" data-spa-page="exercise" data-spa-params="' +
-          JSON.stringify({ id: exId }).replace(/"/g, '&quot;') +
-          '" class="btn btn-secondary btn-sm">↗</a>';
         var weekLabel = isoWeekLabelFromYmd(s.date);
         return '<tr data-exercise-id="' + exId + '">' +
           '<td>' + typeBadge(typeKey) + '</td>' +
@@ -3614,8 +3623,7 @@ body {
           '<td class="mono">' + s.date + '</td>' +
           '<td class="mono">' + s.time + '</td>' +
           '<td class="mono">' + e.date + '</td>' +
-          '<td class="mono">' + e.time + '</td>' +
-          '<td>' + open + '</td></tr>';
+          '<td class="mono">' + e.time + '</td></tr>';
       }).join('');
     }
 
@@ -3654,6 +3662,7 @@ body {
 
     track.addEventListener('pointerdown', function(e) {
       if (!track.classList.contains('edit-mode')) return;
+      if (e.target.closest('a[data-spa-page], .exercise-name-link')) return;
       var bar = e.target.closest('.tl-bar');
       if (!bar || !bar.dataset.exerciseId) return;
       if (!track.contains(bar)) return;
