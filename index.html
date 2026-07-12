@@ -2766,8 +2766,9 @@ body {
       updateBackButton();
       if (typeof initTimelineWeek === 'function') initTimelineWeek();
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
-      if (typeof initDashboardUserCalendar === 'function') initDashboardUserCalendar();
+      if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
+      if (typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
         try { openPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (x) {}
@@ -2960,9 +2961,10 @@ body {
         el.closest('#timelineEditToggle') ||
         el.closest('#timelineProcedureToggle') ||
         el.closest('#dashboardCalExportIcs') ||
+        el.closest('#exercisesCalExportIcs') ||
+        el.closest('[data-app-cal-nav]') ||
         el.closest('.dash-proc-btn') ||
         el.closest('.dash-proc-open-btn') ||
-        el.closest('[data-user-cal-nav]') ||
         el.closest('.tl-handle') ||
         (el.closest('.timeline-track.edit-mode .tl-bar') && !el.closest('.exercise-name-link'));
     }
@@ -3183,17 +3185,17 @@ body {
   }
   window.initDashboardUserSearch = initDashboardUserSearch;
 
-  function initDashboardUserCalendar() {
-    var root = document.getElementById('dashboardUserCalendar');
-    var grid = document.getElementById('userCalGrid');
-    var monthLabel = document.getElementById('userCalMonthLabel');
-    var dayDetail = document.getElementById('userCalDayDetail');
-    var exportBtn = document.getElementById('dashboardCalExportIcs');
-    var dataEl = document.getElementById('dashboardUserCalData');
-    if (!root || !grid || !dataEl || root._calBound) return;
+  function initAppExerciseCalendar(root) {
+    if (!root || root._calBound) return;
+    var grid = root.querySelector('.user-cal-grid');
+    var monthLabel = root.querySelector('.user-cal-month-label');
+    var dayDetail = root.querySelector('.user-cal-day-detail');
+    var exportBtn = root.querySelector('button[id$="ExportIcs"]');
+    var dataEl = root.querySelector('script[type="application/json"]');
+    if (!grid || !dataEl) return;
     root._calBound = true;
 
-    var payload = { events: [], userName: '' };
+    var payload = { events: [], fileName: 'mapim-exercises' };
     try { payload = JSON.parse(dataEl.textContent || '{}'); } catch (e) { /* ignore */ }
     var events = Array.isArray(payload.events) ? payload.events : [];
     if (!events.length) return;
@@ -3225,9 +3227,31 @@ body {
       });
     }
 
-    function fmtClock(ms) {
+    function fmtExerciseWhen(ms) {
       var dt = new Date(+ms);
-      return String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+      return dt.getDate() + '/' + (dt.getMonth() + 1) + ' · ' +
+        String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+    }
+
+    function renderDetailItem(ev) {
+      var link = window.MapimSpa && MapimSpa.exerciseLinkHtml
+        ? MapimSpa.exerciseLinkHtml(ev.id, ev.title)
+        : ('<b>' + ev.title + '</b>');
+      var when = ev.schedule || (fmtExerciseWhen(ev.startMs) + ' – ' + fmtExerciseWhen(ev.endMs));
+      var meta = when;
+      if (ev.responsibility) meta += ' · ' + ev.responsibility;
+      if (ev.status) meta += ' · ' + ev.status;
+      if (ev.mpCount != null) meta += ' · מפים: ' + ev.mpCount;
+      if (ev.type) meta += ' · ' + ev.type;
+      if (ev.location && ev.location !== '—') meta += ' · ' + ev.location;
+      var procBtn = '';
+      if (ev.procedureCount) {
+        procBtn = '<button type="button" class="btn btn-ghost btn-sm dash-proc-open-btn" data-dash-proc-open="' +
+          ev.id + '">📋 נוה"ק (' + ev.procedureCount + ')</button>';
+      }
+      return '<div class="user-cal-detail-item">' + link +
+        '<div style="font-size:11px;color:var(--muted);margin-top:4px">' + meta + '</div>' +
+        procBtn + '</div>';
     }
 
     function showDayDetail(y, m, d) {
@@ -3240,20 +3264,7 @@ body {
       }
       var title = d + ' ב' + HEB_MONTHS[m] + ' ' + y;
       dayDetail.innerHTML = '<h4>תרגילים ב-' + title + '</h4>' +
-        list.map(function(ev) {
-          var link = window.MapimSpa && MapimSpa.exerciseLinkHtml
-            ? MapimSpa.exerciseLinkHtml(ev.id, ev.title)
-            : ('<b>' + ev.title + '</b>');
-          return '<div class="user-cal-detail-item">' + link +
-            '<div style="font-size:11px;color:var(--muted);margin-top:4px">' +
-            fmtClock(ev.startMs) + ' – ' + fmtClock(ev.endMs) +
-            (ev.location ? ' · ' + ev.location : '') +
-            (ev.responsibility ? ' · ' + ev.responsibility : '') +
-            '</div>' +
-            (ev.procedureCount ? ('<button type="button" class="btn btn-ghost btn-sm dash-proc-open-btn" data-dash-proc-open="' +
-              ev.id + '">📋 נוה"ק (' + ev.procedureCount + ')</button>') : '') +
-            '</div>';
-        }).join('');
+        list.map(renderDetailItem).join('');
       dayDetail.hidden = false;
     }
 
@@ -3303,9 +3314,9 @@ body {
     }
 
     root.addEventListener('click', function(e) {
-      var nav = e.target.closest('[data-user-cal-nav]');
+      var nav = e.target.closest('[data-app-cal-nav]');
       if (!nav) return;
-      var action = nav.getAttribute('data-user-cal-nav');
+      var action = nav.getAttribute('data-app-cal-nav');
       if (action === 'prev') cur.setMonth(cur.getMonth() - 1);
       else if (action === 'next') cur.setMonth(cur.getMonth() + 1);
       else if (action === 'today') {
@@ -3341,15 +3352,16 @@ body {
       var lines = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
-        'PRODID:-//Mapim//User Exercises//HE',
+        'PRODID:-//Mapim//Exercises//HE',
         'CALSCALE:GREGORIAN',
         'METHOD:PUBLISH'
       ];
-      events.forEach(function(ev, idx) {
+      events.forEach(function(ev) {
         var desc = [];
         if (ev.responsibility) desc.push('תפקיד: ' + ev.responsibility);
         if (ev.status) desc.push('סטטוס: ' + ev.status);
         if (ev.type) desc.push('סוג: ' + ev.type);
+        if (ev.mpCount != null) desc.push('מפים: ' + ev.mpCount);
         lines.push('BEGIN:VEVENT');
         lines.push('UID:mapim-ex-' + ev.id + '@mapim');
         lines.push('DTSTAMP:' + stamp);
@@ -3363,9 +3375,10 @@ body {
       lines.push('END:VCALENDAR');
       var blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
       var a = document.createElement('a');
-      var safeName = String(payload.userName || 'user').replace(/[^\w\u0590-\u05FF.-]+/g, '_');
+      var safeName = String(payload.fileName || payload.userName || 'exercises')
+        .replace(/[^\w\u0590-\u05FF.-]+/g, '_');
       a.href = URL.createObjectURL(blob);
-      a.download = 'mapim-exercises-' + safeName + '.ics';
+      a.download = safeName + '.ics';
       document.body.appendChild(a);
       a.click();
       setTimeout(function() {
@@ -3394,7 +3407,17 @@ body {
     renderCalendar();
   }
 
-  window.initDashboardUserCalendar = initDashboardUserCalendar;
+  function initAllExerciseCalendars() {
+    document.querySelectorAll('[data-app-cal]').forEach(initAppExerciseCalendar);
+  }
+
+  window.initAllExerciseCalendars = initAllExerciseCalendars;
+  window.initDashboardUserCalendar = function() {
+    initAppExerciseCalendar(document.getElementById('dashboardUserCalendar'));
+  };
+  window.initExercisesCalendar = function() {
+    initAppExerciseCalendar(document.getElementById('exercisesCalendar'));
+  };
 
   function initDashboardProcedurePeek() {
     var root = document.getElementById('dashboardUserExerciseResults');
@@ -3532,6 +3555,33 @@ body {
   // ── Hebrew Date Picker ──
   const HEB_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
   const HEB_DAYS_SHORT = ['א','ב','ג','ד','ה','ו','ש']; // Sun..Sat
+
+  function initTimeHalfInputs() {
+    function normalizeTimeHm(s) {
+      var m = String(s || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return '';
+      var h = parseInt(m[1], 10);
+      var min = parseInt(m[2], 10);
+      if (isNaN(h) || isNaN(min) || h > 23 || min > 59) return '';
+      return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+    }
+
+    document.querySelectorAll('.time-half-input').forEach(function(el) {
+      if (el._timeHalfBound) return;
+      el._timeHalfBound = true;
+      el.addEventListener('blur', function() {
+        var norm = normalizeTimeHm(el.value);
+        if (norm) el.value = norm;
+      });
+      el.addEventListener('change', function() {
+        var norm = normalizeTimeHm(el.value);
+        if (norm) el.value = norm;
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initTimeHalfInputs);
+  if (document.readyState !== 'loading') initTimeHalfInputs();
 
   function initDatePickers() {
     document.querySelectorAll('.dp-wrap').forEach(wrap => {

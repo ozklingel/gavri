@@ -36,6 +36,24 @@ function _fmtDateTimeFull(dateVal, timeVal) {
   return datePart || timePart || '';
 }
 
+/** תצוגת תחילת/סיום תרגיל (לא נוה"ק) — תאריך + שעה */
+function _fmtExerciseStartDisplay(ex) {
+  if (!ex) return '';
+  return _fmtDateTimeFull(ex.rawStartDate || ex.rawDate, ex.rawStartTime);
+}
+
+function _fmtExerciseEndDisplay(ex) {
+  if (!ex) return '';
+  return _fmtDateTimeFull(ex.rawEndDate || ex.rawStartDate || ex.rawDate, ex.rawEndTime);
+}
+
+function _fmtExerciseScheduleRange(ex) {
+  const start = _fmtExerciseStartDisplay(ex);
+  const end = _fmtExerciseEndDisplay(ex);
+  if (start && end && start !== end) return start + ' — ' + end;
+  return start || end || '';
+}
+
 // Format ExerciseDetails time cell (Date, datetime string, or HH:MM)
 function _fmtDetailTime(val) {
   if (val == null || val === '') return '—';
@@ -363,8 +381,8 @@ function Exercises_all() {
     title:       String(r[1]),
     description: String(r[2]),
     created_by:  String(r[3]),
-    start_date:    _fmtDateTime(r[4], r[11]),
-    end_date:      _fmtDateTime(r[5], r[12]),
+    start_date:    _fmtExerciseStartDisplay({ rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawStartTime: r[11] }),
+    end_date:      _fmtExerciseEndDisplay({ rawEndDate: _rawDate(r[5]), rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawEndTime: r[12] }),
     rawStartDate:  _rawDate(r[4]),
     rawEndDate:    _rawDate(r[5]),
     rawStartTime:  _rawTime(r[11]),

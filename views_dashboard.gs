@@ -3,16 +3,21 @@ function Views_exercises(p) {
   const user = Auth_requireRole(p, ['admin']);
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
-  const tab = (p.tab || 'list') === 'new' ? 'new' : 'list';
+  let tab = String(p.tab || 'list').trim();
+  const allowedTabs = ['list', 'calendar', 'new'];
+  if (allowedTabs.indexOf(tab) === -1) tab = 'list';
   const exs = Exercises_all();
 
   let s = _spaTabsBar('exercises', {}, [
     { id: 'list', label: '📋 כל התרגילים' },
+    { id: 'calendar', label: '📅 לוח שנה' },
     { id: 'new', label: '➕ תרגיל חדש' }
   ], tab);
 
   if (tab === 'list') {
     s += _exercisesListModuleHtml(user, sid);
+  } else if (tab === 'calendar') {
+    s += _exercisesCalendarModuleHtml(user, sid);
   } else {
     s += '<div class="spa-tab-panel" style="margin-top:14px">' +
       _exercisesSidebarModuleHtml(user, sid) + '</div>';
@@ -98,6 +103,83 @@ function _exercisesListModuleHtml(user, sid) {
 
   s += '</div>';
   return s;
+}
+
+function _exerciseCalendarEvents(exList, enrichFn) {
+  const events = [];
+  (exList || []).forEach(function(ex) {
+    const range = _exerciseTimeRange(ex);
+    if (!range || isNaN(range.startMs) || isNaN(range.endMs)) return;
+    const ev = {
+      id: String(ex.id),
+      title: String(ex.title || ''),
+      startMs: range.startMs,
+      endMs: range.endMs,
+      type: String(ex.exercise_type || ''),
+      location: String(ex.camp || ex.partner_battalion || '')
+    };
+    if (typeof enrichFn === 'function') enrichFn(ev, ex);
+    events.push(ev);
+  });
+  events.sort(function(a, b) { return a.startMs - b.startMs; });
+  return events;
+}
+
+function _exerciseCalendarCardHtml(opts) {
+  opts = opts || {};
+  const events = opts.events || [];
+  const payload = opts.payload || { events: events };
+  const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+  let exportBtn = '';
+  if (opts.showExport && opts.exportBtnId) {
+    exportBtn = '<button type="button" id="' + _esc(opts.exportBtnId) + '" class="btn btn-secondary btn-sm">' +
+      '⬇ הורד ליומן (.ics)</button>';
+  }
+  return '<div class="card" id="' + _esc(opts.rootId) + '" style="margin-bottom:16px" data-app-cal="1">' +
+    '<div class="card-header" style="flex-wrap:wrap;gap:8px;align-items:center">' +
+    '<span class="card-title">' + (opts.title || '📅 לוח שנה') + '</span>' + exportBtn +
+    '</div>' +
+    '<div class="card-body user-cal-body">' +
+    '<div class="user-cal-nav">' +
+    '<button type="button" class="btn btn-ghost btn-sm" data-app-cal-nav="prev">&#8250;</button>' +
+    '<span class="user-cal-month-label" id="' + _esc(opts.monthLabelId) + '"></span>' +
+    '<button type="button" class="btn btn-ghost btn-sm" data-app-cal-nav="next">&#8249;</button>' +
+    '<button type="button" class="btn btn-ghost btn-sm" data-app-cal-nav="today">היום</button>' +
+    '</div>' +
+    '<div class="user-cal-grid" id="' + _esc(opts.gridId) + '" aria-label="לוח שנה חודשי"></div>' +
+    '<div class="user-cal-day-detail" id="' + _esc(opts.dayDetailId) + '" hidden></div>' +
+    '</div>' +
+    '<script id="' + _esc(opts.dataId) + '" type="application/json">' + json + '</script>' +
+    '</div>';
+}
+
+function _exercisesCalendarModuleHtml(user, sid) {
+  const exs = Exercises_all();
+  const mpCounts = Assignments_mpCountByExercise();
+  const events = _exerciseCalendarEvents(exs, function(ev, ex) {
+    ev.mpCount = mpCounts[ex.id] || 0;
+    ev.schedule = _fmtExerciseScheduleRange(ex);
+    ev.location = _dashExerciseLocation(ex);
+  });
+
+  if (!events.length) {
+    return '<div class="spa-tab-panel" style="margin-top:14px">' +
+      '<div class="card"><div class="empty">אין תרגילים עם תאריכים תקינים להצגה בלוח שנה</div></div></div>';
+  }
+
+  return '<div class="spa-tab-panel" style="margin-top:14px">' +
+    _exerciseCalendarCardHtml({
+      rootId: 'exercisesCalendar',
+      gridId: 'exercisesCalGrid',
+      monthLabelId: 'exercisesCalMonthLabel',
+      dayDetailId: 'exercisesCalDayDetail',
+      dataId: 'exercisesCalData',
+      exportBtnId: 'exercisesCalExportIcs',
+      title: '📅 לוח שנה — כל התרגילים (' + events.length + ')',
+      showExport: true,
+      payload: { events: events, fileName: 'mapim-all-exercises' },
+      events: events
+    }) + '</div>';
 }
 
 function _exercisesSidebarModuleHtml(user, sid) {
@@ -245,10 +327,8 @@ function _dashExerciseLocation(ex) {
 
 function _dashExerciseTime(ex) {
   if (!ex) return '—';
-  const start = ex.start_date || '';
-  const end = ex.end_date || '';
-  if (start && end && start !== end) return start + ' — ' + end;
-  return start || end || '—';
+  const range = _fmtExerciseScheduleRange(ex);
+  return range || '—';
 }
 
 function _dashboardProcedurePanelHtml(ex, details) {
@@ -296,7 +376,8 @@ function _dashboardUserCalendarEvents(assigns) {
       responsibility: String(a.responsibility || ''),
       status: String(a.status || ''),
       type: String(ex.exercise_type || ''),
-      procedureCount: details.length
+      procedureCount: details.length,
+      schedule: _fmtExerciseScheduleRange(ex)
     });
   });
   events.sort(function(a, b) { return a.startMs - b.startMs; });
@@ -305,30 +386,22 @@ function _dashboardUserCalendarEvents(assigns) {
 
 function _dashboardUserCalendarHtml(target, events) {
   if (!events.length) return '';
-  const json = JSON.stringify({
-    userId: String(target.id),
-    userName: String(target.name || ''),
+  return _exerciseCalendarCardHtml({
+    rootId: 'dashboardUserCalendar',
+    gridId: 'userCalGrid',
+    monthLabelId: 'userCalMonthLabel',
+    dayDetailId: 'userCalDayDetail',
+    dataId: 'dashboardUserCalData',
+    exportBtnId: 'dashboardCalExportIcs',
+    title: '📅 לוח שנה — תרגילים',
+    showExport: true,
+    payload: {
+      events: events,
+      fileName: 'mapim-exercises-' + String(target.name || 'user'),
+      userName: String(target.name || '')
+    },
     events: events
-  }).replace(/</g, '\\u003c');
-
-  return '<div class="card" id="dashboardUserCalendar" style="margin-bottom:16px">' +
-    '<div class="card-header" style="flex-wrap:wrap;gap:8px;align-items:center">' +
-    '<span class="card-title">📅 לוח שנה — תרגילים</span>' +
-    '<button type="button" id="dashboardCalExportIcs" class="btn btn-secondary btn-sm">' +
-    '⬇ הורד ליומן שלי (.ics)</button>' +
-    '</div>' +
-    '<div class="card-body user-cal-body">' +
-    '<div class="user-cal-nav">' +
-    '<button type="button" class="btn btn-ghost btn-sm user-cal-nav-btn" data-user-cal-nav="prev" title="חודש קודם">&#8250;</button>' +
-    '<span class="user-cal-month-label" id="userCalMonthLabel"></span>' +
-    '<button type="button" class="btn btn-ghost btn-sm user-cal-nav-btn" data-user-cal-nav="next" title="חודש הבא">&#8249;</button>' +
-    '<button type="button" class="btn btn-ghost btn-sm user-cal-nav-btn" data-user-cal-nav="today">היום</button>' +
-    '</div>' +
-    '<div class="user-cal-grid" id="userCalGrid" aria-label="לוח שנה חודשי"></div>' +
-    '<div class="user-cal-day-detail" id="userCalDayDetail" hidden></div>' +
-    '</div>' +
-    '<script id="dashboardUserCalData" type="application/json">' + json + '</script>' +
-    '</div>';
+  });
 }
 
 function _dashboardUserExerciseResults(viewer, targetUserId) {
@@ -440,6 +513,8 @@ function _commanderTraineeExercisesHtml(assigns) {
     const ex = Exercises_get(a.exercise_id);
     html += '<li style="margin:5px 0;line-height:1.4">' +
       (ex ? _exerciseLink(ex.id, ex.title) : _esc(a.exercise_id)) +
+      (ex ? '<div style="font-size:11px;margin-top:2px;color:var(--muted)">' +
+        _esc(_fmtExerciseScheduleRange(ex)) + '</div>' : '') +
       '<div style="font-size:11px;margin-top:2px;color:var(--muted)">' +
       _esc(a.responsibility || '—') + ' · ' + _statusBadge(a.status) +
       '</div></li>';
@@ -534,8 +609,10 @@ function _tutorDashboardPanels(user, sid) {
 
     s += '<div class="card" style="margin-bottom:12px">' +
       '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
-      '<span class="card-title">🎯 ' + _exerciseLink(exId, title) + '</span>' +
-      '</div><div class="card-body" style="padding:0">' +
+      '<div><span class="card-title">🎯 ' + _exerciseLink(exId, title) + '</span>' +
+      (ex ? '<div style="font-size:11px;color:var(--muted);margin-top:4px">' +
+        _esc(_fmtExerciseScheduleRange(ex)) + '</div>' : '') +
+      '</div></div><div class="card-body" style="padding:0">' +
       '<table class="tbl"><thead><tr><th>חניך</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th><th>משוב</th></tr></thead><tbody>';
 
     rows.forEach(function(row) {
@@ -575,7 +652,7 @@ function _traineeDashboardPanels(user, sid) {
 
   s += '<div class="card"><div class="card-body" style="padding:0">' +
     '<table class="tbl"><thead><tr>' +
-    '<th>תרגיל</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
+    '<th>תרגיל</th><th>זמן</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
     '</tr></thead><tbody>';
 
   assigns.forEach(function(a) {
@@ -583,6 +660,7 @@ function _traineeDashboardPanels(user, sid) {
     const exTitle = ex ? ex.title : a.exercise_id;
     s += '<tr>' +
       '<td>' + (ex ? _exerciseLink(ex.id, exTitle) : _esc(exTitle)) + '</td>' +
+      '<td style="font-size:12px;white-space:nowrap">' + _dashCell(_fmtExerciseScheduleRange(ex)) + '</td>' +
       '<td>' + _esc(a.responsibility) + '</td>' +
       '<td>' + _statusBadge(a.status) + '</td>' +
       '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +

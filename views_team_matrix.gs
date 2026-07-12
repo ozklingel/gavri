@@ -22,15 +22,11 @@ function _teamMatrixExerciseMeta(ex) {
   }
 
   const week = _isoWeekNumber(ex.rawStartDate);
-  const timeParts = [];
-  if (ex.rawStartTime) timeParts.push(ex.rawStartTime);
-  if (ex.rawEndTime) timeParts.push('עד ' + ex.rawEndTime);
-  let dateShort = '';
-  if (ex.rawStartDate) {
+  let timeLine = _fmtExerciseScheduleRange(ex);
+  if (!timeLine && ex.rawStartDate) {
     const p = String(ex.rawStartDate).split('-');
-    if (p.length === 3) dateShort = p[2] + '.' + p[1];
+    if (p.length === 3) timeLine = p[2] + '.' + p[1];
   }
-  const timeLine = timeParts.join(' ') + (dateShort ? ' | ' + dateShort : '');
 
   let typeLine = type;
   if (!typeLine) {

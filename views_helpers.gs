@@ -114,6 +114,31 @@ function _input(name, placeholder, value, type, extra) {
   return '<input type="' + type + '" name="' + name + '" placeholder="' + _esc(placeholder || '') + '" value="' + _esc(value) + '" class="form-input" ' + extra + '>';
 }
 
+function _timeHalfHourOptions() {
+  const opts = [];
+  for (let h = 0; h < 24; h++) {
+    const hh = String(h).padStart(2, '0');
+    opts.push(hh + ':00');
+    opts.push(hh + ':30');
+  }
+  return opts;
+}
+
+/** שעה בבחירה מרשימה (חצאי שעה) או הקלדה ידנית HH:MM */
+function _timeInputHalfHour(name, value, extra) {
+  extra = extra || '';
+  const listId = 'time-half-' + String(name).replace(/[^a-zA-Z0-9_]/g, '_');
+  let datalist = '<datalist id="' + listId + '">';
+  _timeHalfHourOptions().forEach(function(t) {
+    datalist += '<option value="' + t + '"></option>';
+  });
+  datalist += '</datalist>';
+  return '<input type="text" name="' + _esc(name) + '" class="form-input time-half-input" ' +
+    'list="' + listId + '" value="' + _esc(value || '') + '" placeholder="08:00" ' +
+    'inputmode="numeric" autocomplete="off" title="שעה בפורמט HH:MM" ' + extra + '>' +
+    datalist;
+}
+
 
 function _dateInput(name, value) {
   // Custom Hebrew date picker — replaces <input type="date">

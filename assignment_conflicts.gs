@@ -11,7 +11,7 @@ function AssignmentConflicts_gapMs(r1, r2) {
 
 function AssignmentConflicts_exerciseLabel(ex) {
   if (!ex) return '';
-  const when = _fmtDateTimeFull(ex.rawStartDate, ex.rawStartTime);
+  const when = _fmtExerciseScheduleRange(ex);
   return ex.title + (when ? ' · ' + when : '');
 }
 
