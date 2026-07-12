@@ -260,6 +260,12 @@ function _timelineViewHint(range) {
   return 'גלול ימינה ושמאלה לצפייה בכל השבוע · משבצות של 4 שעות · קו מפריד בין ימים ב-00:00';
 }
 
+function _timelineSlotBoundaryLabel(ms) {
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return '';
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function _timelineSlotLabels(meta, viewStartMs) {
   if (meta.mode === '6h') {
     const labels = [];
@@ -1005,11 +1011,11 @@ function Views_timeline(p) {
   // ─────────────────────────────────────
 
   const slotsPerDay = rangeMeta.slotsPerDay;
-  const slotLabels = _timelineSlotLabels(rangeMeta, viewStartMs);
   const dayCount = rangeMeta.dayCount;
   const totalSlots = dayCount * slotsPerDay;
   const timelineMinWidth = dayCount * rangeMeta.dayWidth;
-  const timelineHeaderH = 54;
+  const timeLabelRowH = 16;
+  const timelineHeaderH = 56;
   const rowTopPx = timelineHeaderH;
   const barMinH = 44;
   const trackH = Math.max(280, rowTopPx + layout.totalHeight + 12);
@@ -1052,6 +1058,20 @@ function Views_timeline(p) {
          ';z-index:1;pointer-events:none"></div>';
   }
 
+  for (let i = 0; i <= totalSlots; i++) {
+    const boundaryMs = viewStartMs + i * rangeMeta.slotMs;
+    const rightPct = (i / totalSlots) * 100;
+    const isDayLine = (i % slotsPerDay === 0);
+    let transform = 'translateX(50%)';
+    if (i === 0) transform = 'translateX(0)';
+    else if (i === totalSlots) transform = 'translateX(100%)';
+    s += '<div class="timeline-slot-time-label' + (isDayLine ? ' is-day-boundary' : '') + '" style="' +
+         'position:absolute;top:' + (timelineHeaderH - timeLabelRowH) + 'px;right:' + rightPct + '%;' +
+         'height:' + timeLabelRowH + 'px;line-height:' + timeLabelRowH + 'px;' +
+         'transform:' + transform + ';z-index:12;pointer-events:none">' +
+         _esc(_timelineSlotBoundaryLabel(boundaryMs)) + '</div>';
+  }
+
   for (let d = 0; d < dayCount; d++) {
     const dayStart = viewStartMs + d * DAY_MS;
     const dayDate = new Date(dayStart);
@@ -1062,21 +1082,14 @@ function Views_timeline(p) {
     const dayLabel = DAY_LABELS[dayDate.getDay()];
 
     s += '<div class="timeline-day-head" style="' +
-         'position:absolute;top:0;right:' + dayRight + '%;width:' + dayWidth + '%;height:' + timelineHeaderH + 'px;' +
-         'border-bottom:1px solid var(--border);box-sizing:border-box;' +
+         'position:absolute;top:0;right:' + dayRight + '%;width:' + dayWidth + '%;height:' + (timelineHeaderH - timeLabelRowH) + 'px;' +
+         'border-bottom:1px solid var(--border2);box-sizing:border-box;' +
          (isTodayDay ? 'background:rgba(74,222,128,0.06);' : '') + '">' +
-         '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 0 0">' +
+         '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:2px 0">' +
          '<div style="font-family:var(--mono);font-size:12px;font-weight:bold;color:' +
          (isTodayDay ? 'var(--green)' : 'var(--text2)') + '">' + dayLabel + '</div>' +
          '<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">' +
-         dayDate.getDate() + '/' + (dayDate.getMonth() + 1) + '</div></div>' +
-         '<div class="timeline-day-slots" style="display:flex;width:100%;margin-top:2px;border-top:1px solid var(--border2)">';
-
-    for (let sl = 0; sl < slotsPerDay; sl++) {
-      s += '<span style="flex:1;text-align:center;font-family:var(--mono);font-size:8px;color:var(--muted);' +
-           'line-height:1.1;padding:1px 0">' + slotLabels[sl] + '</span>';
-    }
-    s += '</div></div>';
+         dayDate.getDate() + '/' + (dayDate.getMonth() + 1) + '</div></div></div>';
   }
 
   if (nowMs >= viewStartMs && nowMs < viewEndMs) {

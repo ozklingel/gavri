@@ -160,6 +160,10 @@ function _exerciseMatrixEmbedHtml(user, p) {
   const canEdit = Roles_hasAdminAccess(user.role);
   const payload = _exerciseMatrixBuildPayload();
   payload.canEdit = canEdit;
+  const highlightUserId = _dashboardHighlightUserId(p, user);
+  payload.highlightUserId = highlightUserId;
+  const highlightUser = highlightUserId ? Users_get(highlightUserId) : null;
+  if (highlightUser) payload.highlightUserName = highlightUser.name;
   if (canEdit) {
     payload.users = Users_all().map(function(u) {
       return { id: u.id, name: u.name, role: Roles_label(u.role) };
@@ -183,6 +187,9 @@ function _exerciseMatrixEmbedHtml(user, p) {
 
   return '<script id="exerciseMatrixData" type="application/json">' + jsonData + '</script>' +
     '<div id="exMatrixPageTitle" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px"></div>' +
+    (highlightUser
+      ? '<div class="matrix-highlight-banner">מודגש: <b>' + _esc(highlightUser.name) + '</b> — תאי שיבוץ מסומנים בטבלה</div>'
+      : '') +
     '<div class="card" style="margin-bottom:14px"><div class="card-body" style="padding:12px 16px">' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
     '<div id="exMatrixRoleFilters" class="team-matrix-tabs"></div>' +
@@ -206,6 +213,7 @@ function _exerciseMatrixJs() {
   var openTiers = { brigade: false, battalion: false, company: true };
   var canEdit = !!data.canEdit;
   var users = data.users || [];
+  var highlightUserId = String(data.highlightUserId || '');
   var activeCell = null;
   var editorActiveIdx = -1;
 
@@ -229,13 +237,17 @@ function _exerciseMatrixJs() {
   }
 
   function cellHtml(exId, role, c) {
-    var cls = 'ex-matrix-assign-cell' + (c ? ' filled' : '') + (canEdit ? ' editable' : '');
+    var isUserHighlight = !!(c && highlightUserId && String(c.userId) === highlightUserId);
+    var cls = 'ex-matrix-assign-cell' + (c ? ' filled' : '') + (canEdit ? ' editable' : '') +
+      (isUserHighlight ? ' ex-matrix-cell-highlight' : '');
     var attrs = ' class="' + cls + '" data-ex-id="' + esc(exId) + '" data-role="' + esc(role) + '"';
     if (c && c.assignmentId) attrs += ' data-assignment-id="' + esc(c.assignmentId) + '"';
+    if (c && c.userId) attrs += ' data-user-id="' + esc(c.userId) + '"';
     if (canEdit) attrs += ' title="לחץ לעריכת שיבוץ" tabindex="0"';
     var inner = '';
     if (c) {
-      inner += '<div class="ex-matrix-person"><div class="ex-matrix-person-name">' + userLinkHtml(c.userId, c.name) + '</div>';
+      inner += '<div class="ex-matrix-person"><div class="ex-matrix-person-name' +
+        (isUserHighlight ? ' is-highlighted' : '') + '">' + userLinkHtml(c.userId, c.name) + '</div>';
       if (c.phone) inner += '<div class="ex-matrix-person-phone">' + whatsappLinkHtml(c.phone) + '</div>';
       inner += '</div>';
     } else if (canEdit) {

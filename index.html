@@ -598,12 +598,7 @@ body {
       border-bottom: 1px solid var(--border);
       background: rgba(74, 222, 128, 0.04);
     }
-    .proc-tbl .proc-edit-row[hidden] {
-      display: none;
-    }
-    .proc-tbl .proc-edit-row td {
-      border-top: none;
-    }
+
     .user-cal-day-detail {
       margin-top: 12px;
       padding: 12px;
@@ -1069,7 +1064,106 @@ body {
     .tbl tr:last-child td { border-bottom: none; }
     .tbl tr:hover td { background: var(--bg3); }
     .tbl .mono { font-family: var(--mono); color: var(--green2); font-size: 12px; }
-    .tbl .actions { display: flex; gap: 5px; flex-wrap: wrap; }
+    .tbl td .actions { display: inline-flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+    /* ── TIME WHEEL (חצי שעה) ── */
+    .time-wheel-wrap {
+      position: relative;
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+    }
+    .time-wheel-wrap .time-half-input {
+      flex: 1;
+      min-width: 0;
+    }
+    .time-wheel-btn {
+      flex-shrink: 0;
+      width: 36px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg3);
+      color: var(--green2);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .time-wheel-btn:hover { border-color: var(--green); background: var(--bg4); }
+    .time-wheel-popup {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      left: 0;
+      z-index: 1200;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    .time-wheel-popup[hidden] { display: none; }
+    .time-wheel-list {
+      max-height: 160px;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding: 56px 0;
+    }
+    .time-wheel-item {
+      height: 32px;
+      line-height: 32px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--text2);
+      cursor: pointer;
+      scroll-snap-align: center;
+      user-select: none;
+    }
+    .time-wheel-item:hover { background: var(--bg3); color: var(--green); }
+    .time-wheel-item.selected { color: var(--green); font-weight: 700; background: rgba(74,222,128,0.08); }
+    .time-wheel-list::before,
+    .time-wheel-list::after {
+      content: '';
+      position: sticky;
+      display: block;
+      height: 56px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .time-wheel-list::before {
+      top: 0;
+      margin-bottom: -56px;
+      background: linear-gradient(var(--bg2), transparent);
+    }
+    .time-wheel-list::after {
+      bottom: 0;
+      margin-top: -56px;
+      background: linear-gradient(transparent, var(--bg2));
+    }
+
+    /* ── נוהל קרב — טבלה ── */
+    .proc-tbl .proc-actions-head,
+    .proc-tbl .proc-actions-cell {
+      width: 118px;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .proc-tbl tr.proc-edit-row { display: none; }
+    .proc-tbl tr.proc-edit-row.is-open { display: table-row; }
+    .proc-tbl .proc-edit-cell {
+      background: var(--bg2);
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .proc-tbl .proc-edit-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .proc-tbl tr.proc-row:hover .proc-actions-cell { background: transparent; }
 
     /* ── FORM ── */
     .form-row { margin-bottom: 12px; }
@@ -1334,7 +1428,36 @@ body {
     .team-matrix-user-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
     .team-matrix-cell { text-align: center; padding: 8px 6px !important; }
     .team-matrix-cell.filled { background: var(--bg3); }
+    .team-matrix-cell.team-matrix-cell-highlight {
+      background: rgba(74, 222, 128, 0.22) !important;
+      box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.55);
+    }
+    .team-matrix-name.team-matrix-name-highlight {
+      background: rgba(74, 222, 128, 0.12) !important;
+      box-shadow: inset 4px 0 0 var(--green);
+    }
+    .team-matrix-row-highlight:hover td.team-matrix-name-highlight { background: rgba(74, 222, 128, 0.18) !important; }
     .team-matrix-role { font-size: 11px; line-height: 1.3; display: block; }
+
+    .matrix-highlight-banner {
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--text2);
+      background: rgba(74, 222, 128, 0.08);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+    }
+    .matrix-highlight-banner b { color: var(--green); }
+
+    .ex-matrix-assign-cell.ex-matrix-cell-highlight {
+      background: rgba(74, 222, 128, 0.22) !important;
+      box-shadow: inset 0 0 0 2px rgba(74, 222, 128, 0.65);
+    }
+    .ex-matrix-person-name.is-highlighted,
+    .ex-matrix-person-name.is-highlighted .user-name-link {
+      color: var(--green) !important;
+      font-weight: 800;
+    }
 
     .ex-matrix-tier-toggle {
       width: 100%;
@@ -1770,6 +1893,23 @@ body {
     }
     .timeline-day-slots span:last-child {
       border-left: none;
+    }
+    .timeline-slot-time-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+      text-align: center;
+      padding: 0 2px;
+      background: var(--glass);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border-radius: 2px;
+    }
+    .timeline-slot-time-label.is-day-boundary {
+      color: var(--text2);
+      font-weight: 700;
     }
     .timeline-row-label {
       font-weight: bold;
@@ -2778,7 +2918,7 @@ body {
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
       if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
-      if (typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+      if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
       if (typeof initExerciseProcedurePanel === 'function') initExerciseProcedurePanel();
       if (typeof initExerciseEditShiftPrompt === 'function') initExerciseEditShiftPrompt();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
@@ -2980,6 +3120,9 @@ body {
         el.closest('#proc-add-toggle') ||
         el.closest('.proc-edit-btn') ||
         el.closest('.proc-edit-cancel') ||
+        el.closest('.time-wheel-wrap') ||
+        el.closest('.time-wheel-popup') ||
+        el.closest('.time-wheel-btn') ||
         el.closest('.tl-handle') ||
         (el.closest('.timeline-track.edit-mode .tl-bar') && !el.closest('.exercise-name-link'));
     }
@@ -3583,7 +3726,7 @@ body {
         setTimeout(function() {
           if (!panel.classList.contains('open')) return;
           if (typeof initDatePickers === 'function') initDatePickers();
-          if (typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+          if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
         }, 0);
       });
     }
@@ -3595,12 +3738,12 @@ body {
         var id = editBtn.getAttribute('data-detail-id');
         var row = document.getElementById('proc-edit-' + id);
         if (!row) return;
-        var wasHidden = row.hidden;
-        card.querySelectorAll('.proc-edit-row').forEach(function(r) { r.hidden = true; });
-        row.hidden = !wasHidden;
-        if (!row.hidden) {
+        var wasOpen = row.classList.contains('is-open');
+        card.querySelectorAll('.proc-edit-row').forEach(function(r) { r.classList.remove('is-open'); });
+        if (!wasOpen) {
+          row.classList.add('is-open');
           if (typeof initDatePickers === 'function') initDatePickers();
-          if (typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+          if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
           row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
         return;
@@ -3610,7 +3753,7 @@ body {
         e.preventDefault();
         var cid = cancelBtn.getAttribute('data-detail-id');
         var crow = document.getElementById('proc-edit-' + cid);
-        if (crow) crow.hidden = true;
+        if (crow) crow.classList.remove('is-open');
       }
     });
   }
@@ -3656,32 +3799,172 @@ body {
   }
   window.initExerciseEditShiftPrompt = initExerciseEditShiftPrompt;
 
-  function initTimeHalfInputs() {
+  function initTimeWheelPickers() {
+    var HALF_HOUR_TIMES = [];
+    for (var h = 0; h < 24; h++) {
+      var hh = String(h).padStart(2, '0');
+      HALF_HOUR_TIMES.push(hh + ':00');
+      HALF_HOUR_TIMES.push(hh + ':30');
+    }
+
     function normalizeTimeHm(s) {
       var m = String(s || '').trim().match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return '';
-      var h = parseInt(m[1], 10);
+      var hr = parseInt(m[1], 10);
       var min = parseInt(m[2], 10);
-      if (isNaN(h) || isNaN(min) || h > 23 || min > 59) return '';
-      return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+      if (isNaN(hr) || isNaN(min) || hr > 23 || min > 59) return '';
+      return String(hr).padStart(2, '0') + ':' + String(min).padStart(2, '0');
     }
 
-    document.querySelectorAll('.time-half-input').forEach(function(el) {
-      if (el._timeHalfBound) return;
-      el._timeHalfBound = true;
-      el.addEventListener('blur', function() {
-        var norm = normalizeTimeHm(el.value);
-        if (norm) el.value = norm;
+    function nearestHalfHour(s) {
+      var norm = normalizeTimeHm(s);
+      if (!norm) return '';
+      var parts = norm.split(':').map(Number);
+      var mins = parts[0] * 60 + parts[1];
+      var snapped = Math.round(mins / 30) * 30;
+      if (snapped >= 24 * 60) snapped = 23 * 60 + 30;
+      var nh = Math.floor(snapped / 60);
+      var nm = snapped % 60;
+      return String(nh).padStart(2, '0') + ':' + String(nm).padStart(2, '0');
+    }
+
+    function closeAll(except) {
+      document.querySelectorAll('.time-wheel-wrap').forEach(function(w) {
+        if (except && w === except) return;
+        var popup = w.querySelector('.time-wheel-popup');
+        if (popup) popup.hidden = true;
+        w.classList.remove('open');
       });
-      el.addEventListener('change', function() {
-        var norm = normalizeTimeHm(el.value);
-        if (norm) el.value = norm;
+    }
+
+    function scrollToValue(list, value) {
+      var target = list.querySelector('[data-time="' + value + '"]');
+      if (!target) target = list.querySelector('.time-wheel-item');
+      if (!target) return;
+      var top = target.offsetTop - (list.clientHeight / 2) + (target.offsetHeight / 2);
+      list.scrollTop = Math.max(0, top);
+    }
+
+    function markSelected(list, value) {
+      list.querySelectorAll('.time-wheel-item').forEach(function(item) {
+        item.classList.toggle('selected', item.getAttribute('data-time') === value);
+      });
+    }
+
+    function setValue(wrap, input, value) {
+      var norm = nearestHalfHour(value) || normalizeTimeHm(value) || value;
+      if (norm) input.value = norm;
+      var list = wrap.querySelector('.time-wheel-list');
+      if (list) markSelected(list, norm);
+    }
+
+    function openWheel(wrap) {
+      var popup = wrap.querySelector('.time-wheel-popup');
+      var input = wrap.querySelector('.time-half-input');
+      var list = wrap.querySelector('.time-wheel-list');
+      if (!popup || !input || !list) return;
+      closeAll(wrap);
+      popup.hidden = false;
+      wrap.classList.add('open');
+      var val = nearestHalfHour(input.value) || input.value || '08:00';
+      scrollToValue(list, HALF_HOUR_TIMES.indexOf(val) >= 0 ? val : '08:00');
+      markSelected(list, val);
+    }
+
+    document.querySelectorAll('.time-wheel-wrap').forEach(function(wrap) {
+      if (wrap._timeWheelBound) return;
+      wrap._timeWheelBound = true;
+
+      var input = wrap.querySelector('.time-half-input');
+      var btn = wrap.querySelector('.time-wheel-btn');
+      var popup = wrap.querySelector('.time-wheel-popup');
+      var list = wrap.querySelector('.time-wheel-list');
+      if (!input || !popup || !list) return;
+
+      if (!list.childElementCount) {
+        HALF_HOUR_TIMES.forEach(function(t) {
+          var item = document.createElement('div');
+          item.className = 'time-wheel-item';
+          item.setAttribute('data-time', t);
+          item.setAttribute('role', 'option');
+          item.textContent = t;
+          list.appendChild(item);
+        });
+      }
+
+      function pick(time) {
+        setValue(wrap, input, time);
+        popup.hidden = true;
+        wrap.classList.remove('open');
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      if (btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (popup.hidden) openWheel(wrap);
+          else { popup.hidden = true; wrap.classList.remove('open'); }
+        });
+      }
+
+      input.addEventListener('click', function() {
+        openWheel(wrap);
+      });
+
+      input.addEventListener('blur', function() {
+        var norm = normalizeTimeHm(input.value);
+        if (norm) input.value = norm;
+      });
+
+      input.addEventListener('change', function() {
+        var norm = normalizeTimeHm(input.value);
+        if (norm) input.value = norm;
+      });
+
+      list.addEventListener('mousedown', function(e) {
+        var item = e.target.closest('.time-wheel-item');
+        if (!item) return;
+        e.preventDefault();
+        pick(item.getAttribute('data-time'));
+      });
+
+      var scrollTimer = null;
+      list.addEventListener('scroll', function() {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(function() {
+          var center = list.scrollTop + list.clientHeight / 2;
+          var best = null;
+          var bestDist = Infinity;
+          list.querySelectorAll('.time-wheel-item').forEach(function(item) {
+            var mid = item.offsetTop + item.offsetHeight / 2;
+            var dist = Math.abs(mid - center);
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = item;
+            }
+          });
+          if (best) {
+            var t = best.getAttribute('data-time');
+            markSelected(list, t);
+            input.value = t;
+          }
+        }, 80);
       });
     });
-  }
 
-  document.addEventListener('DOMContentLoaded', initTimeHalfInputs);
-  if (document.readyState !== 'loading') initTimeHalfInputs();
+    if (!window._timeWheelDocBound) {
+      window._timeWheelDocBound = true;
+      document.addEventListener('click', function(e) {
+        if (e.target.closest('.time-wheel-wrap')) return;
+        closeAll(null);
+      });
+    }
+  }
+  window.initTimeWheelPickers = initTimeWheelPickers;
+
+  document.addEventListener('DOMContentLoaded', initTimeWheelPickers);
+  if (document.readyState !== 'loading') initTimeWheelPickers();
 
   function initDatePickers() {
     document.querySelectorAll('.dp-wrap').forEach(wrap => {

@@ -137,7 +137,7 @@ s += _confirmDelete(
     const showActions = Roles_hasAdminAccess(user.role);
     tlHtml += '<div class="card-body" style="padding:0"><table class="tbl proc-tbl"><thead><tr>' +
       '<th>תאריך ושעה</th><th>מיקום</th><th>תיאור</th>' +
-      (showActions ? '<th style="width:88px">פעולות</th>' : '') +
+      (showActions ? '<th class="proc-actions-head">פעולות</th>' : '') +
       '</tr></thead><tbody>';
     details.forEach(function(d) {
       const parsed = _parseDetailDateHm(d.rawTime);
@@ -147,17 +147,17 @@ s += _confirmDelete(
         '<td>' + _esc(d.location) + '</td>' +
         '<td>' + _esc(d.description) + '</td>';
       if (showActions) {
-        tlHtml += '<td class="actions">' +
+        tlHtml += '<td class="proc-actions-cell"><div class="actions">' +
           '<button type="button" class="btn btn-ghost btn-sm proc-edit-btn" data-detail-id="' + _esc(d.id) + '">ערוך</button>' +
           '<a href="#" class="btn btn-danger btn-sm" data-spa-action="deleteDetail"' +
           _spaParamsAttr({ sid: sid, detailId: d.id, exerciseId: ex.id }) +
           ' data-confirm="למחוק את «' + _esc(shortDesc) + '» מנוהל הקרב?" onclick="return confirmDelete(this)">מחק</a>' +
-          '</td>';
+          '</div></td>';
       }
       tlHtml += '</tr>';
       if (showActions) {
-        tlHtml += '<tr class="proc-edit-row" id="proc-edit-' + _esc(d.id) + '" hidden>' +
-          '<td colspan="4" style="background:var(--bg2);padding:12px 14px">' +
+        tlHtml += '<tr class="proc-edit-row" id="proc-edit-' + _esc(d.id) + '">' +
+          '<td colspan="4" class="proc-edit-cell">' +
           _formOpen('proc-edit-form') +
           '<input type="hidden" name="action" value="updateDetail">' +
           '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
@@ -173,7 +173,7 @@ s += _confirmDelete(
           '</div>' +
           '<div class="form-row"><label class="form-label">תיאור</label>' +
           _input('detailDescription', 'תיאור הפעילות', d.description, 'text') + '</div>' +
-          '<div style="display:flex;gap:6px;margin-top:8px">' +
+          '<div class="proc-edit-actions">' +
           _submitBtn('💾 שמור', 'btn btn-primary btn-sm') +
           '<button type="button" class="btn btn-ghost btn-sm proc-edit-cancel" data-detail-id="' + _esc(d.id) + '">ביטול</button>' +
           '</div></form></td></tr>';

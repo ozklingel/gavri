@@ -124,19 +124,17 @@ function _timeHalfHourOptions() {
   return opts;
 }
 
-/** שעה בבחירה מרשימה (חצאי שעה) או הקלדה ידנית HH:MM */
+/** שעה — גלגלת חצאי שעה + הקלדה ידנית HH:MM */
 function _timeInputHalfHour(name, value, extra) {
   extra = extra || '';
-  const listId = 'time-half-' + String(name).replace(/[^a-zA-Z0-9_]/g, '_');
-  let datalist = '<datalist id="' + listId + '">';
-  _timeHalfHourOptions().forEach(function(t) {
-    datalist += '<option value="' + t + '"></option>';
-  });
-  datalist += '</datalist>';
-  return '<input type="text" name="' + _esc(name) + '" class="form-input time-half-input" ' +
-    'list="' + listId + '" value="' + _esc(value || '') + '" placeholder="08:00" ' +
-    'inputmode="numeric" autocomplete="off" title="שעה בפורמט HH:MM" ' + extra + '>' +
-    datalist;
+  const uid = 'tw-' + String(name).replace(/[^a-zA-Z0-9_]/g, '_');
+  return '<div class="time-wheel-wrap" data-time-wheel="' + uid + '">' +
+    '<input type="text" name="' + _esc(name) + '" class="form-input time-half-input" ' +
+    'value="' + _esc(value || '') + '" placeholder="08:00" autocomplete="off" ' +
+    'inputmode="numeric" title="שעה בפורמט HH:MM" ' + extra + '>' +
+    '<button type="button" class="time-wheel-btn" tabindex="-1" aria-label="בחר שעה">▾</button>' +
+    '<div class="time-wheel-popup" hidden><div class="time-wheel-list" role="listbox"></div></div>' +
+    '</div>';
 }
 
 
@@ -627,6 +625,14 @@ function _dashboardResolveSearchUserId(p, user, tab) {
   return '';
 }
 
+/** משתמש להדגשה במטריצות צוות / תרגיל — מחיפוש או המשתמש המחובר */
+function _dashboardHighlightUserId(p, user) {
+  const explicit = String((p && p.searchUserId) || '').trim();
+  if (explicit) return explicit;
+  if (user && user.id) return String(user.id).trim();
+  return '';
+}
+
 function _dashboardTabItems(user) {
   const items = [{ id: 'search', label: '🔍 חיפוש' }];
   if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
@@ -668,7 +674,9 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
 }
 
 function _dashboardTabsShell(user, sid, activeTab, p) {
+  const highlightUserId = _dashboardHighlightUserId(p, user);
   const baseParams = {};
+  if (highlightUserId) baseParams.searchUserId = highlightUserId;
   if (activeTab === 'search') {
     const searchUserId = _dashboardResolveSearchUserId(p, user, 'search');
     if (searchUserId) baseParams.searchUserId = searchUserId;

@@ -137,6 +137,10 @@ function _teamMatrixEmbedHtml(user, p) {
 
   const payload = _teamMatrixBuildPayload(user);
   const initialTeam = String((p && p.teamId) || teams[0].id).trim();
+  const highlightUserId = _dashboardHighlightUserId(p, user);
+  payload.highlightUserId = highlightUserId;
+  const highlightUser = highlightUserId ? Users_get(highlightUserId) : null;
+  if (highlightUser) payload.highlightUserName = highlightUser.name;
   const jsonData = JSON.stringify(payload).replace(/</g, '\\u003c');
 
   return '<script id="teamMatrixData" type="application/json">' + jsonData + '</script>' +
@@ -146,6 +150,9 @@ function _teamMatrixEmbedHtml(user, p) {
     '<div id="teamMatrixTeamTabs" class="team-matrix-tabs"></div>' +
     '</div></div>' +
     '<div id="teamMatrixPanel" class="card">' +
+    (highlightUser
+      ? '<div class="matrix-highlight-banner">מודגש: <b>' + _esc(highlightUser.name) + '</b> — שורות ותאי שיבוץ מסומנים בטבלה</div>'
+      : '') +
     '<div class="card-header" style="flex-wrap:wrap;gap:10px;align-items:center">' +
     '<span class="card-title" id="teamMatrixTitle">—</span>' +
     '<div style="display:flex;gap:6px;margin-right:auto">' +
@@ -168,6 +175,7 @@ function _teamMatrixJs() {
   var data = JSON.parse(document.getElementById('teamMatrixData').textContent);
   var currentTeam = document.getElementById('teamMatrixInitialTeam').value || (data.teams[0] && data.teams[0].id);
   var currentWeek = 'all';
+  var highlightUserId = String(data.highlightUserId || '');
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -326,12 +334,17 @@ function _teamMatrixJs() {
 
     var body = '';
     members.forEach(function(m) {
-      body += '<tr><td class="team-matrix-sticky team-matrix-name"><div class="team-matrix-user-name">' + userLinkHtml(m.id, m.name) + '</div>' +
+      var isHighlight = highlightUserId && String(m.id) === highlightUserId;
+      body += '<tr' + (isHighlight ? ' class="team-matrix-row-highlight"' : '') + '>' +
+        '<td class="team-matrix-sticky team-matrix-name' + (isHighlight ? ' team-matrix-name-highlight' : '') + '">' +
+        '<div class="team-matrix-user-name">' + userLinkHtml(m.id, m.name) + '</div>' +
         '<div class="team-matrix-user-sub">' + esc(rowSummary(m, exIds)) + '</div></td>';
       var row = (data.cells[currentTeam] && data.cells[currentTeam][m.id]) || {};
       exIds.forEach(function(exId) {
         var resp = row[exId] || '';
-        body += '<td class="team-matrix-cell' + (resp ? ' filled' : '') + '">' +
+        var cellCls = 'team-matrix-cell' + (resp ? ' filled' : '');
+        if (isHighlight && resp) cellCls += ' team-matrix-cell-highlight';
+        body += '<td class="' + cellCls + '">' +
           (resp ? '<span class="team-matrix-role">' + esc(resp) + '</span>' : '') + '</td>';
       });
       body += '</tr>';
