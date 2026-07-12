@@ -507,6 +507,14 @@ function _seriesSlotLabel(plan, parentVariantLabel) {
   return plan.variantLabel || parentVariantLabel || 'תרגיל';
 }
 
+/** שם תרגיל בסדרה: מספר ייחודי 4 ספרות + מיקום + שם כוח */
+function _seriesExerciseTitle(seq, location, forceName) {
+  const num = String(Math.max(1, parseInt(seq, 10) || 1)).padStart(4, '0');
+  const loc = String(location || '').trim() || '—';
+  const force = String(forceName || '').trim() || '—';
+  return num + ' ' + loc + ' ' + force;
+}
+
 function Series_schedule(startYmd, endYmd, queue, locations, opts) {
   opts = opts || {};
   const rangeEndMs = _seriesYmdToMs(endYmd, 23, 59) + 60000;
@@ -675,6 +683,7 @@ function Series_buildFormHtml(sid) {
   s += '<p style="font-size:12px;color:#d97706;margin:0 0 12px;font-weight:600">' +
     '⚠ בניית סדרה מוחקת את כל התרגילים, השיבוצים וצירי הזמן הקיימים במערכת.</p>';
   s += '<ul style="font-size:11px;color:var(--muted);margin:0 0 14px 18px;line-height:1.6">';
+  s += '<li>שם כל תרגיל: מספר ייחודי (4 ספרות) + מיקום + שם הגדוד/כוח</li>';
   s += '<li>התחלה ביום שני הראשון בטווח, בשעה 06:00</li>';
   s += '<li>מרווח 18 שעות בין תרגילים באותו כוח (מסלול)</li>';
   s += '<li>עד 3 תרגילים במקביל (גדודים שונים יכולים להיות מאותו סוג כוח)</li>';
@@ -756,14 +765,17 @@ function Exercises_buildSeries(p) {
     const fieldForceId = item.fieldForceId || slotBn.fieldForceId || '';
     plans.forEach(function(plan) {
       const slotLabel = _seriesSlotLabel(plan, item.variant ? item.variant.label : '');
+      const seq = rowIdx + 1;
       const id = 'E' + baseTs + '_' + rowIdx;
       rowIdx++;
       const locPart = location ? (' · ' + location) : '';
+      const title = _seriesExerciseTitle(seq, location, forceName);
 
       exRows.push([
         id,
-        type + ' — ' + slotLabel + locPart + ' ' + rowIdx,
-        'נוצר בבניית סדרה (' + slotLabel + locPart + ', ' + plan.durationH + ' שעות)',
+        title,
+        'נוצר בבניית סדרה · ' + type + ' — ' + slotLabel + locPart +
+          ' (' + plan.durationH + ' שעות)',
         u.id,
         _seriesMsToYmd(plan.startMs),
         _seriesMsToYmd(plan.endMs),
