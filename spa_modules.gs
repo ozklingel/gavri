@@ -1,8 +1,8 @@
 // spa_modules.gs — lazy HTML fragments (legacy module slots on GAS)
 
 function apiLoadModule(sid, moduleId, paramsJson) {
-  _cacheWarmAllIfNeeded();
   const p = _spaMergeParams(sid, paramsJson);
+  _cacheWarmForModule(String(moduleId || '').trim(), p);
   try {
     const html = SpaModule_render(String(moduleId || '').trim(), p);
     return { ok: true, html: html || '' };
@@ -100,4 +100,49 @@ function _dashboardTabSearchModule(user, p) {
   }
   return '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
     'הקלד שם או מספר אישי בשורת החיפוש למעלה.</p>';
+}
+
+function _cacheWarmForModule(moduleId, p) {
+  const id = String(moduleId || '').trim();
+  if (!id) return;
+
+  if (id === 'drawer.panels') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Assignments', 'HomeConstraints']);
+    return;
+  }
+  if (id.indexOf('dashboard.tab.') === 0) {
+    const tab = id.replace('dashboard.tab.', '');
+    if (tab === 'conflicts') {
+      _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'Assignments']);
+    } else {
+      _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
+    }
+    return;
+  }
+  if (id.indexOf('users.tab.') === 0) {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams']);
+    return;
+  }
+  if (id.indexOf('statistics.') === 0 || id === 'statistics.main') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'Assignments']);
+    return;
+  }
+  if (id.indexOf('assign.') === 0 || id === 'assign.main') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'HomeConstraints']);
+    return;
+  }
+  if (id.indexOf('exercise.panel.') === 0) {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'Assignments', 'FieldForces', 'FireZones']);
+    return;
+  }
+  if (id === 'timeline.main') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces']);
+    return;
+  }
+  if (id === 'exercises.list' || id === 'exercises.sidebar') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'FieldForces', 'FireZones']);
+    return;
+  }
+
+  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
 }

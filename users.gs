@@ -20,9 +20,18 @@ function Users_all() {
   }));
 }
 
+var _usersById = null;
+
+function Users_byIdMap() {
+  if (!_rowsCache['Users']) _usersById = null;
+  if (_usersById) return _usersById;
+  _usersById = {};
+  Users_all().forEach(function(u) { _usersById[u.id] = u; });
+  return _usersById;
+}
+
 function Users_get(id) {
-  // PERF: uses cached _rows — no extra Sheets API call
-  return Users_all().find(x => x.id === String(id)) || null;
+  return Users_byIdMap()[String(id)] || null;
 }
 
 function Users_byTeam(teamId) {

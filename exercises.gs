@@ -513,27 +513,56 @@ function Exercises_all() {
   }));
 }
 
+var _exercisesById = null;
+var _exerciseDetailsByExId = null;
+
+function _exercisesClearDerived() {
+  _exercisesById = null;
+  _exerciseDetailsByExId = null;
+}
+
+function Exercises_byIdMap() {
+  if (!_rowsCache['Exercises']) _exercisesClearDerived();
+  if (_exercisesById) return _exercisesById;
+  _exercisesById = {};
+  Exercises_all().forEach(function(e) { _exercisesById[e.id] = e; });
+  return _exercisesById;
+}
+
 function Exercises_get(id) {
-  // PERF: uses cached _rows — no extra Sheets API call
-  return Exercises_all().find(e => e.id === String(id)) || null;
+  return Exercises_byIdMap()[String(id)] || null;
+}
+
+function _exerciseDetailFromRow(r) {
+  return {
+    id: String(r[0]),
+    rawTime: r[2],
+    time: _fmtDetailTime(r[2]),
+    location: String(r[3] || ''),
+    description: String(r[4] || '')
+  };
+}
+
+function Exercises_detailsIndex() {
+  if (!_rowsCache['ExerciseDetails']) _exercisesClearDerived();
+  if (_exerciseDetailsByExId) return _exerciseDetailsByExId;
+  _exerciseDetailsByExId = {};
+  _rows('ExerciseDetails').data.forEach(function(r) {
+    const exId = String(r[1]);
+    if (!_exerciseDetailsByExId[exId]) _exerciseDetailsByExId[exId] = [];
+    _exerciseDetailsByExId[exId].push(_exerciseDetailFromRow(r));
+  });
+  Object.keys(_exerciseDetailsByExId).forEach(function(exId) {
+    _exerciseDetailsByExId[exId].sort(function(a, b) {
+      return _exerciseDetailSortMs(a.rawTime) - _exerciseDetailSortMs(b.rawTime);
+    });
+  });
+  return _exerciseDetailsByExId;
 }
 
 function Exercises_details(exerciseId) {
-  const items = _rows('ExerciseDetails').data
-    .filter(function(r) { return String(r[1]) === String(exerciseId); })
-    .map(function(r) {
-      return {
-        id: String(r[0]),
-        rawTime: r[2],
-        time: _fmtDetailTime(r[2]),
-        location: String(r[3] || ''),
-        description: String(r[4] || '')
-      };
-    });
-  items.sort(function(a, b) {
-    return _exerciseDetailSortMs(a.rawTime) - _exerciseDetailSortMs(b.rawTime);
-  });
-  return items;
+  const list = Exercises_detailsIndex()[String(exerciseId)];
+  return list ? list.slice() : [];
 }
 
 function _exerciseDetailsInsertSorted(exId, row) {

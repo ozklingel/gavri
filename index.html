@@ -3088,18 +3088,7 @@ body {
     function boot() {
       var sid = getSid();
       MapimLoader.showSplashStatus('טוען...');
-      if (!sid) {
-        navigate('login', {});
-        return;
-      }
-      google.script.run
-        .withSuccessHandler(function() {
-          navigate('dashboard', {});
-        })
-        .withFailureHandler(function() {
-          navigate('dashboard', {});
-        })
-        .apiWarmCache(sid);
+      navigate(sid ? 'dashboard' : 'login', {});
     }
 
     function isLocalUiClick(el) {

@@ -316,11 +316,11 @@ function _drawerDashboardPanels(user, sid) {
   else                                      s += _traineeDashboardPanels(user, sid);
   return s;
 }
-function _dashExerciseLocation(ex) {
+function _dashExerciseLocation(ex, details) {
   if (!ex) return '—';
-  const details = Exercises_details(ex.id);
-  for (let i = 0; i < details.length; i++) {
-    if (details[i].location) return details[i].location;
+  const dlist = details || Exercises_details(ex.id);
+  for (let i = 0; i < dlist.length; i++) {
+    if (dlist[i].location) return dlist[i].location;
   }
   return ex.camp || ex.partner_battalion || '—';
 }
@@ -359,20 +359,22 @@ function _dashboardProcedurePanelHtml(ex, details) {
   return html;
 }
 
-function _dashboardUserCalendarEvents(assigns) {
+function _dashboardUserCalendarEvents(assigns, exById, detailsByEx) {
+  exById = exById || Exercises_byIdMap();
+  detailsByEx = detailsByEx || Exercises_detailsIndex();
   const events = [];
   assigns.forEach(function(a) {
-    const ex = Exercises_get(a.exercise_id);
+    const ex = exById[a.exercise_id];
     if (!ex) return;
     const range = _exerciseTimeRange(ex);
     if (!range || isNaN(range.startMs) || isNaN(range.endMs)) return;
-    const details = Exercises_details(ex.id);
+    const details = detailsByEx[ex.id] || [];
     events.push({
       id: String(ex.id),
       title: String(ex.title || ''),
       startMs: range.startMs,
       endMs: range.endMs,
-      location: _dashExerciseLocation(ex),
+      location: _dashExerciseLocation(ex, details),
       responsibility: String(a.responsibility || ''),
       status: String(a.status || ''),
       type: String(ex.exercise_type || ''),
@@ -411,9 +413,11 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
   }
 
   const assigns = Assignments_byUser(targetUserId).slice();
+  const exById = Exercises_byIdMap();
+  const detailsByEx = Exercises_detailsIndex();
   assigns.sort(function(a, b) {
-    const ea = Exercises_get(a.exercise_id);
-    const eb = Exercises_get(b.exercise_id);
+    const ea = exById[a.exercise_id];
+    const eb = exById[b.exercise_id];
     const da = ea && ea.rawStartDate ? ea.rawStartDate : '9999';
     const db = eb && eb.rawStartDate ? eb.rawStartDate : '9999';
     return String(da).localeCompare(String(db));
@@ -449,7 +453,7 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
   }
   s += '</div></div>';
 
-  const calEvents = _dashboardUserCalendarEvents(assigns);
+  const calEvents = _dashboardUserCalendarEvents(assigns, exById, detailsByEx);
   s += _dashboardUserCalendarHtml(target, calEvents);
 
   if (!assigns.length) {
@@ -460,9 +464,9 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
       '<th>תרגיל</th><th>שבוע לועזי</th><th>מיקום</th><th>זמן</th><th>תפקיד בתרגיל</th><th>סוג תרגיל</th><th>סטטוס</th><th>נוה"ק</th>' +
       '</tr></thead><tbody>';
     assigns.forEach(function(a) {
-      const ex = Exercises_get(a.exercise_id);
+      const ex = exById[a.exercise_id];
       const title = ex ? ex.title : a.exercise_id;
-      const details = ex ? Exercises_details(ex.id) : [];
+      const details = ex ? (detailsByEx[ex.id] || []) : [];
       const exId = ex ? String(ex.id) : '';
       let procCell = '<span style="color:var(--muted);font-size:11px">—</span>';
       if (ex && details.length) {
@@ -476,7 +480,7 @@ function _dashboardUserExerciseResults(viewer, targetUserId) {
         (ex ? _exerciseLink(ex.id, title) : _esc(title)) + '</td>' +
         '<td style="font-size:12px;white-space:nowrap">' +
         _dashCell(ex && ex.rawStartDate ? _isoWeekLabel(ex.rawStartDate) : '') + '</td>' +
-        '<td>' + _dashCell(_dashExerciseLocation(ex)) + '</td>' +
+        '<td>' + _dashCell(_dashExerciseLocation(ex, details)) + '</td>' +
         '<td style="font-size:12px;white-space:nowrap">' + _dashCell(_dashExerciseTime(ex)) + '</td>' +
         '<td>' + _dashCell(a.responsibility) + '</td>' +
         '<td>' + (ex && ex.exercise_type ? _badge(ex.exercise_type, 'muted') : _dashCell('')) + '</td>' +

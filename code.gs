@@ -32,8 +32,9 @@ var DB_SHEET_NAMES = [
   'Users', 'Credentials', 'Teams', 'Exercises', 'ExerciseDetails',
   'Assignments', 'FieldForces', 'FireZones', 'HomeConstraints', 'TimelineBlocks'
 ];
-// מינימום לעלייה — לוגין לא דורש DB; דשבורד (טאב חיפוש) רק Users+Teams
-var DB_BOOT_SHEETS = ['Users', 'Teams'];
+// מינימום לעלייה אחרי התחברות — דשבורד, חיפוש, שיבוצים (ללא Credentials / שטחי אש / ציר זמן)
+var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments'];
+var DB_BOOT_SHEETS = DB_SESSION_SHEETS;
 var DB_CACHE_TTL_SEC = 600;
 var DB_CACHE_PREFIX = 'mdb:';
 var DB_CACHE_CHUNK = 90000;
@@ -145,8 +146,8 @@ function apiWarmCache(sid) {
   } catch (e) {
     return { ok: true, sheets: 0, scope: 'none' };
   }
-  _cacheWarmSheetsIfNeeded(DB_BOOT_SHEETS);
-  return { ok: true, sheets: DB_BOOT_SHEETS.length, scope: 'boot' };
+  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
+  return { ok: true, sheets: DB_SESSION_SHEETS.length, scope: 'session' };
 }
 
 function _cacheFlush() {

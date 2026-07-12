@@ -83,13 +83,36 @@ function _cacheWarmForPage(page, p) {
 
   if (pg === 'dashboard') {
     const tab = String((p && p.tab) || 'search').trim();
-    if (tab === 'team' || tab === 'exercise' || tab === 'conflicts') {
-      _cacheWarmAllIfNeeded();
+    if (tab === 'team' || tab === 'exercise') {
+      _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
+    } else if (tab === 'conflicts') {
+      _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'Assignments']);
     } else if (tab === 'search') {
-      _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments']);
+      _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
     } else {
       _cacheWarmSheetsIfNeeded(DB_BOOT_SHEETS);
     }
+    return;
+  }
+
+  if (pg === 'exercise') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'Assignments', 'FieldForces', 'FireZones']);
+    return;
+  }
+  if (pg === 'users') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams']);
+    return;
+  }
+  if (pg === 'user') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'Assignments']);
+    return;
+  }
+  if (pg === 'feedback') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'Assignments']);
+    return;
+  }
+  if (pg === 'teamMatrix' || pg === 'exerciseMatrix') {
+    _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
     return;
   }
 
@@ -118,11 +141,11 @@ function _cacheWarmForPage(page, p) {
     return;
   }
   if (pg === 'statistics') {
-    _cacheWarmAllIfNeeded();
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'Assignments']);
     return;
   }
 
-  _cacheWarmAllIfNeeded();
+  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
 }
 
 function _spaDispatchPage(page, p) {

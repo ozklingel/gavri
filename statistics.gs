@@ -1,5 +1,7 @@
 // statistics.gs — נתוני סטטיסטיקות לדשבורד סגל
 
+var _statisticsPayloadCache = null;
+
 function _Statistics_isMpUser(user) {
   return !!(user && Roles_isTrainee(user.role));
 }
@@ -64,6 +66,8 @@ function _Statistics_exerciseTypeKey(ex) {
 }
 
 function Statistics_buildPayload() {
+  if (_statisticsPayloadCache) return _statisticsPayloadCache;
+
   const users = Users_all();
   const assigns = Assignments_all();
   const exercises = Exercises_all();
@@ -194,7 +198,7 @@ function Statistics_buildPayload() {
     };
   });
 
-  return {
+  const payload = {
     mp: mp,
     magad: magad,
     teams: teams.map(function(t) { return { id: t.id, name: t.name }; }),
@@ -205,4 +209,6 @@ function Statistics_buildPayload() {
     assignmentsLite: assignmentsLite,
     avgExercisesPerTrainee: avgExercisesPerTrainee
   };
+  _statisticsPayloadCache = payload;
+  return payload;
 }

@@ -77,17 +77,19 @@ function _exerciseMatrixIsMpRole(resp) {
   return /^מפ /.test(r) || /^סמפ /.test(r) || r.indexOf('חונך מפ') === 0 || r.indexOf('חנוך מפ') === 0;
 }
 
-function _exerciseMatrixLocation(ex) {
+function _exerciseMatrixLocation(ex, details) {
   if (!ex) return '';
-  const details = Exercises_details(ex.id);
-  for (let i = 0; i < details.length; i++) {
-    if (details[i].location) return details[i].location;
+  const dlist = details || Exercises_details(ex.id);
+  for (let i = 0; i < dlist.length; i++) {
+    if (dlist[i].location) return dlist[i].location;
   }
   return ex.camp || ex.partner_battalion || '';
 }
 
 function _exerciseMatrixBuildPayload() {
   const tiers = _exerciseMatrixRoleTiers();
+  const detailsByEx = Exercises_detailsIndex();
+  const usersById = Users_byIdMap();
   const exList = Exercises_all().slice().sort(function(a, b) {
     return String(a.rawStartDate || a.id).localeCompare(String(b.rawStartDate || b.id));
   });
@@ -99,7 +101,7 @@ function _exerciseMatrixBuildPayload() {
   exList.forEach(function(ex) {
     exIds.push(ex.id);
     const meta = _teamMatrixExerciseMeta(ex);
-    meta.location = _exerciseMatrixLocation(ex);
+    meta.location = _exerciseMatrixLocation(ex, detailsByEx[ex.id]);
     meta.label = String(ex.title || ex.id || '').trim();
     exMeta[ex.id] = meta;
     exercises.push({ id: ex.id, label: meta.label });
@@ -114,7 +116,7 @@ function _exerciseMatrixBuildPayload() {
     if (!resp || exIds.indexOf(a.exercise_id) === -1) return;
     if (_exerciseMatrixExcludedRoles().indexOf(resp) !== -1) return;
 
-    const u = Users_get(a.user_id);
+    const u = usersById[a.user_id];
     const key = a.exercise_id + '\x1f' + resp;
     cells[key] = {
       assignmentId: a.id,
