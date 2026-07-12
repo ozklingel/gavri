@@ -221,6 +221,105 @@ function _timelineRenderBlockBar(block, weekStartMs, weekEndMs, layout, rowTopPx
     'style="' + style + '" title="' + _timelineAttrEsc(block.label) + '">' + _esc(block.label) + '</div>';
 }
 
+function _timelineProcedureShortLabel(desc) {
+  const s = String(desc || '').trim();
+  if (!s) return 'נוה"ק';
+  const m = s.match(/^\[[^\]]+\]\s*(.+?)(?:\s*\||$)/);
+  if (m) return m[1].trim().slice(0, 48);
+  return s.slice(0, 48);
+}
+
+function _timelineParseDetailTimeRange(rawTime) {
+  if (rawTime == null || rawTime === '') return null;
+  let s = String(rawTime).trim();
+  if (!s) return null;
+  s = s.replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+  let startMs;
+  let endMs;
+  const emDash = s.indexOf(' — ');
+  const hyphen = s.indexOf(' - ');
+  if (emDash !== -1) {
+    startMs = _exerciseDetailSortMs(s.slice(0, emDash).trim());
+    endMs = _exerciseDetailSortMs(s.slice(emDash + 3).trim());
+  } else if (hyphen !== -1) {
+    startMs = _exerciseDetailSortMs(s.slice(0, hyphen).trim());
+    endMs = _exerciseDetailSortMs(s.slice(hyphen + 3).trim());
+  } else {
+    startMs = _exerciseDetailSortMs(s);
+    endMs = startMs;
+  }
+
+  if (isNaN(startMs) || startMs >= Number.MAX_SAFE_INTEGER - 2) return null;
+  if (isNaN(endMs) || endMs >= Number.MAX_SAFE_INTEGER - 2) endMs = startMs;
+  if (endMs <= startMs) endMs = startMs + 20 * 60 * 1000;
+  return { startMs: startMs, endMs: endMs };
+}
+
+function _timelineProcedureEventsForWeek(weekItems, weekStartMs, weekEndMs) {
+  const allDetails = _rows('ExerciseDetails').data;
+  const byExId = {};
+  allDetails.forEach(function(r) {
+    const exId = String(r[1]);
+    if (!byExId[exId]) byExId[exId] = [];
+    byExId[exId].push({
+      rawTime: r[2],
+      location: String(r[3] || ''),
+      description: String(r[4] || '')
+    });
+  });
+
+  const events = [];
+  weekItems.forEach(function(item) {
+    const details = byExId[String(item.ex.id)] || [];
+    details.forEach(function(d) {
+      const range = _timelineParseDetailTimeRange(d.rawTime);
+      if (!range) return;
+      if (range.startMs >= weekEndMs || range.endMs <= weekStartMs) return;
+      events.push({
+        exerciseId: String(item.ex.id),
+        exerciseTitle: item.ex.title,
+        item: item,
+        startMs: range.startMs,
+        endMs: range.endMs,
+        location: d.location,
+        description: d.description,
+        label: _timelineProcedureShortLabel(d.description)
+      });
+    });
+  });
+  return events;
+}
+
+function _timelineRenderProcedureBar(ev, weekStartMs, weekEndMs, rowTopPx) {
+  const DAY_MS = 86400000;
+  const item = ev.item;
+  const band = item.band;
+  if (!band) return '';
+
+  const visStart = Math.max(ev.startMs, weekStartMs);
+  const visEnd = Math.min(ev.endMs, weekEndMs);
+  const startPct = ((visStart - weekStartMs) / (7 * DAY_MS)) * 100;
+  const widthPct = Math.max(((visEnd - visStart) / (7 * DAY_MS)) * 100, 0.35);
+
+  const barH = band.subBarH - 8;
+  const procH = Math.min(12, Math.max(8, barH - 6));
+  const topPx = rowTopPx + band.top + (item.subLane || 0) * band.subBarH + 4 + barH - procH - 2;
+  const tip = ev.label +
+    (ev.location ? ' · ' + ev.location : '') +
+    (ev.description ? ' — ' + ev.description : '');
+
+  const style =
+    'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;width:' + widthPct + '%;' +
+    'height:' + procH + 'px;min-width:4px;box-sizing:border-box;' +
+    'z-index:' + (22 + (item.baseLane || 0) * 3 + (item.subLane || 0)) + ';';
+
+  return '<div class="tl-procedure-bar" data-exercise-id="' + _timelineAttrEsc(ev.exerciseId) + '" ' +
+    'title="' + _timelineAttrEsc(tip) + '" style="' + style + '">' +
+    (widthPct > 2.5 ? '<span class="tl-procedure-label">' + _esc(ev.label) + '</span>' : '') +
+    '</div>';
+}
+
 function _timelineParseExercise(ex) {
   const range = _exerciseTimeRange(ex);
   if (!range) return null;
@@ -593,6 +692,8 @@ function Views_timeline(p) {
   }
   s += '</select>';
 
+  s += '<button type="button" id="timelineProcedureToggle" class="btn btn-ghost btn-sm">📋 הצג נוה"ק</button>';
+
   if (canEdit) {
     s += '<button type="button" id="timelineEditToggle" class="btn btn-ghost btn-sm">✏ מצב עריכה</button>';
   }
@@ -743,6 +844,8 @@ function Views_timeline(p) {
     s += _timelineRenderBlockBar(block, weekStartMs, weekEndMs, layout, rowTopPx);
   });
 
+  const procedureEvents = _timelineProcedureEventsForWeek(weekItems, weekStartMs, weekEndMs);
+
   weekItems.forEach(function(item, idx) {
     const startPct = ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
     const widthPct = ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
@@ -785,6 +888,10 @@ function Views_timeline(p) {
         '<span class="tl-bar-label" title="' + _timelineAttrEsc(barTitle) + '">' +
         _esc(item.ex.title) + '</span></a>';
     }
+  });
+
+  procedureEvents.forEach(function(ev) {
+    s += _timelineRenderProcedureBar(ev, weekStartMs, weekEndMs, rowTopPx);
   });
 
   s += '</div></div>';

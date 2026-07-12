@@ -1655,6 +1655,7 @@ body {
       box-shadow: 0 0 0 2px var(--green), 0 4px 12px rgba(30, 60, 40, 0.15);
     }
     .timeline-track.edit-mode .tl-bar-label { pointer-events: none; user-select: none; }
+    .timeline-track.edit-mode .tl-procedure-bar { pointer-events: none; }
     #timelineEditToggle.active {
       border-color: var(--green);
       color: var(--green);
@@ -1862,6 +1863,35 @@ body {
     }
     .timeline-track .tl-slot-bar {
       pointer-events: none;
+    }
+    .timeline-track:not(.show-procedures) .tl-procedure-bar {
+      display: none;
+    }
+    .timeline-track .tl-procedure-bar {
+      background: rgba(245, 158, 11, 0.55);
+      border: 1px solid #d97706;
+      border-radius: 4px;
+      overflow: hidden;
+      pointer-events: auto;
+      cursor: help;
+      box-shadow: 0 1px 3px rgba(120, 53, 15, 0.2);
+    }
+    .timeline-track .tl-procedure-label {
+      display: block;
+      font-size: 8px;
+      font-weight: 700;
+      line-height: 1.1;
+      padding: 0 3px;
+      color: #78350f;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+    #timelineProcedureToggle.active {
+      border-color: #d97706;
+      color: #b45309;
+      background: rgba(245, 158, 11, 0.12);
     }
     @media (max-width: 900px) {
       .timeline-page-row {
@@ -2189,7 +2219,8 @@ body {
       -webkit-backdrop-filter: blur(8px);
     }
     .timeline-track .tl-bar,
-    .timeline-track .tl-slot-bar {
+    .timeline-track .tl-slot-bar,
+    .timeline-track .tl-procedure-bar {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
@@ -3372,8 +3403,33 @@ body {
     });
   }
 
+  function initTimelineProcedureToggle() {
+    var track = document.getElementById('timelineTrack');
+    var btn = document.getElementById('timelineProcedureToggle');
+    if (!track || !btn || btn._bound) return;
+    btn._bound = true;
+    var KEY = 'mapim_timeline_show_procedures';
+
+    function apply(on) {
+      track.classList.toggle('show-procedures', on);
+      btn.classList.toggle('active', on);
+      btn.textContent = on ? '📋 הסתר נוה"ק' : '📋 הצג נוה"ק';
+    }
+
+    var on = false;
+    try { on = localStorage.getItem(KEY) === '1'; } catch (e) { /* ignore */ }
+    apply(on);
+
+    btn.addEventListener('click', function() {
+      on = !track.classList.contains('show-procedures');
+      apply(on);
+      try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) { /* ignore */ }
+    });
+  }
+
   function initTimelineWeek() {
     initTimelineToolsPanel();
+    initTimelineProcedureToggle();
 
     var weekSel = document.getElementById('timelineWeekSelect');
     if (weekSel && !weekSel._bound) {
