@@ -598,9 +598,6 @@ body {
       border-bottom: 1px solid var(--border);
       background: rgba(74, 222, 128, 0.04);
     }
-    .proc-add-panel[hidden] {
-      display: none;
-    }
     .proc-tbl .proc-edit-row[hidden] {
       display: none;
     }
@@ -3583,12 +3580,11 @@ body {
     var panel = document.getElementById('proc-add-panel');
     if (toggle && panel) {
       toggle.addEventListener('click', function() {
-        var open = panel.hidden;
-        panel.hidden = !open;
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        toggle.textContent = open ? '➕ הוסף אירוע' : '▾ הסתר הוספה';
-        if (open && typeof initDatePickers === 'function') initDatePickers();
-        if (open && typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+        setTimeout(function() {
+          if (!panel.classList.contains('open')) return;
+          if (typeof initDatePickers === 'function') initDatePickers();
+          if (typeof initTimeHalfInputs === 'function') initTimeHalfInputs();
+        }, 0);
       });
     }
 
@@ -3631,20 +3627,27 @@ body {
         }
         var origDate = form.getAttribute('data-orig-start-date') || '';
         var origTime = form.getAttribute('data-orig-start-time') || '';
+        var origEndDate = form.getAttribute('data-orig-end-date') || '';
+        var origEndTime = form.getAttribute('data-orig-end-time') || '';
         var procCount = parseInt(form.getAttribute('data-procedure-count') || '0', 10);
         var fd = new FormData(form);
         var newDate = String(fd.get('start_date') || '').trim();
         var newTime = String(fd.get('start_time') || '').trim();
-        var timeChanged = origDate !== newDate || origTime !== newTime;
-        if (!timeChanged || procCount <= 0) return;
+        var newEndDate = String(fd.get('end_date') || '').trim();
+        var newEndTime = String(fd.get('end_time') || '').trim();
+        var startChanged = origDate !== newDate || origTime !== newTime;
+        var endChanged = origEndDate !== newEndDate || origEndTime !== newEndTime;
+        if ((!startChanged && !endChanged) || procCount <= 0) return;
 
         e.preventDefault();
         e.stopImmediatePropagation();
         var yes = confirm(
-          'שינית את זמן התחלת התרגיל.\n\nלעדכן את לוז נוהל הקרב בהתאם (הזזת כל האירועים באותו הפרש)?'
+          'שינית את זמני התרגיל.\n\nלעדכן את לוז נוהל הקרב בהתאם (הזזת כל האירועים באותו הפרש)?'
         );
         var inp = form.querySelector('input[name="shift_procedure"]');
+        var anchorInp = form.querySelector('input[name="shift_anchor"]');
         if (inp) inp.value = yes ? '1' : '';
+        if (anchorInp) anchorInp.value = yes ? (startChanged ? 'start' : 'end') : '';
         form._shiftConfirmed = true;
         if (typeof form.requestSubmit === 'function') form.requestSubmit();
         else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -4198,11 +4201,14 @@ body {
       var e = msToParts(endMs);
       var procCount = parseInt(bar.getAttribute('data-procedure-count') || '0', 10);
       var startChanged = startMs !== origStart;
+      var endChanged = endMs !== origEnd;
       var shiftProcedure = false;
-      if (startChanged && procCount > 0) {
+      var shiftAnchor = 'start';
+      if ((startChanged || endChanged) && procCount > 0) {
         shiftProcedure = confirm(
-          'שינית את זמן התחלת התרגיל.\n\nלעדכן את לוז נוהל הקרב בהתאם (הזזת כל האירועים באותו הפרש)?'
+          'שינית את זמני התרגיל.\n\nלעדכן את לוז נוהל הקרב בהתאם (הזזת כל האירועים באותו הפרש)?'
         );
+        shiftAnchor = startChanged ? 'start' : 'end';
       }
 
       bar.classList.add('tl-saving');
@@ -4226,7 +4232,8 @@ body {
           exerciseId,
           s.date, s.time, e.date, e.time,
           track.dataset.weekOffset || '0',
-          shiftProcedure
+          shiftProcedure,
+          shiftAnchor
         );
     }
 

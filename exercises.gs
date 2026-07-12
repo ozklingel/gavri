@@ -215,9 +215,23 @@ function Exercises_shiftAllDetails(exerciseId, deltaMs) {
   return count;
 }
 
-function Exercises_shiftDetailsByStartDelta(exerciseId, oldEx, newStartDate, newStartTime) {
-  const oldMs = Exercise_msFromYmdHm(oldEx.rawStartDate, oldEx.rawStartTime || '00:00');
-  const newMs = Exercise_msFromYmdHm(newStartDate, newStartTime || '00:00');
+function Exercises_shiftDetailsForScheduleChange(exerciseId, oldEx, p) {
+  const anchor = String(p.shift_anchor || 'start').trim() === 'end' ? 'end' : 'start';
+  let oldMs;
+  let newMs;
+  if (anchor === 'end') {
+    oldMs = Exercise_msFromYmdHm(oldEx.rawEndDate || oldEx.rawStartDate, oldEx.rawEndTime || '23:59');
+    newMs = Exercise_msFromYmdHm(
+      String(p.end_date || oldEx.rawEndDate || oldEx.rawStartDate || '').trim(),
+      String(p.end_time != null ? p.end_time : oldEx.rawEndTime || '23:59').trim()
+    );
+  } else {
+    oldMs = Exercise_msFromYmdHm(oldEx.rawStartDate, oldEx.rawStartTime || '00:00');
+    newMs = Exercise_msFromYmdHm(
+      String(p.start_date || '').trim(),
+      String(p.start_time != null ? p.start_time : '').trim()
+    );
+  }
   if (isNaN(oldMs) || isNaN(newMs)) return 0;
   const deltaMs = newMs - oldMs;
   if (!deltaMs) return 0;
@@ -690,9 +704,7 @@ function Exercises_edit(p) {
 
   let info = 'התרגיל עודכן בהצלחה.';
   if (_parseBool(p.shift_procedure) && ex) {
-    const shifted = Exercises_shiftDetailsByStartDelta(
-      p.id, ex, String(p.start_date || '').trim(), String(p.start_time || '').trim()
-    );
+    const shifted = Exercises_shiftDetailsForScheduleChange(p.id, ex, p);
     if (shifted) info += ' לוז נוה"ק עודכן (' + shifted + ' רשומות).';
   }
 
@@ -724,9 +736,7 @@ function Exercises_updateTimes(p) {
 
   let shiftInfo = '';
   if (_parseBool(p.shift_procedure) && ex) {
-    const shifted = Exercises_shiftDetailsByStartDelta(
-      id, ex, String(p.start_date || '').trim(), String(p.start_time || '').trim()
-    );
+    const shifted = Exercises_shiftDetailsForScheduleChange(id, ex, p);
     if (shifted) shiftInfo = ' לוז נוה"ק עודכן (' + shifted + ' רשומות).';
   }
 

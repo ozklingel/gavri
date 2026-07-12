@@ -11,7 +11,7 @@ function apiRenderPage(sid, page, paramsJson) {
 }
 
 // Direct update for participant row save (explicit params — reliable in HtmlService iframe)
-function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, endTime, week, shiftProcedure) {
+function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, endTime, week, shiftProcedure, shiftAnchor) {
   const p = {
     sid: String(sid || '').trim(),
     id: String(exerciseId || '').trim(),
@@ -21,6 +21,7 @@ function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, 
     end_time: endTime == null ? '' : String(endTime),
     week: week == null ? '0' : String(week),
     shift_procedure: shiftProcedure ? '1' : '',
+    shift_anchor: shiftAnchor === 'end' ? 'end' : 'start',
     timelineInline: true
   };
   try {

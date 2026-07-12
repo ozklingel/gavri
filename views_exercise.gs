@@ -104,12 +104,14 @@ s += _confirmDelete(
     const genAction = 'action=generateTimeline&id=' + encodeURIComponent(ex.id) +
       '&exerciseId=' + encodeURIComponent(ex.id) + (details.length ? '&replace=true' : '');
     tlHtml += _confirmAction(genAction, '📅 צור תבנית נוה"ק', genMsg, 'btn btn-secondary btn-sm');
-    tlHtml += '<button type="button" class="btn btn-ghost btn-sm" id="proc-add-toggle" aria-expanded="true">➕ הוסף אירוע</button>';
   }
   tlHtml += '</div>';
 
   if (Roles_hasAdminAccess(user.role)) {
-    tlHtml += '<div id="proc-add-panel" class="proc-add-panel">' +
+    tlHtml += '<button type="button" class="collapsible-toggle" id="proc-add-toggle" ' +
+      'style="margin:0;border-radius:0;border-left:none;border-right:none;border-top:none">' +
+      '<span>➕ הוסף אירוע לנוה"ק</span><span class="arrow">▾</span></button>' +
+      '<div class="collapsible-content proc-add-panel" id="proc-add-panel">' +
       '<div class="card-body" style="padding:10px 14px">' +
       _formOpen('proc-add-form') +
       '<input type="hidden" name="action" value="addDetail">' +
@@ -145,11 +147,11 @@ s += _confirmDelete(
         '<td>' + _esc(d.location) + '</td>' +
         '<td>' + _esc(d.description) + '</td>';
       if (showActions) {
-        tlHtml += '<td style="white-space:nowrap;display:flex;gap:4px">' +
-          '<button type="button" class="btn btn-ghost btn-sm proc-edit-btn" data-detail-id="' + _esc(d.id) + '" title="עריכה">✏️</button>' +
-          '<a href="#" class="btn btn-danger btn-sm btn-icon" data-spa-action="deleteDetail"' +
+        tlHtml += '<td class="actions">' +
+          '<button type="button" class="btn btn-ghost btn-sm proc-edit-btn" data-detail-id="' + _esc(d.id) + '">ערוך</button>' +
+          '<a href="#" class="btn btn-danger btn-sm" data-spa-action="deleteDetail"' +
           _spaParamsAttr({ sid: sid, detailId: d.id, exerciseId: ex.id }) +
-          ' data-confirm="למחוק את «' + _esc(shortDesc) + '» מנוהל הקרב?" onclick="return confirmDelete(this)" title="מחיקה">✕</a>' +
+          ' data-confirm="למחוק את «' + _esc(shortDesc) + '» מנוהל הקרב?" onclick="return confirmDelete(this)">מחק</a>' +
           '</td>';
       }
       tlHtml += '</tr>';
@@ -449,11 +451,14 @@ function _exerciseEditPanelHtml(p) {
   return '<div class="card"><div class="card-body">' +
     '<form class="spa-form exercise-edit-form" data-orig-start-date="' + _esc(ex.rawStartDate || '') + '"' +
     ' data-orig-start-time="' + _esc(ex.rawStartTime || '') + '"' +
+    ' data-orig-end-date="' + _esc(ex.rawEndDate || '') + '"' +
+    ' data-orig-end-time="' + _esc(ex.rawEndTime || '') + '"' +
     ' data-procedure-count="' + procCount + '">' +
     '<input type="hidden" name="action" value="editExercise">' +
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
     '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
     '<input type="hidden" name="shift_procedure" value="">' +
+    '<input type="hidden" name="shift_anchor" value="">' +
     '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', '', ex.title, 'text', 'required') + '</div>' +
     '<div class="form-row"><label class="form-label">תיאור</label>' + _input('description', '', ex.description) + '</div>' +
     '<div class="form-grid">' +
