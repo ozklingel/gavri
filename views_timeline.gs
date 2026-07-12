@@ -511,22 +511,11 @@ function _timelineParseDetailTimeRange(rawTime) {
   return { startMs: startMs, endMs: endMs };
 }
 
-function _timelineProcedureEventsForWeek(weekItems, weekStartMs, weekEndMs) {
-  const allDetails = _rows('ExerciseDetails').data;
-  const byExId = {};
-  allDetails.forEach(function(r) {
-    const exId = String(r[1]);
-    if (!byExId[exId]) byExId[exId] = [];
-    byExId[exId].push({
-      rawTime: r[2],
-      location: String(r[3] || ''),
-      description: String(r[4] || '')
-    });
-  });
-
+function _timelineProcedureEventsForWeek(weekItems, weekStartMs, weekEndMs, detailsIndex) {
+  detailsIndex = detailsIndex || (typeof Exercises_detailsIndex === 'function' ? Exercises_detailsIndex() : {});
   const events = [];
   weekItems.forEach(function(item) {
-    const details = byExId[String(item.ex.id)] || [];
+    const details = detailsIndex[String(item.ex.id)] || [];
     details.forEach(function(d) {
       const range = _timelineParseDetailTimeRange(d.rawTime);
       if (!range) return;
@@ -649,8 +638,10 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
 
 var TIMELINE_TYPE_ORDER = ['חיר', 'חשן', '900', 'אחר'];
 
-function _timelineBandOrder() {
-  const bn = typeof Series_getBattalionConfig === 'function' ? Series_getBattalionConfig() : null;
+function _timelineBandOrder(battalionConfig) {
+  const bn = battalionConfig != null
+    ? battalionConfig
+    : (typeof Series_getBattalionConfig === 'function' ? Series_getBattalionConfig() : null);
   if (bn && bn.length) {
     return bn.map(function(b) {
       return {
@@ -702,12 +693,13 @@ function _timelineRangesOverlap(a, b) {
 }
 
 /** Assign band (גדוד או סוג כוח) + sub-lane when exercises overlap in time. */
-function _timelineAssignStackedLanes(items) {
+function _timelineAssignStackedLanes(items, battalionConfig) {
   const SUB_BAR_H = 46;
   const MIN_BAND_H = 58;
-  const battalionConfig = typeof Series_getBattalionConfig === 'function'
-    ? Series_getBattalionConfig() : null;
-  const bandOrder = _timelineBandOrder();
+  if (battalionConfig == null && typeof Series_getBattalionConfig === 'function') {
+    battalionConfig = Series_getBattalionConfig();
+  }
+  const bandOrder = _timelineBandOrder(battalionConfig);
   const bandByKey = {};
   const byBand = {};
 
@@ -792,6 +784,84 @@ function _timelineAssignStackedLanes(items) {
   };
 }
 
+var _timelineWeekSelectLabels = null;
+
+function _timelineWeekSelectOptionsHtml(selectedOffset) {
+  if (!_timelineWeekSelectLabels) {
+    _timelineWeekSelectLabels = {};
+    for (let w = TIMELINE_WEEK_MIN; w <= TIMELINE_WEEK_MAX; w++) {
+      const bounds = _timelineWeekBounds(w);
+      _timelineWeekSelectLabels[w] = _esc(_timelineWeekLabel(w) + ' · ' + _isoWeekLabel(bounds.weekStartYmd));
+    }
+  }
+  let html = '';
+  for (let w = TIMELINE_WEEK_MIN; w <= TIMELINE_WEEK_MAX; w++) {
+    html += '<option value="' + w + '"' + (w === selectedOffset ? ' selected' : '') + '>' +
+      _timelineWeekSelectLabels[w] + '</option>';
+  }
+  return html;
+}
+
+function _timelineExercisesForUser(user) {
+  let exercises = Exercises_all();
+
+  if (Roles_isCompanyCommander(user.role)) {
+    const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
+    const teamExerciseIds = {};
+    traineeIds.forEach(function(tid) {
+      (Assignments_byUser(tid) || []).forEach(function(a) {
+        teamExerciseIds[a.exercise_id] = true;
+      });
+    });
+    exercises = exercises.filter(function(ex) {
+      return !!teamExerciseIds[ex.id];
+    });
+  } else if (Roles_isTutor(user.role)) {
+    const tutoredExIds = {};
+    Assignments_byTutor(user.id).forEach(function(a) {
+      tutoredExIds[a.exercise_id] = true;
+    });
+    exercises = exercises.filter(function(ex) {
+      return !!tutoredExIds[ex.id];
+    });
+  } else if (Roles_isTrainee(user.role)) {
+    const myExIds = Assignments_byUser(user.id).map(function(a) { return a.exercise_id; });
+    exercises = exercises.filter(function(ex) {
+      return myExIds.indexOf(ex.id) !== -1;
+    });
+  }
+
+  return exercises;
+}
+
+function _timelineRoughOverlapsView(ex, viewStartMs, viewEndMs) {
+  const startYmd = ex.rawStartDate || ex.rawDate || '';
+  if (!startYmd) return true;
+  let startMs = _parseRawDate(startYmd);
+  if (isNaN(startMs)) return true;
+  const endYmd = ex.rawEndDate || startYmd;
+  let endMs = _parseRawDate(endYmd);
+  if (isNaN(endMs)) endMs = startMs;
+  endMs += 86400000;
+  return startMs < viewEndMs && endMs > viewStartMs;
+}
+
+function _timelineItemsInView(exercises, viewStartMs, viewEndMs) {
+  const items = [];
+  let unparsed = 0;
+  exercises.forEach(function(ex) {
+    if (!_timelineRoughOverlapsView(ex, viewStartMs, viewEndMs)) return;
+    const range = _exerciseTimeRange(ex);
+    if (!range) {
+      unparsed++;
+      return;
+    }
+    if (range.startMs >= viewEndMs || range.endMs <= viewStartMs) return;
+    items.push({ ex: ex, startMs: range.startMs, endMs: range.endMs });
+  });
+  return { items: items, unparsedCount: unparsed };
+}
+
 function Views_timeline(p) {
 
   const user = Auth_current(p);
@@ -802,53 +872,6 @@ function Views_timeline(p) {
  
   const sid  = user.id;
   const sidQ = encodeURIComponent(sid);
-
-  let exercises = Exercises_all();
-
-  // ─────────────────────────────────────
-  // Permissions
-  // ─────────────────────────────────────
-
-  if (Roles_isCompanyCommander(user.role)) {
-
-    const traineeIds = Users_traineesOfCommander(user.id).map(function(t) {
-      return t.id;
-    });
-    const teamExerciseIds = {};
-    (Assignments_all ? Assignments_all() : []).forEach(function(a) {
-      if (traineeIds.indexOf(a.user_id) !== -1) {
-        teamExerciseIds[a.exercise_id] = true;
-      }
-    });
-    exercises = exercises.filter(function(ex) {
-      return !!teamExerciseIds[ex.id];
-    });
-
-  } else if (Roles_isTutor(user.role)) {
-
-    const tutoredExIds = {};
-    (Assignments_byTutor ? Assignments_byTutor(user.id) : []).forEach(function(a) {
-      tutoredExIds[a.exercise_id] = true;
-    });
-
-    exercises = exercises.filter(function(ex) {
-      return !!tutoredExIds[ex.id];
-    });
-
-  } else if (Roles_isTrainee(user.role)) {
-
-    const myAssigns =
-      Assignments_byUser
-      ? Assignments_byUser(user.id)
-      : [];
-
-    const myExIds =
-      myAssigns.map(a => a.exercise_id);
-
-    exercises = exercises.filter(ex =>
-      myExIds.indexOf(ex.id) !== -1
-    );
-  }
 
   const weekOffset = _timelineWeekOffset(p);
   const canEdit = Roles_hasAdminAccess(user.role);
@@ -862,20 +885,21 @@ function Views_timeline(p) {
   const viewSpanMs = viewEndMs - viewStartMs;
   const weekStartMs = view.weekStartMs;
   const weekEndMs = view.weekEndMs;
+
+  const exercises = _timelineExercisesForUser(user);
+  const battalionConfig = typeof Series_getBattalionConfig === 'function' ? Series_getBattalionConfig() : null;
+  const detailsIndex = typeof Exercises_detailsIndex === 'function' ? Exercises_detailsIndex() : {};
+  const viewPack = _timelineItemsInView(exercises, viewStartMs, viewEndMs);
+  const viewItems = viewPack.items;
+  const unparsedCount = viewPack.unparsedCount;
+
   const displayedIsoWeek = _isoWeekLabel(_timelineWeekBounds(weekOffset).weekStartYmd);
   const navLabels = _timelineNavLabels(rangeMode);
   const navPrev = _timelineNavStep(weekOffset, rangeMode, view.pos, -1);
   const navNext = _timelineNavStep(weekOffset, rangeMode, view.pos, 1);
   const jumpParams = _timelineSpaParams(0, rangeMode, null);
 
-  const parsed = exercises.map(_timelineParseExercise).filter(Boolean);
-  const unparsedCount = exercises.length - parsed.length;
-
-  const viewItems = parsed.filter(function(item) {
-    return item.startMs < viewEndMs && item.endMs > viewStartMs;
-  });
-
-  const layout = _timelineAssignStackedLanes(viewItems);
+  const layout = _timelineAssignStackedLanes(viewItems, battalionConfig);
   viewItems.sort(function(a, b) {
     if (a.baseLane !== b.baseLane) return a.baseLane - b.baseLane;
     if ((a.subLane || 0) !== (b.subLane || 0)) return (a.subLane || 0) - (b.subLane || 0);
@@ -948,11 +972,7 @@ function Views_timeline(p) {
   }
 
   s += '<select id="timelineWeekSelect" class="form-select" style="width:auto;min-width:200px;font-size:12px">';
-  for (let w = TIMELINE_WEEK_MIN; w <= TIMELINE_WEEK_MAX; w++) {
-    const wIso = _isoWeekLabel(_timelineWeekBounds(w).weekStartYmd);
-    s += '<option value="' + w + '"' + (w === weekOffset ? ' selected' : '') + '>' +
-      _esc(_timelineWeekLabel(w) + ' · ' + wIso) + '</option>';
-  }
+  s += _timelineWeekSelectOptionsHtml(weekOffset);
   s += '</select>';
 
   s += '<button type="button" id="timelineProcedureToggle" class="btn btn-ghost btn-sm">📋 הצג נוה"ק</button>';
@@ -1103,12 +1123,12 @@ function Views_timeline(p) {
     s += _timelineRenderBlockBar(block, viewStartMs, viewSpanMs, layout, rowTopPx);
   });
 
-  const procedureEvents = _timelineProcedureEventsForWeek(viewItems, viewStartMs, viewEndMs);
+  const procedureEvents = _timelineProcedureEventsForWeek(viewItems, viewStartMs, viewEndMs, detailsIndex);
 
   const procCountByEx = {};
-  _rows('ExerciseDetails').data.forEach(function(r) {
-    const exId = String(r[1]);
-    procCountByEx[exId] = (procCountByEx[exId] || 0) + 1;
+  viewItems.forEach(function(item) {
+    const exId = String(item.ex.id);
+    procCountByEx[exId] = (detailsIndex[exId] || []).length;
   });
 
   viewItems.forEach(function(item, idx) {

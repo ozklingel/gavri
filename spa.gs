@@ -129,7 +129,7 @@ function _cacheWarmForPage(page, p) {
     return;
   }
   if (pg === 'timeline') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces']);
+    _cacheWarmTimelineSheets();
     return;
   }
   if (pg === 'exercises') {

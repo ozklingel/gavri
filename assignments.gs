@@ -28,6 +28,42 @@ function Assignments_all() {
   }));
 }
 
+var _assignmentsByUserId = null;
+var _assignmentsByExerciseId = null;
+var _assignmentsByTutorId = null;
+
+function _assignmentsClearDerived() {
+  _assignmentsByUserId = null;
+  _assignmentsByExerciseId = null;
+  _assignmentsByTutorId = null;
+}
+
+function _assignmentsEnsureIndex() {
+  if (!_rowsCache['Assignments']) _assignmentsClearDerived();
+  if (_assignmentsByUserId) return;
+  _assignmentsByUserId = {};
+  _assignmentsByExerciseId = {};
+  _assignmentsByTutorId = {};
+  Assignments_all().forEach(function(a) {
+    const uid = String(a.user_id);
+    const eid = String(a.exercise_id);
+    const tid = String(a.tutor || '');
+    if (!_assignmentsByUserId[uid]) _assignmentsByUserId[uid] = [];
+    _assignmentsByUserId[uid].push(a);
+    if (!_assignmentsByExerciseId[eid]) _assignmentsByExerciseId[eid] = [];
+    _assignmentsByExerciseId[eid].push(a);
+    if (tid) {
+      if (!_assignmentsByTutorId[tid]) _assignmentsByTutorId[tid] = [];
+      _assignmentsByTutorId[tid].push(a);
+    }
+  });
+}
+
+function _assignmentsInvalidate() {
+  _assignmentsInvalidate();
+  _assignmentsClearDerived();
+}
+
 function Assignments_get(id) {
   return Assignments_all().find(function(a) { return a.id === String(id); }) || null;
 }
@@ -73,17 +109,21 @@ function Assignments_canEditScore(user, assignment) {
 }
 
 function Assignments_byTutor(tutorId) {
-  return Assignments_all().filter(function(a) {
-    return String(a.tutor) === String(tutorId);
-  });
+  _assignmentsEnsureIndex();
+  const list = _assignmentsByTutorId[String(tutorId)];
+  return list ? list.slice() : [];
 }
 
 function Assignments_byUser(userId) {
-  return Assignments_all().filter(a => a.user_id === String(userId));
+  _assignmentsEnsureIndex();
+  const list = _assignmentsByUserId[String(userId)];
+  return list ? list.slice() : [];
 }
 
 function Assignments_byExercise(exerciseId) {
-  return Assignments_all().filter(a => a.exercise_id === String(exerciseId));
+  _assignmentsEnsureIndex();
+  const list = _assignmentsByExerciseId[String(exerciseId)];
+  return list ? list.slice() : [];
 }
 
 // Assign a single user to an exercise (admin only)
@@ -123,7 +163,7 @@ function Assignments_remove(p) {
   const row = _findRowIndex('Assignments', aid);
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
   _sheet('Assignments').deleteRow(row);
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return Views_exercise({ sid: p.sid, id: exId, info: 'המשתתף הוסר מהתרגיל.' });
 }
 
@@ -142,7 +182,7 @@ function Assignments_complete(p) {
   // PERF: batch-write status + score in one call
   const score = p.score || '';
   sh.getRange(row, 4, 1, 2).setValues([['completed', score]]);
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return Views_dashboard({ sid: p.sid, info: 'התרגיל סומן כהושלם.' });
 }
 
@@ -611,7 +651,7 @@ function Assignments_clearAll(p) {
   if (last > 1) {
     sh.deleteRows(2, last - 1);
   }
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return Views_assign({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
 }
 
@@ -635,7 +675,7 @@ function Assignments_update(p) {
       throw new Error('אין הרשאה לעדכן ציון להקצאה זו.');
     }
     sh.getRange(row, 5).setValue(String(p.score != null ? p.score : '').trim());
-    _cacheInvalidate('Assignments');
+    _assignmentsInvalidate();
     return Views_exercise({ sid: p.sid, id: exId || assignment.exercise_id, info: 'הציון נשמר.' });
   }
 
@@ -650,7 +690,7 @@ function Assignments_update(p) {
   sh.getRange(row, 5).setValue(newScore);
   sh.getRange(row, 6).setValue(newResp);
   sh.getRange(row, 8).setValue(newTutor);
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
 
   return Views_exercise({ sid: p.sid, id: exId, info: 'פרטי המשתתף עודכנו בהצלחה.' });
 }
@@ -671,7 +711,7 @@ function Assignments_saveFeedback(p) {
   const row = _findRowIndex('Assignments', aid);
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
   _sheet('Assignments').getRange(row, 7).setValue(String(p.feedback != null ? p.feedback : '').trim());
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
 
   return Views_exercise({
     sid: p.sid,
@@ -716,7 +756,7 @@ function removeAssignmentById(sid, assignId) {
   var row = _findRowIndex('Assignments', assignId);
   if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
   _sheet('Assignments').deleteRow(row);
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return { ok: true };
 }
 
@@ -735,7 +775,7 @@ function moveAssignmentById(sid, assignId, toExId) {
     if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
   });
   sh.getRange(row, 2).setValue(toExId);
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return { ok: true };
 }
 
@@ -757,7 +797,7 @@ function updateAssignmentRespFromBoard(sid, assignId, exerciseId, responsibility
   }
 
   sh.getRange(row, 6).setValue(resp);
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return { ok: true, responsibility: resp };
 }
 
@@ -866,7 +906,7 @@ function assignExerciseMatrixCell(sid, exId, role, userId) {
     _append('Assignments', _assignmentRow(keptId, exId, userId, 'pending', '', role, '', ''));
   }
 
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return _assignmentMatrixCellPayload(Assignments_get(keptId));
 }
 
@@ -888,6 +928,6 @@ function clearExerciseMatrixCell(sid, exId, role) {
     const r = _findRowIndex('Assignments', a.id);
     if (r >= 0) sh.deleteRow(r);
   });
-  _cacheInvalidate('Assignments');
+  _assignmentsInvalidate();
   return { ok: true, cleared: true };
 }

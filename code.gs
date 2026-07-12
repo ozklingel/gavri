@@ -35,6 +35,7 @@ var DB_SHEET_NAMES = [
 // מינימום לעלייה אחרי התחברות — דשבורד, חיפוש, שיבוצים (ללא Credentials / שטחי אש / ציר זמן)
 var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments'];
 var DB_BOOT_SHEETS = DB_SESSION_SHEETS;
+var DB_TIMELINE_SHEETS = ['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces', 'FireZones'];
 var DB_CACHE_TTL_SEC = 600;
 var DB_CACHE_PREFIX = 'mdb:';
 var DB_CACHE_CHUNK = 90000;
@@ -148,6 +149,32 @@ function apiWarmCache(sid) {
   }
   _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
   return { ok: true, sheets: DB_SESSION_SHEETS.length, scope: 'session' };
+}
+
+function _cacheWarmTimelineSheets() {
+  _cacheWarmSheetsIfNeeded(DB_TIMELINE_SHEETS);
+}
+
+/** חימום קאש ברקע לפני ניווט לדף (נקרא מהלקוח אחרי דשבורד / פתיחת תפריט) */
+function apiWarmPageCache(sid, page) {
+  const s = String(sid || '').trim();
+  const pg = String(page || '').trim();
+  if (!s || !pg) return { ok: true, sheets: 0, page: pg };
+  try {
+    Auth_current({ sid: s });
+  } catch (e) {
+    return { ok: true, sheets: 0, page: pg };
+  }
+  if (pg === 'timeline') {
+    _cacheWarmTimelineSheets();
+    return { ok: true, sheets: DB_TIMELINE_SHEETS.length, page: pg };
+  }
+  if (pg === 'assign') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'HomeConstraints']);
+    return { ok: true, sheets: 6, page: pg };
+  }
+  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
+  return { ok: true, sheets: DB_SESSION_SHEETS.length, page: pg };
 }
 
 function _cacheFlush() {

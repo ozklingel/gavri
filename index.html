@@ -2903,6 +2903,31 @@ body {
         safeText + '</a>';
     }
 
+    var warmPageScheduled = {};
+    function scheduleWarmPageCache(page) {
+      page = String(page || '').trim();
+      if (!page || warmPageScheduled[page] || !getSid()) return;
+      warmPageScheduled[page] = true;
+      var run = function() {
+        try {
+          google.script.run.apiWarmPageCache(getSid(), page);
+        } catch (e) {}
+      };
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(run, { timeout: 3500 });
+      } else {
+        setTimeout(run, 1200);
+      }
+    }
+
+    if (!document.body._timelineWarmBound) {
+      document.body._timelineWarmBound = true;
+      document.addEventListener('mouseenter', function(e) {
+        if (!e.target || !e.target.closest) return;
+        if (e.target.closest('[data-spa-page="timeline"]')) scheduleWarmPageCache('timeline');
+      }, true);
+    }
+
     function getSid() {
       try { return sessionStorage.getItem(SID_KEY) || ''; } catch (e) { return ''; }
     }
@@ -2981,6 +3006,7 @@ body {
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
         overlay.hidden = false;
+        scheduleWarmPageCache('timeline');
         requestAnimationFrame(function() {
           overlay.classList.add('open');
         });
@@ -3052,6 +3078,7 @@ body {
       if (result.title) document.title = result.title;
       finishBootUi();
       loading = false;
+      if (currentRoute.page === 'dashboard') scheduleWarmPageCache('timeline');
     }
 
     function fail(err) {

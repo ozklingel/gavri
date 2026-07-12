@@ -136,7 +136,7 @@ function _cacheWarmForModule(moduleId, p) {
     return;
   }
   if (id === 'timeline.main') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces']);
+    _cacheWarmTimelineSheets();
     return;
   }
   if (id === 'exercises.list' || id === 'exercises.sidebar') {
