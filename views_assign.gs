@@ -120,8 +120,6 @@ function _assignMainModuleHtml(user, sid, openSet) {
     '</div>' +
     '</div>' +
     '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">' +
-    _expandablePanel('assign', {}, 'seriesRules', '📅 הסבר — לוגיקת בניית סדרה',
-      Series_rulesExplainHtml(), openSet) +
     _expandablePanel('assign', {}, 'autoAssign', '⚡ הסבר — שיבוץ אוטומטי',
       _autoAssignRulesExplainHtml(), openSet) +
     _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',

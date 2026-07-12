@@ -83,7 +83,7 @@ function SpaModule_render(moduleId, p) {
       return _exercisesListModuleHtml(user, sid);
 
     case 'exercises.sidebar':
-      return _exercisesSidebarModuleHtml(user, sid);
+      return _exercisesSidebarModuleHtml(user, sid, _parseOpenSections(p));
 
     case 'statistics.main':
       return _adminStatisticsContent(sid);

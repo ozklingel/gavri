@@ -629,8 +629,7 @@ function Series_rulesExplainHtml() {
   let s = '<div style="font-size:12px;line-height:1.65">';
   s += '<p class="rules-muted" style="margin:0 0 10px">' +
     'בניית סדרה יוצרת תרגילים אוטומטית לפי שלושה גדודים (מ<a href="#" data-spa-page="fieldForces">כוחות בשטח</a>), ' +
-    'סוג הכוח של כל גדוד ושטחי האש שנבחרו. הפעולה מתבצעת מדף ' +
-    '<a href="#" data-spa-page="exercises">ניהול תרגילים</a>.</p>';
+    'סוג הכוח של כל גדוד ושטחי האש שנבחרו. הטופס נמצא בלשונית <b>תרגיל חדש</b> בדף זה.</p>';
   s += '<p class="rules-warn" style="font-size:12px;margin:0 0 10px;font-weight:600">' +
     '⚠ בניית סדרה מוחקת את כל התרגילים, השיבוצים וצירי הזמן הקיימים במערכת.</p>';
   s += _seriesSchedulingRulesBulletsHtml();

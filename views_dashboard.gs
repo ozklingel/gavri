@@ -3,6 +3,7 @@ function Views_exercises(p) {
   const user = Auth_requireRole(p, ['admin']);
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
+  const openSet = _parseOpenSections(p);
   let tab = String(p.tab || 'list').trim();
   const allowedTabs = ['list', 'calendar', 'new'];
   if (allowedTabs.indexOf(tab) === -1) tab = 'list';
@@ -20,8 +21,13 @@ function Views_exercises(p) {
     s += _exercisesCalendarModuleHtml(user, sid);
   } else {
     s += '<div class="spa-tab-panel" style="margin-top:14px">' +
-      _exercisesSidebarModuleHtml(user, sid) + '</div>';
+      _exercisesSidebarModuleHtml(user, sid, openSet) + '</div>';
   }
+
+  s += '<div class="expandable-stack" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">' +
+    _expandablePanel('exercises', { tab: tab }, 'seriesRules', '📅 הסבר — לוגיקת בניית סדרה',
+      Series_rulesExplainHtml(), openSet) +
+    '</div>';
 
   const body =
     _topbar(user, sid) +
@@ -182,7 +188,8 @@ function _exercisesCalendarModuleHtml(user, sid) {
     }) + '</div>';
 }
 
-function _exercisesSidebarModuleHtml(user, sid) {
+function _exercisesSidebarModuleHtml(user, sid, openSet) {
+  openSet = openSet || {};
   let s = '<div class="card"><div class="card-header"><div class="card-title">➕ תרגיל חדש</div></div>' +
     '<div class="card-body">' +
     _formOpen() +
