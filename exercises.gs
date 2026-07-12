@@ -520,7 +520,13 @@ function Exercises_create(p) {
 
   if (String(p.from || '').trim() === 'timeline') {
     const week = p.week != null ? String(p.week) : '0';
-    return Views_timeline({ sid: p.sid, week: week, info: info });
+    return Views_timeline({
+      sid: p.sid,
+      week: week,
+      range: p.range != null ? String(p.range) : 'week',
+      pos: p.pos != null ? String(p.pos) : undefined,
+      info: info
+    });
   }
 
   return Views_exercise({ sid: p.sid, id: id, info: info });
@@ -596,6 +602,8 @@ function Exercises_updateTimes(p) {
   return Views_timeline({
     sid: p.sid,
     week: week,
+    range: p.range != null ? String(p.range) : 'week',
+    pos: p.pos != null ? String(p.pos) : undefined,
     info: 'זמני התרגיל עודכנו.'
   });
 }

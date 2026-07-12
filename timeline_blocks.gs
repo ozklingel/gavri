@@ -79,6 +79,8 @@ function TimelineBlocks_create(p) {
   return Views_timeline({
     sid: p.sid,
     week: p.week != null ? String(p.week) : '0',
+    range: p.range != null ? String(p.range) : 'week',
+    pos: p.pos != null ? String(p.pos) : undefined,
     info: 'משבצת לוז נוספה ללוח.'
   });
 }
@@ -95,6 +97,8 @@ function TimelineBlocks_delete(p) {
   return Views_timeline({
     sid: p.sid,
     week: p.week != null ? String(p.week) : '0',
+    range: p.range != null ? String(p.range) : 'week',
+    pos: p.pos != null ? String(p.pos) : undefined,
     info: 'משבצת לוז נמחקה.'
   });
 }

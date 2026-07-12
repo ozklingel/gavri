@@ -1,7 +1,9 @@
-// views_timeline.gs — Weekly timeline RTL + week picker + edit mode (admin)
+// views_timeline.gs — Timeline RTL (6h / day / 3d / week) + edit mode (admin)
 
 var TIMELINE_WEEK_MIN = -12;
 var TIMELINE_WEEK_MAX = 12;
+var TIMELINE_6H_MS = 6 * 3600000;
+var TIMELINE_6H_SLOTS_PER_WEEK = 28;
 
 function _timelineWeekOffset(p) {
   let w = parseInt(p && p.week != null ? p.week : 0, 10);
@@ -31,6 +33,243 @@ function _timelineWeekBounds(weekOffset) {
       String(weekStart.getMonth() + 1).padStart(2, '0') + '-' +
       String(weekStart.getDate()).padStart(2, '0')
   };
+}
+
+function _timelineRangeMode(p) {
+  const r = String(p && p.range != null ? p.range : 'week').trim();
+  if (r === '6h' || r === '6') return '6h';
+  if (r === 'day' || r === '1d') return 'day';
+  if (r === '3d' || r === '3') return '3d';
+  return 'week';
+}
+
+function _timelineRangeMeta(mode) {
+  const DAY_MS = 86400000;
+  if (mode === '6h') {
+    return {
+      mode: '6h',
+      label: '6 שעות',
+      spanMs: TIMELINE_6H_MS,
+      dayCount: 1,
+      slotsPerDay: 6,
+      slotMs: 3600000,
+      dayWidth: 480,
+      slotLabels: null
+    };
+  }
+  if (mode === 'day') {
+    return {
+      mode: 'day',
+      label: 'יום',
+      spanMs: DAY_MS,
+      dayCount: 1,
+      slotsPerDay: 6,
+      slotMs: 4 * 3600000,
+      dayWidth: 400,
+      slotLabels: ['00', '04', '08', '12', '16', '20']
+    };
+  }
+  if (mode === '3d') {
+    return {
+      mode: '3d',
+      label: '3 ימים',
+      spanMs: 3 * DAY_MS,
+      dayCount: 3,
+      slotsPerDay: 6,
+      slotMs: 4 * 3600000,
+      dayWidth: 400,
+      slotLabels: ['00', '04', '08', '12', '16', '20']
+    };
+  }
+  return {
+    mode: 'week',
+    label: 'שבוע',
+    spanMs: 7 * DAY_MS,
+    dayCount: 7,
+    slotsPerDay: 6,
+    slotMs: 4 * 3600000,
+    dayWidth: 400,
+    slotLabels: ['00', '04', '08', '12', '16', '20']
+  };
+}
+
+function _timelineDefaultPos(mode, weekOffset, nowMs, weekStartMs) {
+  const DAY_MS = 86400000;
+  if (weekOffset !== 0) {
+    if (mode === '6h') return 0;
+    if (mode === 'day') return 0;
+    if (mode === '3d') return 0;
+    return 0;
+  }
+  const rel = nowMs - weekStartMs;
+  if (mode === '6h') {
+    let pos = Math.floor(rel / TIMELINE_6H_MS);
+    if (pos < 0) pos = 0;
+    if (pos > TIMELINE_6H_SLOTS_PER_WEEK - 1) pos = TIMELINE_6H_SLOTS_PER_WEEK - 1;
+    return pos;
+  }
+  if (mode === 'day') {
+    let pos = Math.floor(rel / DAY_MS);
+    if (pos < 0) pos = 0;
+    if (pos > 6) pos = 6;
+    return pos;
+  }
+  if (mode === '3d') {
+    let pos = Math.floor(rel / DAY_MS);
+    if (pos > 4) pos = 4;
+    if (pos < 0) pos = 0;
+    return pos;
+  }
+  return 0;
+}
+
+function _timelineViewBounds(p, nowMs) {
+  const mode = _timelineRangeMode(p);
+  const meta = _timelineRangeMeta(mode);
+  const weekOffset = _timelineWeekOffset(p);
+  const weekBounds = _timelineWeekBounds(weekOffset);
+  const weekStartMs = weekBounds.weekStartMs;
+  const weekEndMs = weekStartMs + 7 * 86400000;
+  let pos = parseInt(p && p.pos != null ? p.pos : NaN, 10);
+
+  if (mode !== 'week' && isNaN(pos)) {
+    pos = _timelineDefaultPos(mode, weekOffset, nowMs, weekStartMs);
+  }
+  if (mode === 'week') {
+    pos = 0;
+  } else if (mode === '6h') {
+    if (pos < 0) pos = 0;
+    if (pos > TIMELINE_6H_SLOTS_PER_WEEK - 1) pos = TIMELINE_6H_SLOTS_PER_WEEK - 1;
+  } else if (mode === 'day') {
+    if (pos < 0) pos = 0;
+    if (pos > 6) pos = 6;
+  } else if (mode === '3d') {
+    if (pos < 0) pos = 0;
+    if (pos > 4) pos = 4;
+  }
+
+  let viewStartMs = weekStartMs;
+  if (mode === '6h') viewStartMs = weekStartMs + pos * TIMELINE_6H_MS;
+  else if (mode === 'day') viewStartMs = weekStartMs + pos * 86400000;
+  else if (mode === '3d') viewStartMs = weekStartMs + pos * 86400000;
+
+  return {
+    mode: mode,
+    meta: meta,
+    weekOffset: weekOffset,
+    pos: pos,
+    weekStartMs: weekStartMs,
+    weekEndMs: weekEndMs,
+    viewStartMs: viewStartMs,
+    viewEndMs: viewStartMs + meta.spanMs,
+    viewStartYmd: _timelineMsToYmdLocal(viewStartMs)
+  };
+}
+
+function _timelineSpaParams(weekOffset, range, pos, extra) {
+  const o = { week: weekOffset, range: range || 'week' };
+  if (range && range !== 'week' && pos != null && !isNaN(pos)) o.pos = pos;
+  if (extra) {
+    Object.keys(extra).forEach(function(k) { o[k] = extra[k]; });
+  }
+  return o;
+}
+
+function _timelineNavStep(weekOffset, range, pos, delta) {
+  let w = weekOffset;
+  let p = pos || 0;
+  if (range === 'week') {
+    w += delta;
+    if (w < TIMELINE_WEEK_MIN) w = TIMELINE_WEEK_MIN;
+    if (w > TIMELINE_WEEK_MAX) w = TIMELINE_WEEK_MAX;
+    return _timelineSpaParams(w, 'week', 0);
+  }
+  if (range === '6h') {
+    p += delta;
+    if (p < 0) { w--; p = TIMELINE_6H_SLOTS_PER_WEEK - 1; }
+    if (p > TIMELINE_6H_SLOTS_PER_WEEK - 1) { w++; p = 0; }
+    if (w < TIMELINE_WEEK_MIN) { w = TIMELINE_WEEK_MIN; p = 0; }
+    if (w > TIMELINE_WEEK_MAX) { w = TIMELINE_WEEK_MAX; p = TIMELINE_6H_SLOTS_PER_WEEK - 1; }
+    return _timelineSpaParams(w, '6h', p);
+  }
+  if (range === 'day') {
+    p += delta;
+    if (p < 0) { w--; p = 6; }
+    if (p > 6) { w++; p = 0; }
+    if (w < TIMELINE_WEEK_MIN) { w = TIMELINE_WEEK_MIN; p = 0; }
+    if (w > TIMELINE_WEEK_MAX) { w = TIMELINE_WEEK_MAX; p = 6; }
+    return _timelineSpaParams(w, 'day', p);
+  }
+  p += delta;
+  if (p < 0) { w--; p = 4; }
+  if (p > 4) { w++; p = 0; }
+  if (w < TIMELINE_WEEK_MIN) { w = TIMELINE_WEEK_MIN; p = 0; }
+  if (w > TIMELINE_WEEK_MAX) { w = TIMELINE_WEEK_MAX; p = 4; }
+  return _timelineSpaParams(w, '3d', p);
+}
+
+function _timelineNavLabels(range) {
+  if (range === '6h') return { prev: '6ש →', next: '← 6ש' };
+  if (range === 'day') return { prev: 'יום →', next: '← יום' };
+  if (range === '3d') return { prev: '3 ימים →', next: '← 3 ימים' };
+  return { prev: 'שבוע →', next: '← שבוע' };
+}
+
+function _timelineRangeSegHtml(range, weekOffset, pos) {
+  const modes = [
+    { id: '6h', label: '6 שעות' },
+    { id: 'day', label: 'יום' },
+    { id: '3d', label: '3 ימים' },
+    { id: 'week', label: 'שבוע' }
+  ];
+  let html = '<div class="timeline-range-seg" role="group" aria-label="טווח תצוגה">';
+  modes.forEach(function(m) {
+    const active = m.id === range ? ' active' : '';
+    html += '<a href="#" class="timeline-range-btn' + active + '" data-spa-page="timeline"' +
+      _spaParamsAttr(_timelineSpaParams(weekOffset, m.id, m.id === range ? pos : null)) +
+      '>' + m.label + '</a>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function _timelineFormatViewClock(ms) {
+  const d = new Date(ms);
+  return d.getDate() + '/' + (d.getMonth() + 1) + ' · ' +
+    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function _timelineViewTitle(view, displayedIsoWeek) {
+  if (view.mode === 'week') {
+    return _timelineWeekLabel(view.weekOffset) + ' · מוצג: ' + displayedIsoWeek;
+  }
+  if (view.mode === '6h') {
+    return _timelineFormatViewClock(view.viewStartMs) + ' – ' +
+      _timelineFormatViewClock(view.viewEndMs);
+  }
+  const endLabel = new Date(view.viewEndMs - 1);
+  return view.viewStartYmd + ' – ' +
+    endLabel.getDate() + '/' + (endLabel.getMonth() + 1) +
+    ' · ' + view.meta.label;
+}
+
+function _timelineViewHint(range) {
+  if (range === '6h') return 'משבצות של שעה · גלול לצפייה בכל הטווח';
+  if (range === 'day') return 'משבצות של 4 שעות · קו מפריד בין ימים ב-00:00';
+  if (range === '3d') return '3 ימים · משבצות של 4 שעות · קו מפריד בין ימים ב-00:00';
+  return 'גלול ימינה ושמאלה לצפייה בכל השבוע · משבצות של 4 שעות · קו מפריד בין ימים ב-00:00';
+}
+
+function _timelineSlotLabels(meta, viewStartMs) {
+  if (meta.mode === '6h') {
+    const labels = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(viewStartMs + i * meta.slotMs);
+      labels.push(String(d.getHours()).padStart(2, '0'));
+    }
+    return labels;
+  }
+  return meta.slotLabels;
 }
 
 function _timelineFieldForcesTabHtml() {
@@ -74,8 +313,11 @@ function _timelineFieldForcesTabHtml() {
     list + '</div>';
 }
 
-function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
+function _timelineSidePanelHtml(user, sid, viewCtx, bounds, weekBlocks) {
   const sidQ = encodeURIComponent(sid);
+  const weekOffset = viewCtx.weekOffset;
+  const range = viewCtx.mode;
+  const pos = viewCtx.pos;
   weekBlocks = weekBlocks || [];
 
   let blockList = '';
@@ -92,7 +334,10 @@ function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
         ' · ' + _esc(laneLabel) + '</span></div>' +
         _confirmDelete(
           'action=deleteTimelineBlock&id=' + encodeURIComponent(b.id) +
-          '&week=' + encodeURIComponent(String(weekOffset)) + '&sid=' + sidQ,
+          '&week=' + encodeURIComponent(String(weekOffset)) +
+          '&range=' + encodeURIComponent(range) +
+          '&pos=' + encodeURIComponent(String(pos)) +
+          '&sid=' + sidQ,
           'למחוק את המשבצת "' + b.label + '"?'
         ) + '</li>';
     });
@@ -105,6 +350,8 @@ function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
     '<input type="hidden" name="action" value="createTimelineBlock">' +
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
     '<input type="hidden" name="week" value="' + _esc(String(weekOffset)) + '">' +
+    '<input type="hidden" name="range" value="' + _esc(range) + '">' +
+    '<input type="hidden" name="pos" value="' + _esc(String(pos)) + '">' +
     '<div class="form-row"><label class="form-label">טקסט</label>' +
     '<input type="text" name="block_label" class="form-input" placeholder="מסדרים ביום ראשון" required></div>' +
     '<div class="form-grid">' +
@@ -137,6 +384,8 @@ function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
     '<input type="hidden" name="from" value="timeline">' +
     '<input type="hidden" name="week" value="' + _esc(String(weekOffset)) + '">' +
+    '<input type="hidden" name="range" value="' + _esc(range) + '">' +
+    '<input type="hidden" name="pos" value="' + _esc(String(pos)) + '">' +
     '<div class="form-row"><label class="form-label">שם התרגיל</label>' +
     '<input type="text" name="title" class="form-input" required></div>' +
     '<div class="form-row"><label class="form-label">תיאור</label>' +
@@ -181,15 +430,15 @@ function _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks) {
     '</div></aside>';
 }
 
-function _timelineRenderBlockBar(block, weekStartMs, weekEndMs, layout, rowTopPx) {
+function _timelineRenderBlockBar(block, viewStartMs, viewSpanMs, layout, rowTopPx) {
   const startMs = _timelineBlockStartMs(block);
   const endMs = _timelineBlockEndMs(block);
   if (isNaN(startMs) || isNaN(endMs)) return '';
-  if (startMs >= weekEndMs || endMs <= weekStartMs) return '';
+  const viewEndMs = viewStartMs + viewSpanMs;
+  if (startMs >= viewEndMs || endMs <= viewStartMs) return '';
 
-  const DAY_MS = 86400000;
-  const startPct = ((Math.max(startMs, weekStartMs) - weekStartMs) / (7 * DAY_MS)) * 100;
-  const endPct = ((Math.min(endMs, weekEndMs) - weekStartMs) / (7 * DAY_MS)) * 100;
+  const startPct = ((Math.max(startMs, viewStartMs) - viewStartMs) / viewSpanMs) * 100;
+  const endPct = ((Math.min(endMs, viewEndMs) - viewStartMs) / viewSpanMs) * 100;
   const widthPct = Math.max(endPct - startPct, 1.5);
 
   let topPx = rowTopPx;
@@ -291,16 +540,17 @@ function _timelineProcedureEventsForWeek(weekItems, weekStartMs, weekEndMs) {
   return events;
 }
 
-function _timelineRenderProcedureBar(ev, weekStartMs, weekEndMs, rowTopPx) {
+function _timelineRenderProcedureBar(ev, viewStartMs, viewSpanMs, rowTopPx) {
   const DAY_MS = 86400000;
   const item = ev.item;
   const band = item.band;
   if (!band) return '';
 
-  const visStart = Math.max(ev.startMs, weekStartMs);
-  const visEnd = Math.min(ev.endMs, weekEndMs);
-  const startPct = ((visStart - weekStartMs) / (7 * DAY_MS)) * 100;
-  const widthPct = Math.max(((visEnd - visStart) / (7 * DAY_MS)) * 100, 0.35);
+  const viewEndMs = viewStartMs + viewSpanMs;
+  const visStart = Math.max(ev.startMs, viewStartMs);
+  const visEnd = Math.min(ev.endMs, viewEndMs);
+  const startPct = ((visStart - viewStartMs) / viewSpanMs) * 100;
+  const widthPct = Math.max(((visEnd - visStart) / viewSpanMs) * 100, 0.35);
 
   const barH = band.subBarH - 8;
   const procH = Math.min(12, Math.max(8, barH - 6));
@@ -596,36 +846,31 @@ function Views_timeline(p) {
 
   const weekOffset = _timelineWeekOffset(p);
   const canEdit = Roles_hasAdminAccess(user.role);
+  const nowMs = Date.now();
+  const DAY_MS = 86400000;
+  const view = _timelineViewBounds(p, nowMs);
+  const rangeMode = view.mode;
+  const rangeMeta = view.meta;
+  const viewStartMs = view.viewStartMs;
+  const viewEndMs = view.viewEndMs;
+  const viewSpanMs = viewEndMs - viewStartMs;
+  const weekStartMs = view.weekStartMs;
+  const weekEndMs = view.weekEndMs;
   const displayedIsoWeek = _isoWeekLabel(_timelineWeekBounds(weekOffset).weekStartYmd);
-
-  const nowMs   = Date.now();
-  const nowDate = new Date(nowMs);
-  const DAY_MS  = 86400000;
-
-  const baseWeek = new Date(nowDate);
-  baseWeek.setHours(0, 0, 0, 0);
-  baseWeek.setDate(nowDate.getDate() - nowDate.getDay());
-
-  const weekStart = new Date(baseWeek);
-  weekStart.setDate(baseWeek.getDate() + weekOffset * 7);
-
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 7);
-
-  const weekStartMs = weekStart.getTime();
-  const weekEndMs   = weekEnd.getTime();
+  const navLabels = _timelineNavLabels(rangeMode);
+  const navPrev = _timelineNavStep(weekOffset, rangeMode, view.pos, -1);
+  const navNext = _timelineNavStep(weekOffset, rangeMode, view.pos, 1);
+  const jumpParams = _timelineSpaParams(0, rangeMode, null);
 
   const parsed = exercises.map(_timelineParseExercise).filter(Boolean);
   const unparsedCount = exercises.length - parsed.length;
 
-  const weekItems = parsed.filter(item =>
+  const viewItems = parsed.filter(function(item) {
+    return item.startMs < viewEndMs && item.endMs > viewStartMs;
+  });
 
-    item.startMs < weekEndMs &&
-    item.endMs > weekStartMs
-  );
-
-  const layout = _timelineAssignStackedLanes(weekItems);
-  weekItems.sort(function(a, b) {
+  const layout = _timelineAssignStackedLanes(viewItems);
+  viewItems.sort(function(a, b) {
     if (a.baseLane !== b.baseLane) return a.baseLane - b.baseLane;
     if ((a.subLane || 0) !== (b.subLane || 0)) return (a.subLane || 0) - (b.subLane || 0);
     return a.startMs - b.startMs;
@@ -664,24 +909,36 @@ function Views_timeline(p) {
 
   s += '<div class="page">';
 
-  s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
+  s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
 
-  s += '<div class="page-title" style="margin:0">📅 ציר זמן — ' + _esc(_timelineWeekLabel(weekOffset)) +
-    ' · מוצג: ' + _esc(displayedIsoWeek) + '</div>';
+  s += '<div class="page-title" style="margin:0">📅 ציר זמן — ' +
+    _esc(_timelineViewTitle(view, displayedIsoWeek)) + '</div>';
 
   s += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
 
-  if (weekOffset > TIMELINE_WEEK_MIN) {
+  s += _timelineRangeSegHtml(rangeMode, weekOffset, view.pos);
+
+  const canPrev = rangeMode === 'week'
+    ? weekOffset > TIMELINE_WEEK_MIN
+    : (weekOffset > TIMELINE_WEEK_MIN || view.pos > 0);
+  const canNext = rangeMode === 'week'
+    ? weekOffset < TIMELINE_WEEK_MAX
+    : (weekOffset < TIMELINE_WEEK_MAX ||
+      (rangeMode === '6h' && view.pos < TIMELINE_6H_SLOTS_PER_WEEK - 1) ||
+      (rangeMode === 'day' && view.pos < 6) ||
+      (rangeMode === '3d' && view.pos < 4));
+
+  if (canPrev) {
     s += '<a href="#" class="btn btn-secondary btn-sm" data-spa-page="timeline"' +
-      _spaParamsAttr({ week: weekOffset - 1 }) + '>שבוע →</a>';
+      _spaParamsAttr(navPrev) + '>' + navLabels.prev + '</a>';
   }
-  if (weekOffset < TIMELINE_WEEK_MAX) {
+  if (canNext) {
     s += '<a href="#" class="btn btn-secondary btn-sm" data-spa-page="timeline"' +
-      _spaParamsAttr({ week: weekOffset + 1 }) + '>← שבוע</a>';
+      _spaParamsAttr(navNext) + '>' + navLabels.next + '</a>';
   }
-  if (weekOffset !== 0) {
+  if (weekOffset !== 0 || (rangeMode !== 'week' && view.pos !== _timelineDefaultPos(rangeMode, 0, nowMs, weekStartMs))) {
     s += '<a href="#" class="btn btn-ghost btn-sm" data-spa-page="timeline"' +
-      _spaParamsAttr({ week: 0 }) + '>היום</a>';
+      _spaParamsAttr(jumpParams) + '>עכשיו</a>';
   }
 
   s += '<select id="timelineWeekSelect" class="form-select" style="width:auto;min-width:200px;font-size:12px">';
@@ -704,10 +961,10 @@ function Views_timeline(p) {
   if (unparsedCount > 0) {
     s += '<div class="flash flash-error" style="margin-bottom:12px">⚠ ' +
       unparsedCount + ' תרגילים ללא תאריך תקין — לא ניתן להציג בלוח. עדכן תאריכי התחלה/סיום.</div>';
-  } else if (exercises.length && !weekItems.length) {
+  } else if (exercises.length && !viewItems.length) {
     s += '<div class="flash flash-info" style="margin-bottom:12px">ℹ יש ' + exercises.length +
-      ' תרגילים במערכת, אך אין תרגילים ב' + _esc(_timelineWeekLabel(weekOffset)) +
-      '. השתמש בבורר השבועות למעלה כדי לנווט לשבוע הרלוונטי.</div>';
+      ' תרגילים במערכת, אך אין תרגילים בטווח ' + _esc(rangeMeta.label) + ' זה. ' +
+      'השתמש בכפתורי הניווט או בבורר השבועות.</div>';
   }
 
   const bounds = _timelineWeekBounds(weekOffset);
@@ -726,45 +983,32 @@ function Views_timeline(p) {
 
   s += '<div class="card" style="margin-bottom:20px" id="timelineWeekCard">';
 
-  const wStartFmt =
-    weekStart.getDate() +
-    '/' +
-    (weekStart.getMonth()+1);
-
-  const wEndDate =
-    new Date(weekEndMs - 1);
-
-  const wEndFmt =
-    wEndDate.getDate() +
-    '/' +
-    (wEndDate.getMonth()+1);
+  const viewStartDate = new Date(viewStartMs);
+  const viewEndDate = new Date(viewEndMs - 1);
+  const wStartFmt = viewStartDate.getDate() + '/' + (viewStartDate.getMonth() + 1);
+  const wEndFmt = viewEndDate.getDate() + '/' + (viewEndDate.getMonth() + 1);
 
   s += '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--text2)">';
 
-  s += '📅 ' +
-       wStartFmt +
-       ' – ' +
-       wEndFmt +
-       ' &nbsp;|&nbsp; ' +
-       _esc(displayedIsoWeek) +
-       ' &nbsp;|&nbsp; ' +
-       weekItems.length +
-       ' תרגילים';
+  s += '📅 ' + wStartFmt + ' – ' + wEndFmt +
+    ' &nbsp;|&nbsp; ' + _esc(rangeMeta.label) +
+    (rangeMode === 'week' ? ' &nbsp;|&nbsp; ' + _esc(displayedIsoWeek) : '') +
+    ' &nbsp;|&nbsp; ' + viewItems.length + ' תרגילים';
 
   s += '</div>';
 
   s += '<div style="padding:6px 14px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">' +
-    'גלול ימינה ושמאלה לצפייה בכל השבוע · משבצות של 4 שעות · קו מפריד בין ימים ב-00:00</div>';
+    _esc(_timelineViewHint(rangeMode)) + '</div>';
 
   // ─────────────────────────────────────
   // Timeline
   // ─────────────────────────────────────
 
-  const TIMELINE_SLOTS_PER_DAY = 6;
-  const TIMELINE_SLOT_LABELS = ['00', '04', '08', '12', '16', '20'];
-  const TIMELINE_TOTAL_SLOTS = 7 * TIMELINE_SLOTS_PER_DAY;
-  const TIMELINE_DAY_WIDTH = 400;
-  const TIMELINE_MIN_WIDTH = 7 * TIMELINE_DAY_WIDTH;
+  const slotsPerDay = rangeMeta.slotsPerDay;
+  const slotLabels = _timelineSlotLabels(rangeMeta, viewStartMs);
+  const dayCount = rangeMeta.dayCount;
+  const totalSlots = dayCount * slotsPerDay;
+  const timelineMinWidth = dayCount * rangeMeta.dayWidth;
   const timelineHeaderH = 54;
   const rowTopPx = timelineHeaderH;
   const barMinH = 44;
@@ -773,11 +1017,15 @@ function Views_timeline(p) {
   const labelPad = layout.battalionMode ? 92 : 48;
   s += '<div class="timeline-scroll" id="timelineScroll">';
   s += '<div id="timelineTrack" class="timeline-track" style="position:relative;height:' +
-       trackH + 'px;min-width:' + TIMELINE_MIN_WIDTH + 'px;padding-right:' + labelPad + 'px;' +
+       trackH + 'px;min-width:' + timelineMinWidth + 'px;padding-right:' + labelPad + 'px;' +
        '--tl-lane-h:' + layout.subBarH + 'px;--tl-bar-min-h:' + barMinH + 'px"' +
+       ' data-view-start="' + viewStartMs + '"' +
+       ' data-view-end="' + viewEndMs + '"' +
        ' data-week-start="' + weekStartMs + '"' +
        ' data-week-end="' + weekEndMs + '"' +
        ' data-week-offset="' + weekOffset + '"' +
+       ' data-range="' + _timelineAttrEsc(rangeMode) + '"' +
+       ' data-pos="' + view.pos + '"' +
        ' data-sid-q="' + _timelineAttrEsc(sidQ) + '"' +
        ' data-can-edit="' + (canEdit ? '1' : '0') + '">';
 
@@ -795,25 +1043,23 @@ function Views_timeline(p) {
       _esc(row.label) + typeHint + '</div>';
   });
 
-  for (let i = 0; i <= TIMELINE_TOTAL_SLOTS; i++) {
-    const rightPct = (i / TIMELINE_TOTAL_SLOTS) * 100;
-    const isDayLine = (i % TIMELINE_SLOTS_PER_DAY === 0);
+  for (let i = 0; i <= totalSlots; i++) {
+    const rightPct = (i / totalSlots) * 100;
+    const isDayLine = (i % slotsPerDay === 0);
     s += '<div class="timeline-grid-line' + (isDayLine ? ' timeline-grid-day' : '') + '" style="' +
          'position:absolute;top:' + timelineHeaderH + 'px;bottom:0;right:' + rightPct + '%;width:1px;' +
          (isDayLine ? 'background:var(--border);opacity:1' : 'background:var(--border2);opacity:0.55') +
          ';z-index:1;pointer-events:none"></div>';
   }
 
-  for (let d = 0; d < 7; d++) {
-    const dayStart = weekStartMs + d * DAY_MS;
+  for (let d = 0; d < dayCount; d++) {
+    const dayStart = viewStartMs + d * DAY_MS;
     const dayDate = new Date(dayStart);
-    const dayMs = weekStartMs + d * DAY_MS;
-    const isTodayDay =
-      weekOffset === 0 &&
-      nowMs >= dayMs &&
-      nowMs < dayMs + DAY_MS;
-    const dayRight = (d / 7) * 100;
-    const dayWidth = (100 / 7);
+    const dayMs = dayStart;
+    const isTodayDay = nowMs >= dayMs && nowMs < dayMs + DAY_MS;
+    const dayRight = (d / dayCount) * 100;
+    const dayWidth = (100 / dayCount);
+    const dayLabel = DAY_LABELS[dayDate.getDay()];
 
     s += '<div class="timeline-day-head" style="' +
          'position:absolute;top:0;right:' + dayRight + '%;width:' + dayWidth + '%;height:' + timelineHeaderH + 'px;' +
@@ -821,34 +1067,34 @@ function Views_timeline(p) {
          (isTodayDay ? 'background:rgba(74,222,128,0.06);' : '') + '">' +
          '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 0 0">' +
          '<div style="font-family:var(--mono);font-size:12px;font-weight:bold;color:' +
-         (isTodayDay ? 'var(--green)' : 'var(--text2)') + '">' + DAY_LABELS[d] + '</div>' +
+         (isTodayDay ? 'var(--green)' : 'var(--text2)') + '">' + dayLabel + '</div>' +
          '<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">' +
          dayDate.getDate() + '/' + (dayDate.getMonth() + 1) + '</div></div>' +
          '<div class="timeline-day-slots" style="display:flex;width:100%;margin-top:2px;border-top:1px solid var(--border2)">';
 
-    for (let sl = 0; sl < TIMELINE_SLOTS_PER_DAY; sl++) {
+    for (let sl = 0; sl < slotsPerDay; sl++) {
       s += '<span style="flex:1;text-align:center;font-family:var(--mono);font-size:8px;color:var(--muted);' +
-           'line-height:1.1;padding:1px 0">' + TIMELINE_SLOT_LABELS[sl] + '</span>';
+           'line-height:1.1;padding:1px 0">' + slotLabels[sl] + '</span>';
     }
     s += '</div></div>';
   }
 
-  if (weekOffset === 0 && nowMs >= weekStartMs && nowMs < weekEndMs) {
-    const nowOffset = ((nowMs - weekStartMs) / (7 * DAY_MS)) * 100;
+  if (nowMs >= viewStartMs && nowMs < viewEndMs) {
+    const nowOffset = ((nowMs - viewStartMs) / viewSpanMs) * 100;
     s += '<div class="timeline-now" style="' +
          'position:absolute;top:' + timelineHeaderH + 'px;bottom:0;right:' + nowOffset + '%;width:2px;' +
          'background:var(--green);z-index:30"></div>';
   }
 
   weekBlocks.forEach(function(block) {
-    s += _timelineRenderBlockBar(block, weekStartMs, weekEndMs, layout, rowTopPx);
+    s += _timelineRenderBlockBar(block, viewStartMs, viewSpanMs, layout, rowTopPx);
   });
 
-  const procedureEvents = _timelineProcedureEventsForWeek(weekItems, weekStartMs, weekEndMs);
+  const procedureEvents = _timelineProcedureEventsForWeek(viewItems, viewStartMs, viewEndMs);
 
-  weekItems.forEach(function(item, idx) {
-    const startPct = ((item.startMs - weekStartMs) / (7 * DAY_MS)) * 100;
-    const widthPct = ((item.endMs - item.startMs) / (7 * DAY_MS)) * 100;
+  viewItems.forEach(function(item, idx) {
+    const startPct = ((item.startMs - viewStartMs) / viewSpanMs) * 100;
+    const widthPct = ((item.endMs - item.startMs) / viewSpanMs) * 100;
     const band = item.band;
     const barH = band.subBarH - 8;
     const topPx = rowTopPx + band.top + (item.subLane || 0) * band.subBarH + 4;
@@ -891,7 +1137,7 @@ function Views_timeline(p) {
   });
 
   procedureEvents.forEach(function(ev) {
-    s += _timelineRenderProcedureBar(ev, weekStartMs, weekEndMs, rowTopPx);
+    s += _timelineRenderProcedureBar(ev, viewStartMs, viewSpanMs, rowTopPx);
   });
 
   s += '</div></div>';
@@ -906,11 +1152,14 @@ function Views_timeline(p) {
 
   s += '</div>';
   if (canEdit) {
-    s += _timelineSidePanelHtml(user, sid, weekOffset, bounds, weekBlocks);
+    s += _timelineSidePanelHtml(user, sid, view, bounds, weekBlocks);
     s += '</div>';
   }
 
-  s += '<div class="page-title" style="margin-top:10px">📋 תרגילים בשבוע זה · ' + _esc(displayedIsoWeek) + '</div>';
+  const tableTitle = rangeMode === 'week'
+    ? '📋 תרגילים בשבוע זה · ' + displayedIsoWeek
+    : '📋 תרגילים בטווח · ' + rangeMeta.label;
+  s += '<div class="page-title" style="margin-top:10px">' + _esc(tableTitle) + '</div>';
 
   s += '<div class="card" style="padding:0" id="timelineWeekTableCard">';
 
@@ -928,7 +1177,7 @@ function Views_timeline(p) {
 
   s += '</tr></thead><tbody id="timelineWeekTableBody">';
 
-  s += _timelineWeekTableRowsHtml(weekItems, sidQ);
+  s += _timelineWeekTableRowsHtml(viewItems, sidQ);
 
   s += '</tbody></table>';
 

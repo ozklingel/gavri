@@ -1661,6 +1661,36 @@ body {
       color: var(--green);
       background: rgba(74, 222, 128, 0.1);
     }
+    .timeline-range-seg {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      padding: 2px;
+      border: 1px solid var(--border2);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.65);
+    }
+    .timeline-range-btn {
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: var(--mono);
+      line-height: 1.2;
+    }
+    .timeline-range-btn:hover {
+      background: rgba(74, 222, 128, 0.12);
+      color: var(--green);
+    }
+    .timeline-range-btn.active {
+      background: #166534;
+      color: #fff !important;
+    }
     .spa-module-skeleton {
       display: flex;
       flex-direction: column;
@@ -3436,7 +3466,13 @@ body {
       weekSel._bound = true;
       weekSel.addEventListener('change', function() {
         if (!window.MapimSpa) return;
-        MapimSpa.navigate('timeline', { week: parseInt(weekSel.value, 10) || 0 });
+        var track = document.getElementById('timelineTrack');
+        var params = { week: parseInt(weekSel.value, 10) || 0 };
+        if (track) {
+          var range = track.getAttribute('data-range');
+          if (range && range !== 'week') params.range = range;
+        }
+        MapimSpa.navigate('timeline', params);
       });
     }
 
@@ -3457,8 +3493,16 @@ body {
     var MIN_MS = 30 * 60 * 1000;
     var drag = null;
 
-    function weekMs() {
+    function viewMs() {
+      var vs = track.dataset.viewStart;
+      var ve = track.dataset.viewEnd;
+      if (vs != null && ve != null) return (+ve) - (+vs);
       return (+track.dataset.weekEnd) - (+track.dataset.weekStart);
+    }
+
+    function viewStartMs() {
+      if (track.dataset.viewStart != null) return +track.dataset.viewStart;
+      return +track.dataset.weekStart;
     }
 
     function getBarByExerciseId(exerciseId) {
@@ -3529,8 +3573,8 @@ body {
 
     function applyBar(bar, startMs, endMs) {
       if (!bar) return;
-      var w = weekMs();
-      var ws = +track.dataset.weekStart;
+      var w = viewMs();
+      var ws = viewStartMs();
       var rightPct = ((startMs - ws) / w) * 100;
       var widthPct = ((endMs - startMs) / w) * 100;
       bar.style.right = rightPct + '%';
@@ -3551,7 +3595,7 @@ body {
         fromRight = box.right - clientX;
       }
       var pct = Math.max(0, Math.min(1, fromRight / fullW));
-      return +track.dataset.weekStart + pct * weekMs();
+      return viewStartMs() + pct * viewMs();
     }
 
     function showTimelineFlash(msg) {
@@ -3609,7 +3653,7 @@ body {
       e.preventDefault();
       var bar = getBarByExerciseId(drag.exerciseId);
       if (!bar) return;
-      var deltaMs = -((e.clientX - drag.startX) / trackFullWidth(track)) * weekMs();
+      var deltaMs = -((e.clientX - drag.startX) / trackFullWidth(track)) * viewMs();
       var startMs = drag.origStart;
       var endMs = drag.origEnd;
 
