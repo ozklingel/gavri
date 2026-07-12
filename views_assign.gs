@@ -181,6 +181,11 @@ function _assignBoardJs() {
     return '<b>' + escHtml(userName) + '</b>';
   }
 
+  function whatsappLinkHtml(phone, label) {
+    if (window.MapimSpa && MapimSpa.whatsappLinkHtml) return MapimSpa.whatsappLinkHtml(phone, label);
+    return phone ? escHtml(label != null ? label : phone) : '';
+  }
+
   function createUserNameLink(userId, userName, style) {
     var a = document.createElement('a');
     a.href = '#';
@@ -484,11 +489,11 @@ function _assignBoardJs() {
     });
   }
 
-  function profileRow(label, val) {
-    if (!val) return '';
+  function profileRow(label, val, htmlVal) {
+    if (!val && !htmlVal) return '';
     return '<div style="display:flex;gap:8px;margin-bottom:3px">' +
       '<span style="color:var(--muted);flex-shrink:0">' + escHtml(label) + '</span>' +
-      '<span style="word-break:break-word">' + escHtml(val) + '</span></div>';
+      '<span style="word-break:break-word">' + (htmlVal || escHtml(val)) + '</span></div>';
   }
 
   function buildProfileHtml(u, uid) {
@@ -498,7 +503,7 @@ function _assignBoardJs() {
     h += profileRow('תפקיד', ROLE_LABELS[u.role] || u.role);
     h += profileRow('צוות', u.teamName);
     h += profileRow('שיבוצים', String(countAssignments(uid)));
-    h += profileRow('טלפון', u.phone);
+    h += profileRow('טלפון', u.phone, u.phone ? whatsappLinkHtml(u.phone) : '');
     return h;
   }
 

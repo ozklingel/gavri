@@ -329,6 +329,10 @@ function _dashCell(val) {
   return val ? _esc(val) : '<span style="color:var(--muted)">—</span>';
 }
 
+function _dashPhoneCell(phone) {
+  return _whatsappLink(phone);
+}
+
 function _commanderTraineeExercisesHtml(assigns) {
   if (!assigns.length) {
     return '<span style="color:var(--muted)">אין תרגילים</span>';
@@ -384,7 +388,7 @@ function _commanderDashboardPanels(user, sid) {
       '<td>' + _dashCell(t.military_affiliation) + '</td>' +
       '<td>' + (t.service_type ? _badge(t.service_type, 'muted') : _dashCell('')) + '</td>' +
       '<td style="white-space:nowrap">' + _userLink(t.id, t.name, '') + '</td>' +
-      '<td class="mono" style="font-size:12px">' + _dashCell(t.phone) + '</td>' +
+      '<td class="mono" style="font-size:12px">' + _dashPhoneCell(t.phone) + '</td>' +
       '<td>' + _dashCell(unitDetail) + '</td>' +
       '<td>' + _dashCell(t.target_role) + '</td>' +
       '<td>' + _commanderTraineeExercisesHtml(assigns) + '</td>' +

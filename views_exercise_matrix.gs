@@ -215,6 +215,13 @@ function _exerciseMatrixJs() {
     return '<b>' + safe + '</b>';
   }
 
+  function whatsappLinkHtml(phone, label) {
+    if (window.MapimSpa && MapimSpa.whatsappLinkHtml) return MapimSpa.whatsappLinkHtml(phone, label);
+    var raw = String(phone || '').trim();
+    if (!raw) return '';
+    return String(label != null ? label : raw).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  }
+
   function cellHtml(exId, role, c) {
     var cls = 'ex-matrix-assign-cell' + (c ? ' filled' : '') + (canEdit ? ' editable' : '');
     var attrs = ' class="' + cls + '" data-ex-id="' + esc(exId) + '" data-role="' + esc(role) + '"';
@@ -223,7 +230,7 @@ function _exerciseMatrixJs() {
     var inner = '';
     if (c) {
       inner += '<div class="ex-matrix-person"><div class="ex-matrix-person-name">' + userLinkHtml(c.userId, c.name) + '</div>';
-      if (c.phone) inner += '<div class="ex-matrix-person-phone">' + esc(c.phone) + '</div>';
+      if (c.phone) inner += '<div class="ex-matrix-person-phone">' + whatsappLinkHtml(c.phone) + '</div>';
       inner += '</div>';
     } else if (canEdit) {
       inner += '<span class="ex-matrix-cell-empty">+ שיבוץ</span>';
@@ -364,7 +371,7 @@ function _exerciseMatrixJs() {
       current.hidden = false;
       current.innerHTML = '<span class="ex-matrix-cell-editor-current-label">משובץ:</span> ' +
         userLinkHtml(cell.userId, cell.name) +
-        (cell.phone ? ' <span class="ex-matrix-cell-editor-current-phone">' + esc(cell.phone) + '</span>' : '');
+        (cell.phone ? ' <span class="ex-matrix-cell-editor-current-phone">' + whatsappLinkHtml(cell.phone) + '</span>' : '');
     } else if (current) {
       current.hidden = true;
       current.innerHTML = '';

@@ -240,6 +240,30 @@ function _userLink(userId, userName, sidQ) {
     ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(userName) + '</b></a>';
 }
 
+function _whatsappDigits(phone) {
+  var d = String(phone || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.indexOf('972') === 0) return d;
+  if (d.charAt(0) === '0') return '972' + d.slice(1);
+  if (d.length === 9 && d.charAt(0) === '5') return '972' + d;
+  return d;
+}
+
+function _whatsappUrl(phone) {
+  var d = _whatsappDigits(phone);
+  return d ? ('https://wa.me/' + d) : '';
+}
+
+function _whatsappLink(phone, label) {
+  var raw = String(phone || '').trim();
+  if (!raw) return '<span style="color:var(--muted)">—</span>';
+  var url = _whatsappUrl(raw);
+  if (!url) return _esc(raw);
+  var text = label != null ? String(label) : raw;
+  return '<a href="' + _esc(url) + '" target="_blank" rel="noopener noreferrer" class="whatsapp-link" title="פתח צ\'אט בוואטסאפ">' +
+    _esc(text) + '</a>';
+}
+
 function _exerciseLink(exerciseId, title) {
   return '<a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: exerciseId }) +
     ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(title) + '</b></a>';
