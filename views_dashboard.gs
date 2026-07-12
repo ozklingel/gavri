@@ -72,7 +72,7 @@ function _exercisesListModuleHtml(user, sid) {
       const mpN = mpCounts[e.id] || 0;
       s += '<tr>' +
         '<td>' +
-          '<div class="ex-title">' + _esc(e.title) + '</div>' +
+          '<div class="ex-title">' + _exerciseLink(e.id, e.title) + '</div>' +
           '<div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div>' +
         '</td>' +
         '<td>' + (e.exercise_type ? _badge(e.exercise_type, 'muted') : '—') + '</td>' +
@@ -486,8 +486,7 @@ function _traineeDashboardPanels(user, sid) {
     const ex = Exercises_get(a.exercise_id);
     const exTitle = ex ? ex.title : a.exercise_id;
     s += '<tr>' +
-      '<td><a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: a.exercise_id }) +
-        ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(exTitle) + '</b></a></td>' +
+      '<td>' + (ex ? _exerciseLink(ex.id, exTitle) : _esc(exTitle)) + '</td>' +
       '<td>' + _esc(a.responsibility) + '</td>' +
       '<td>' + _statusBadge(a.status) + '</td>' +
       '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +

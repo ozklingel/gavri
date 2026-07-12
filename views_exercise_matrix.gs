@@ -222,6 +222,12 @@ function _exerciseMatrixJs() {
     return String(label != null ? label : raw).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   }
 
+  function exerciseLinkHtml(exId, title) {
+    if (window.MapimSpa && MapimSpa.exerciseLinkHtml) return MapimSpa.exerciseLinkHtml(exId, title);
+    var safe = String(title == null ? '' : title).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return '<b>' + safe + '</b>';
+  }
+
   function cellHtml(exId, role, c) {
     var cls = 'ex-matrix-assign-cell' + (c ? ' filled' : '') + (canEdit ? ' editable' : '');
     var attrs = ' class="' + cls + '" data-ex-id="' + esc(exId) + '" data-role="' + esc(role) + '"';
@@ -571,7 +577,7 @@ function _exerciseMatrixJs() {
       var fullTitle = String(m.label || m.title || ex.label || ex.id || '');
       head += '<th class="team-matrix-col-hdr ex-matrix-col"><div class="team-matrix-ex-title"' +
         (fullTitle ? ' title="' + esc(fullTitle) + '"' : '') + '>' +
-        esc(fullTitle) + '</div>';
+        exerciseLinkHtml(ex.id, fullTitle) + '</div>';
       if (m.weekLabel) head += '<div class="team-matrix-ex-sub">' + esc(m.weekLabel) + '</div>';
       else if (m.week) head += '<div class="team-matrix-ex-sub">שבוע לועזי ' + m.week + '</div>';
       if (m.typeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.typeLine) + '</div>';

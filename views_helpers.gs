@@ -265,8 +265,8 @@ function _whatsappLink(phone, label) {
 }
 
 function _exerciseLink(exerciseId, title) {
-  return '<a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: exerciseId }) +
-    ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(title) + '</b></a>';
+  return '<a href="#" class="exercise-name-link" data-spa-page="exercise"' + _spaParamsAttr({ id: exerciseId }) +
+    '><b>' + _esc(title) + '</b></a>';
 }
 
 function _assignmentRespOptions() {

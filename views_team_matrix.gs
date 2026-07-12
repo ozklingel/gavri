@@ -183,6 +183,11 @@ function _teamMatrixJs() {
     return '<b>' + esc(userName) + '</b>';
   }
 
+  function exerciseLinkHtml(exId, title) {
+    if (window.MapimSpa && MapimSpa.exerciseLinkHtml) return MapimSpa.exerciseLinkHtml(exId, title);
+    return '<b>' + esc(title || exId) + '</b>';
+  }
+
   function isMpRole(r) {
     r = String(r || '').trim();
     if (!r) return false;
@@ -306,7 +311,7 @@ function _teamMatrixJs() {
       var m = data.exMeta[exId] || { title: exId };
       var fullTitle = String(m.title || m.label || exId || '');
       head += '<th class="team-matrix-col-hdr team-matrix-ex-col"><div class="team-matrix-ex-title"' +
-        (fullTitle ? ' title="' + esc(fullTitle) + '"' : '') + '>' + esc(fullTitle) + '</div>';
+        (fullTitle ? ' title="' + esc(fullTitle) + '"' : '') + '>' + exerciseLinkHtml(exId, fullTitle) + '</div>';
       if (m.weekLabel) head += '<div class="team-matrix-ex-sub">' + esc(m.weekLabel) + '</div>';
       else if (m.week) head += '<div class="team-matrix-ex-sub">שבוע לועזי ' + m.week + '</div>';
       if (m.typeLine) head += '<div class="team-matrix-ex-sub">' + esc(m.typeLine) + '</div>';

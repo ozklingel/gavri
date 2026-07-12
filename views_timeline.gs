@@ -279,7 +279,7 @@ function _timelineWeekTableRowsHtml(items, sidQ) {
     const exWeekLabel = ex.rawStartDate ? _isoWeekLabel(ex.rawStartDate) : _isoWeekLabel(startYmd);
     s += '<tr data-exercise-id="' + _timelineAttrEsc(ex.id) + '">' +
       '<td>' + _badge(typeKey, typeKey === 'חיר' ? 'green' : typeKey === 'חשן' ? 'blue' : 'yellow') + '</td>' +
-      '<td><b>' + _esc(ex.title) + '</b></td>' +
+      '<td>' + _exerciseLink(ex.id, ex.title) + '</td>' +
       '<td style="font-size:12px;white-space:nowrap">' + (exWeekLabel ? _esc(exWeekLabel) : '—') + '</td>' +
       '<td class="mono">' + _esc(startYmd) + '</td>' +
       '<td class="mono">' + _esc(startHm) + '</td>' +
@@ -780,7 +780,7 @@ function Views_timeline(p) {
     if (canEdit) {
       s += '<div class="tl-bar"' + dataAttrs + ' style="' + barStyle + '">' +
         '<span class="tl-bar-label" title="' + _timelineAttrEsc(barTitle) + '">' +
-        _esc(item.ex.title) + '</span></div>';
+        _exerciseLink(item.ex.id, item.ex.title) + '</span></div>';
     } else {
       s += '<a class="tl-bar tl-bar-link"' + dataAttrs + ' ' + _spaBarLink('exercise', { id: item.ex.id }) +
         ' style="' + barStyle + 'text-decoration:none">' +

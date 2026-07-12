@@ -173,7 +173,10 @@ function render() {
     var head = document.createElement('div');
     head.className = 'ex-col-head';
     head.innerHTML =
-      '<div class="ex-col-title" title="' + ex.title + '">' + ex.title + '</div>' +
+      '<div class="ex-col-title" title="' + ex.title + '">' +
+        '<a href="#" class="exercise-name-link" data-spa-page="exercise" data-spa-params="' +
+        JSON.stringify({ id: ex.id }).replace(/"/g, '&quot;') + '" onclick="event.stopPropagation()"><b>' +
+        ex.title + '</b></a></div>' +
       '<div class="ex-col-meta">' +
         (ex.date ? '<span>' + ex.date + '</span>' : '<span></span>') +
         '<span id="cnt-' + ex.id + '" style="color:var(--green2)">' + members.length + ' משתתפים</span>' +

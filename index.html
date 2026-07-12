@@ -431,6 +431,19 @@ body {
     .assign-chip .user-name-link { color: var(--text1); text-decoration: underline; }
     .assign-chip .user-name-link:hover { color: var(--blue, #2563eb); }
     .ex-matrix-person-name .user-name-link { color: inherit; }
+    a.exercise-name-link,
+    .exercise-name-link {
+      color: var(--blue, #2563eb);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    a.exercise-name-link:hover,
+    .exercise-name-link:hover { color: #1d4ed8; }
+    .assign-ex-row-title .exercise-name-link { font-weight: 700; font-size: inherit; color: inherit; text-decoration: underline; }
+    .assign-ex-row-title .exercise-name-link:hover { color: var(--blue, #2563eb); }
+    .team-matrix-ex-title .exercise-name-link { font-weight: bold; color: inherit; text-decoration: underline; }
+    .team-matrix-ex-title .exercise-name-link:hover { color: var(--blue, #2563eb); }
+    .timeline-track.edit-mode .tl-bar-label .exercise-name-link { pointer-events: auto; cursor: pointer; }
 
     /* ── LAYOUT ── */
     .page { padding: 16px 20px 40px; max-width: 1100px; margin: 0 auto; }
@@ -2442,6 +2455,16 @@ body {
         safeName + '</b></a>';
     }
 
+    function exerciseLinkHtml(exerciseId, title) {
+      var exId = String(exerciseId || '').trim();
+      var name = String(title == null ? '' : title);
+      if (!exId) return '<b>' + String(name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</b>';
+      var params = JSON.stringify({ id: exId }).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      var safeName = String(name || exId).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return '<a href="#" class="exercise-name-link" data-spa-page="exercise" data-spa-params="' + params + '"><b>' +
+        safeName + '</b></a>';
+    }
+
     function whatsappDigits(phone) {
       var d = String(phone || '').replace(/\D/g, '');
       if (!d) return '';
@@ -2760,6 +2783,7 @@ body {
     return {
       navigate: navigate, runAction: runAction, goBack: goBack, canGoBack: canGoBack,
       getSid: getSid, setSid: setSid, userLinkHtml: userLinkHtml, whatsappLinkHtml: whatsappLinkHtml,
+      exerciseLinkHtml: exerciseLinkHtml,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();
@@ -3585,7 +3609,7 @@ body {
         var weekLabel = isoWeekLabelFromYmd(s.date);
         return '<tr data-exercise-id="' + exId + '">' +
           '<td>' + typeBadge(typeKey) + '</td>' +
-          '<td><b>' + title + '</b></td>' +
+          '<td>' + (window.MapimSpa && MapimSpa.exerciseLinkHtml ? MapimSpa.exerciseLinkHtml(exId, title) : ('<b>' + title + '</b>')) + '</td>' +
           '<td style="font-size:12px;white-space:nowrap">' + (weekLabel || '—') + '</td>' +
           '<td class="mono">' + s.date + '</td>' +
           '<td class="mono">' + s.time + '</td>' +

@@ -8,7 +8,8 @@ function _assignmentConflictsListHtml(items, emptyText) {
   items.forEach(function(item) {
     s += '<li style="margin:6px 0;line-height:1.5;font-size:12px">' +
       _userLink(item.user_id, item.user_name, '') + ' — ' +
-      _esc(item.exercise_a_title) + ' ↔ ' + _esc(item.exercise_b_title);
+      _exerciseLink(item.exercise_a_id, item.exercise_a_title) + ' ↔ ' +
+      _exerciseLink(item.exercise_b_id, item.exercise_b_title);
     if (item.type === 'procedure') {
       s += ' <span class="badge badge-yellow" style="font-size:10px">' +
         item.gap_hours + ' שע׳</span>';

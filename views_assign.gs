@@ -186,6 +186,15 @@ function _assignBoardJs() {
     return phone ? escHtml(label != null ? label : phone) : '';
   }
 
+  function exerciseLinkHtml(exId, title) {
+    if (window.MapimSpa && MapimSpa.exerciseLinkHtml) return MapimSpa.exerciseLinkHtml(exId, title);
+    return '<b>' + escHtml(title || exId) + '</b>';
+  }
+
+  function exTitleLink(exId) {
+    return exerciseLinkHtml(exId, getExTitle(exId));
+  }
+
   function createUserNameLink(userId, userName, style) {
     var a = document.createElement('a');
     a.href = '#';
@@ -333,13 +342,13 @@ function _assignBoardJs() {
     var u = data.userMap[ch.userId];
     var nameHtml = userLinkHtml(ch.userId, u ? u.name : ch.userId);
     if (ch.type === 'add') {
-      return '+ שיבוץ ' + nameHtml + ' → ' + escHtml(getExTitle(ch.exId)) + (ch.resp ? ' (' + escHtml(ch.resp) + ')' : '');
+      return '+ שיבוץ ' + nameHtml + ' → ' + exTitleLink(ch.exId) + (ch.resp ? ' (' + escHtml(ch.resp) + ')' : '');
     }
     if (ch.type === 'remove') {
-      return '− הסרת ' + nameHtml + ' מ־' + escHtml(getExTitle(ch.exId));
+      return '− הסרת ' + nameHtml + ' מ־' + exTitleLink(ch.exId);
     }
     if (ch.type === 'move') {
-      return '↔ העברת ' + nameHtml + ' ל־' + escHtml(getExTitle(ch.toExId));
+      return '↔ העברת ' + nameHtml + ' ל־' + exTitleLink(ch.toExId);
     }
     if (ch.type === 'resp') {
       return '✎ תפקיד ' + nameHtml + ': ' + escHtml(ch.oldResp || '—') + ' → ' + escHtml(ch.resp);
@@ -765,7 +774,7 @@ function _assignBoardJs() {
     hdr.className = 'assign-ex-row-head';
     var h3 = document.createElement('div');
     h3.className = 'assign-ex-row-title';
-    h3.textContent = title;
+    h3.innerHTML = exerciseLinkHtml(exId, title);
     var sub = document.createElement('div');
     sub.className = 'assign-ex-row-meta';
     sub.textContent = subtitle || '';

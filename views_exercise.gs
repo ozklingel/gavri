@@ -353,8 +353,7 @@ function Views_user(p) {
       const ex = Exercises_get(a.exercise_id);
       const exTitle = ex ? ex.title : a.exercise_id;
       s += '<tr>' +
-        '<td><a href="#" data-spa-page="exercise"' + _spaParamsAttr({ id: a.exercise_id }) + ' style="color:var(--blue);text-decoration:underline">' +
-        _esc(exTitle) + '</a></td>' +
+        '<td>' + (ex ? _exerciseLink(ex.id, exTitle) : _esc(exTitle)) + '</td>' +
         '<td>' + _esc(a.responsibility || '—') + '</td>' +
         '<td>' + _statusBadge(a.status) + '</td>';
       if (canViewScores) {
