@@ -245,7 +245,7 @@ function _expandablePanel(page, baseParams, sectionId, title, contentHtml, openS
     return '<div class="collapsible open" id="panel-' + _esc(sectionId) + '">' +
       '<a href="#" class="collapsible-toggle coll-open" data-spa-page="' + _esc(page) + '"' +
       _spaParamsAttr(closeParams) + '>' + title + ' <span class="arrow">▴</span></a>' +
-      '<div class="collapsible-content open">' + contentHtml + '</div></div>';
+      '<div class="collapsible-content open expandable-panel-body">' + contentHtml + '</div></div>';
   }
   const openParams = Object.assign({}, baseParams || {}, { open: sectionId });
   return '<div class="expandable-closed-wrap">' +

@@ -139,10 +139,10 @@ function _assignConflictsSectionHtml(sid) {
 function _autoAssignRulesExplainHtml() {
   const slots = Assignments_slotConfig();
   let s = '<div style="font-size:12px;line-height:1.65">';
-  s += '<p style="color:var(--muted);margin:0 0 10px">' +
+  s += '<p class="rules-muted" style="margin:0 0 10px">' +
     'שיבוץ אוטומטי ממלא <b>תפקידים חסרים</b> בלבד — שיבוצים קיימים נשארים ללא שינוי. ' +
     'משתתף יכול להיות במספר תרגילים, אך לא בשני תרגילים שחופפים בזמן.</p>';
-  s += '<ul style="font-size:11px;color:var(--muted);margin:0 0 12px 18px;line-height:1.6">';
+  s += '<ul class="rules-muted" style="font-size:11px;margin:0 0 12px 18px;line-height:1.6">';
   s += '<li>תרגילים מעובדים לפי סדר זמן התחלה</li>';
   s += '<li>לכל תרגיל — מילוי התפקידים בטבלה (לפי שיוך חיילי / חיל)</li>';
   s += '<li>עדיפות לחניך עם <b>פחות שיבוצים</b> · אותו צוות שכבר על התרגיל · מתמרן · מילואים לפני סדיר (אם יש מילואים פנוי עם פחות שיבוצים)</li>';
@@ -151,7 +151,7 @@ function _autoAssignRulesExplainHtml() {
   s += '<li>לא משבץ אם קיים <b>אילוץ בית מאושר</b> לתאריכי התרגיל</li>';
   s += '<li>שיבוץ ידני בלוח (גרירה) עוקב באותם כללים לחפיפות ואילוצי בית</li>';
   s += '</ul>';
-  s += '<p style="font-size:11px;color:var(--muted);margin:0 0 6px"><b>תפקידים לכל תרגיל</b></p>';
+  s += '<p class="rules-muted" style="font-size:11px;margin:0 0 6px"><b>תפקידים לכל תרגיל</b></p>';
   s += '<table class="tbl" style="font-size:11px;margin:0 0 10px"><thead><tr>' +
     '<th>תפקיד</th><th>כמות</th><th>מקור מועמדים</th></tr></thead><tbody>';
   slots.forEach(function(slot) {
@@ -163,7 +163,7 @@ function _autoAssignRulesExplainHtml() {
       slot.count + '</td><td>' + source + '</td></tr>';
   });
   s += '</tbody></table>';
-  s += '<p style="font-size:11px;color:var(--muted);margin:0">' +
+  s += '<p class="rules-muted" style="font-size:11px;margin:0">' +
     'בסיום מוצג סיכום: הקצאות חדשות, תרגילים מלאים/חלקיים/ריקים, ומספר תפקידים שלא מולאו.</p>';
   s += '</div>';
   return s;

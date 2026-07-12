@@ -614,7 +614,7 @@ function Series_schedule(startYmd, endYmd, queue, locations, opts) {
 }
 
 function _seriesSchedulingRulesBulletsHtml() {
-  let s = '<ul style="font-size:11px;color:var(--muted);margin:0 0 14px 18px;line-height:1.6">';
+  let s = '<ul class="rules-muted" style="font-size:11px;margin:0 0 14px 18px;line-height:1.6">';
   s += '<li>שם כל תרגיל: מספר ייחודי (4 ספרות) + מיקום + שם הגדוד/כוח</li>';
   s += '<li>התחלה ביום שני הראשון בטווח, בשעה 06:00</li>';
   s += '<li>מרווח 18 שעות בין תרגילים באותו כוח (מסלול)</li>';
@@ -627,17 +627,17 @@ function _seriesSchedulingRulesBulletsHtml() {
 
 function Series_rulesExplainHtml() {
   let s = '<div style="font-size:12px;line-height:1.65">';
-  s += '<p style="color:var(--muted);margin:0 0 10px">' +
+  s += '<p class="rules-muted" style="margin:0 0 10px">' +
     'בניית סדרה יוצרת תרגילים אוטומטית לפי שלושה גדודים (מ<a href="#" data-spa-page="fieldForces">כוחות בשטח</a>), ' +
     'סוג הכוח של כל גדוד ושטחי האש שנבחרו. הפעולה מתבצעת מדף ' +
     '<a href="#" data-spa-page="exercises">ניהול תרגילים</a>.</p>';
-  s += '<p style="font-size:12px;color:#d97706;margin:0 0 10px;font-weight:600">' +
+  s += '<p class="rules-warn" style="font-size:12px;margin:0 0 10px;font-weight:600">' +
     '⚠ בניית סדרה מוחקת את כל התרגילים, השיבוצים וצירי הזמן הקיימים במערכת.</p>';
   s += _seriesSchedulingRulesBulletsHtml();
   s += Series_variantsRulesHtml();
-  s += '<p style="font-size:11px;color:var(--muted);margin:12px 0 6px"><b>שטחי אש לשיבוץ</b> (מטבלת שטחי אש)</p>';
+  s += '<p class="rules-muted" style="font-size:11px;margin:12px 0 6px"><b>שטחי אש לשיבוץ</b> (מטבלת שטחי אש)</p>';
   s += Series_locationRulesHtml();
-  s += '<p style="font-size:11px;color:var(--muted);margin:10px 0 0">' +
+  s += '<p class="rules-muted" style="font-size:11px;margin:10px 0 0">' +
     'דוגמה: 9 תרגילים, 3 גדודים (חיר + חשן + 900) → 3 תרגילים לכל גדוד. בציר הזמן — שורה לכל גדוד.</p>';
   s += '</div>';
   return s;
@@ -645,7 +645,7 @@ function Series_rulesExplainHtml() {
 
 function Series_variantsRulesHtml() {
   const forceOrder = ['חיר', '900', 'חשן'];
-  let s = '<p style="font-size:11px;color:var(--muted);margin:0 0 6px"><b>סוגי תרגיל ומשך</b> (לפי סוג כוח של הגדוד)</p>';
+  let s = '<p class="rules-muted" style="font-size:11px;margin:0 0 6px"><b>סוגי תרגיל ומשך</b> (לפי סוג כוח של הגדוד)</p>';
   s += '<table class="tbl" style="font-size:11px;margin:0 0 12px"><thead><tr>' +
     '<th>סוג כוח</th><th>תרגיל</th><th style="text-align:left">משך</th></tr></thead><tbody>';
   forceOrder.forEach(function(ft) {
@@ -664,7 +664,7 @@ function Series_locationRulesHtml() {
   const zoneMap = Series_fireZoneMap();
   const names = Object.keys(zoneMap);
   if (!names.length) {
-    return '<p style="font-size:11px;color:#d97706;margin:0 0 12px">' +
+    return '<p class="rules-warn" style="font-size:11px;margin:0 0 12px">' +
       'אין שטחי אש במערכת — הוסף ב<a href="#" data-spa-page="fireZones">שטחי אש</a>.</p>';
   }
   let s = '<table class="tbl" style="font-size:11px;margin:0 0 12px"><thead><tr>' +

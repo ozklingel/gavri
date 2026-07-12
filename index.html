@@ -1048,6 +1048,70 @@ body {
       display: flex;
       margin-bottom: 0;
     }
+    .expandable-stack .collapsible-toggle,
+    .expandable-stack .expandable-closed {
+      background: var(--glass-heavy) !important;
+      color: var(--green3);
+      border-color: var(--border2);
+      box-shadow: 0 1px 4px rgba(20, 45, 30, 0.08);
+    }
+    .expandable-stack .collapsible-toggle:hover,
+    .expandable-stack .expandable-closed:hover {
+      background: var(--bg4) !important;
+      border-color: var(--green2);
+    }
+    .expandable-panel-body {
+      background: var(--glass-heavy) !important;
+      border: 1px solid var(--border2);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      padding: 14px 16px 16px;
+      margin-bottom: 8px;
+      color: var(--text);
+      box-shadow: 0 2px 10px rgba(20, 45, 30, 0.06);
+    }
+    .expandable-panel-body p,
+    .expandable-panel-body li,
+    .expandable-panel-body td,
+    .expandable-panel-body span {
+      color: var(--text);
+    }
+    .expandable-panel-body p[style*="color:var(--muted)"],
+    .expandable-panel-body li[style*="color:var(--muted)"],
+    .expandable-panel-body .rules-muted {
+      color: var(--text2) !important;
+    }
+    .expandable-panel-body a {
+      color: #1d4ed8;
+      text-decoration: underline;
+      font-weight: 600;
+    }
+    .expandable-panel-body a:hover {
+      color: #1e40af;
+    }
+    .expandable-panel-body .tbl th {
+      background: var(--bg4) !important;
+      color: var(--green3);
+      border-bottom: 2px solid var(--border2);
+    }
+    .expandable-panel-body .tbl td {
+      background: rgba(255, 255, 255, 0.92) !important;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+    .expandable-panel-body .tbl tr:hover td {
+      background: rgba(240, 247, 243, 0.98) !important;
+    }
+    .expandable-panel-body .tbl .mono {
+      color: var(--green3);
+    }
+    .expandable-panel-body .rules-warn {
+      color: #b45309 !important;
+      background: rgba(254, 243, 199, 0.65);
+      border: 1px solid rgba(217, 119, 6, 0.35);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
     .spa-tab-panel { width: 100%; }
 
     /* ── TABLE ── */
@@ -2637,6 +2701,33 @@ body {
     }
     ::-webkit-scrollbar-track {
       background: var(--bg3);
+    }
+    /* פאנלים מתקפלים (הסבר סדרה / שיבוץ) — ניגודיות מעל זכוכית גלובלית */
+    .expandable-panel-body {
+      background: var(--glass-heavy) !important;
+      color: var(--text) !important;
+    }
+    .expandable-stack .collapsible-toggle,
+    .expandable-stack .expandable-closed {
+      background: var(--glass-heavy) !important;
+      color: var(--green3) !important;
+    }
+    .expandable-panel-body .tbl th {
+      background: var(--bg4) !important;
+      color: var(--green3) !important;
+    }
+    .expandable-panel-body .tbl td {
+      background: rgba(255, 255, 255, 0.92) !important;
+      color: var(--text) !important;
+    }
+    .expandable-panel-body .rules-muted,
+    .expandable-panel-body p,
+    .expandable-panel-body li {
+      color: var(--text) !important;
+    }
+    .expandable-panel-body .rules-warn {
+      color: #92400e !important;
+      background: rgba(254, 243, 199, 0.85) !important;
     }
 </style>
 </head>
