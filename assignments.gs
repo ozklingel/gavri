@@ -15,7 +15,8 @@ function _assignmentRow(id, exId, userId, status, score, resp, feedback, tutor) 
   ];
 }
 
-function Assignments_all() {
+function Assignments_all(includeArchived) {
+  const activeEx = includeArchived ? null : Exercises_activeIdSet();
   return _rows('Assignments').data.map(r => ({
     id:             String(r[0]),
     exercise_id:    String(r[1]),
@@ -25,7 +26,10 @@ function Assignments_all() {
     responsibility: r[5] == null ? '' : String(r[5]),
     feedback:       r[6] == null ? '' : String(r[6]),
     tutor:          r[7] == null ? '' : String(r[7])
-  }));
+  })).filter(function(a) {
+    if (includeArchived) return true;
+    return !!activeEx[String(a.exercise_id)];
+  });
 }
 
 var _assignmentsByUserId = null;
@@ -60,7 +64,7 @@ function _assignmentsEnsureIndex() {
 }
 
 function _assignmentsInvalidate() {
-  _assignmentsInvalidate();
+  _cacheInvalidate('Assignments');
   _assignmentsClearDerived();
 }
 
@@ -645,14 +649,25 @@ function Assignments_autoAssignAll(p) {
 }
 // פעולה: ניקוי כל השיבוצים (לפני הרצה מחדש של שיבוץ אוטומטי)
 function Assignments_clearAll(p) {
-  Auth_requireRole(p, ['admin']);
+  const u = Auth_requireRole(p, ['admin']);
+  const activeEx = Exercises_activeIdSet();
   const sh = _sheet('Assignments');
-  const last = sh.getLastRow();
-  if (last > 1) {
-    sh.deleteRows(2, last - 1);
+  const data = _rows('Assignments').data;
+  let removed = 0;
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (!activeEx[String(data[i][1])]) continue;
+    sh.deleteRow(i + 2);
+    removed++;
   }
   _assignmentsInvalidate();
-  return Views_assign({ sid: p.sid, info: '🗑 כל השיבוצים נוקו.' });
+  SystemLog_write({
+    user_id: u.id,
+    action: 'assignments.clearAll',
+    entity_type: 'assignments',
+    entity_id: '',
+    details: { removed: removed, scope: 'active_series_only' }
+  });
+  return Views_assign({ sid: p.sid, info: '🗑 שיבוצי הסדרה הפעילה נוקו (' + removed + ').' });
 }
 
 // Update assignment fields — admin: all; tutor: score only for assigned tutee

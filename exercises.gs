@@ -489,7 +489,25 @@ function Exercises_appendRows(rows) {
   _cacheInvalidate('Exercises');
 }
 
-function Exercises_all() {
+function Exercises_activeIdSet() {
+  const activeSid = Series_getActiveId();
+  const col = Series_exerciseColIndex();
+  const set = {};
+  _rows('Exercises').data.forEach(function(r) {
+    const exId = String(r[0]);
+    const sid = String(r[col] || '').trim();
+    if (activeSid) {
+      if (sid === activeSid) set[exId] = true;
+    } else if (!sid) {
+      set[exId] = true;
+    }
+  });
+  return set;
+}
+
+function Exercises_all(includeArchived) {
+  const activeSid = includeArchived ? null : Series_getActiveId();
+  const seriesCol = Series_exerciseColIndex();
   return _rows('Exercises').data.map(r => ({
     id:          String(r[0]),
     title:       String(r[1]),
@@ -509,8 +527,13 @@ function Exercises_all() {
     camp:                r[9]  == null ? '' : String(r[9]),
     battalion_commander: r[10] == null ? '' : String(r[10]),
     series_force_slot:   r[13] == null ? '' : String(r[13]),
-    field_force_id:      r[14] == null ? '' : String(r[14])
-  }));
+    field_force_id:      r[14] == null ? '' : String(r[14]),
+    series_id:           r[seriesCol] == null ? '' : String(r[seriesCol])
+  })).filter(function(e) {
+    if (includeArchived) return true;
+    if (!activeSid) return !e.series_id;
+    return e.series_id === activeSid;
+  });
 }
 
 var _exercisesById = null;
@@ -547,8 +570,10 @@ function Exercises_detailsIndex() {
   if (!_rowsCache['ExerciseDetails']) _exercisesClearDerived();
   if (_exerciseDetailsByExId) return _exerciseDetailsByExId;
   _exerciseDetailsByExId = {};
+  const activeIds = Exercises_activeIdSet();
   _rows('ExerciseDetails').data.forEach(function(r) {
     const exId = String(r[1]);
+    if (!activeIds[exId]) return;
     if (!_exerciseDetailsByExId[exId]) _exerciseDetailsByExId[exId] = [];
     _exerciseDetailsByExId[exId].push(_exerciseDetailFromRow(r));
   });
@@ -668,6 +693,18 @@ function Exercises_create(p) {
     act, exerciseType, partnerBattalion, camp, battalionCommander,
     startTime, endTime
   ]);
+
+  Series_ensureMigrated();
+  const seriesId = Series_getActiveId();
+  if (seriesId) Series_assignExercisesToSeries([id], seriesId);
+
+  SystemLog_write({
+    user_id: u.id,
+    action: 'exercise.create',
+    entity_type: 'exercise',
+    entity_id: id,
+    details: { title: title, series_id: seriesId }
+  });
 
   let info = 'התרגיל נוצר בהצלחה (' + id + ').';
 
@@ -882,26 +919,29 @@ function Exercises_deleteDetail(p) {
   });
 }
 
-/** מוחק את כל התרגילים + הקצאות + פרטי ציר זמן (לא נוגע ב-TimelineBlocks). */
+/** @deprecated — בניית סדרה משתמשת ב-Series_prepareNewBuild (ארכוב, לא מחיקה). */
 function Exercises_clearAllBeforeSeries() {
-  const removedExercises = _rows('Exercises').data.length;
-
-  ['Assignments', 'ExerciseDetails', 'Exercises'].forEach(function(name) {
-    const sh = _sheet(name);
-    const last = sh.getLastRow();
-    if (last > 1) sh.deleteRows(2, last - 1);
-    _cacheInvalidate(name);
-  });
-
-  return removedExercises;
+  return 0;
 }
 
 // (החלף את הפונקציה Exercises_delete בקובץ exercises.gs בגרסה הזו)
 
 function Exercises_delete(p) {
-  Auth_requireRole(p, ['admin']);
+  const u = Auth_requireRole(p, ['admin']);
   const id = (p.id || '').trim();
   if (!id) throw new Error('חסר מזהה תרגיל.');
+
+  const ex = Exercises_get(id);
+  SystemLog_write({
+    user_id: u.id,
+    action: 'exercise.delete',
+    entity_type: 'exercise',
+    entity_id: id,
+    details: {
+      title: ex ? ex.title : '',
+      series_id: ex ? ex.series_id : ''
+    }
+  });
 
   // Delete related assignments
   const assignSh   = _sheet('Assignments');

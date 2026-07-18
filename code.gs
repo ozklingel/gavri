@@ -31,10 +31,10 @@ var _rowsCache = {};
 var DB_SHEET_NAMES = [
   'Users', 'Credentials', 'Teams', 'Exercises', 'ExerciseDetails',
   'Assignments', 'FieldForces', 'FireZones', 'HomeConstraints', 'TimelineBlocks',
-  'UserFieldDefs', 'UserFieldValues'
+  'UserFieldDefs', 'UserFieldValues', 'Series', 'SystemLog'
 ];
 // מינימום לעלייה אחרי התחברות — דשבורד, חיפוש, שיבוצים (ללא Credentials / שטחי אש / ציר זמן)
-var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments'];
+var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
 var DB_BOOT_SHEETS = DB_SESSION_SHEETS;
 var DB_TIMELINE_SHEETS = ['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces', 'FireZones'];
 var DB_CACHE_TTL_SEC = 600;
@@ -202,6 +202,11 @@ function _cacheInvalidate(name) {
   for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
 }
 
+function _colIndex(sheetName, columnName) {
+  const header = _rows(sheetName).header.map(String);
+  return header.indexOf(columnName);
+}
+
 function _append(name, row) {
   _sheet(name).appendRow(row);
   _cacheInvalidate(name);   // keep cache consistent after write
@@ -266,7 +271,10 @@ function setupSheets() {
   ensureColumn('Exercises', 'end_time');
   ensureColumn('Exercises', 'series_force_slot');
   ensureColumn('Exercises', 'field_force_id');
+  ensureColumn('Exercises', 'series_id');
   ensure('ExerciseDetails',  ['id','exercise_id','time','location','description']);
+  ensure('Series', ['id','label','start_date','end_date','status','created_at','created_by','exercise_count','assignment_count','detail_count','battalion_config_json','build_params_json']);
+  ensure('SystemLog', ['id','timestamp','user_id','action','entity_type','entity_id','details_json']);
   ensure('Assignments',      ['id','exercise_id','user_id','status','score','responsibility','feedback']);
   ensureColumn('Assignments', 'responsibility');
   ensureColumn('Assignments', 'feedback');
@@ -296,6 +304,10 @@ function setupSheets() {
     ss.getSheetByName('Credentials').appendRow(['U004','train123']);
     ss.getSheetByName('Teams').appendRow(['T1','Alpha Team','U002']);
   }
+
+  Series_ensureMigrated();
+  _cacheInvalidate('Exercises');
+  _cacheInvalidate('Series');
 }
 
 function resetTrainingTables() {

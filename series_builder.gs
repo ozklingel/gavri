@@ -631,7 +631,7 @@ function Series_rulesExplainHtml() {
     'בניית סדרה יוצרת תרגילים אוטומטית לפי שלושה גדודים (מ<a href="#" data-spa-page="fieldForces">כוחות בשטח</a>), ' +
     'סוג הכוח של כל גדוד ושטחי האש שנבחרו. הטופס נמצא בלשונית <b>תרגיל חדש</b> בדף זה.</p>';
   s += '<p class="rules-warn" style="font-size:12px;margin:0 0 10px;font-weight:600">' +
-    '⚠ בניית סדרה מוחקת את כל התרגילים, השיבוצים וצירי הזמן הקיימים במערכת.</p>';
+    'ℹ בניית סדרה חדשה שומרת את הסדרה הקודמת בארכיון (תרגילים, שיבוצים ונוה״ק) — רק הסדרה החדשה תוצג למשתמשים.</p>';
   s += _seriesSchedulingRulesBulletsHtml();
   s += Series_variantsRulesHtml();
   s += '<p class="rules-muted" style="font-size:11px;margin:12px 0 6px"><b>שטחי אש לשיבוץ</b> (מטבלת שטחי אש)</p>';
@@ -709,8 +709,8 @@ function Series_buildFormHtml(sid) {
     s += '<p style="font-size:12px;color:#d97706;margin:0 0 12px;font-weight:600">' +
       '⚠ יש רק ' + battalionCount + ' גדודים במערכת — הוסף גדודים ב<a href="#" data-spa-page="fieldForces">כוחות בשטח</a> (תפקיד: גדוד).</p>';
   }
-  s += '<p style="font-size:12px;color:#d97706;margin:0 0 12px;font-weight:600">' +
-    '⚠ בניית סדרה מוחקת את כל התרגילים, השיבוצים וצירי הזמן הקיימים במערכת.</p>';
+  s += '<p style="font-size:12px;color:#0369a1;margin:0 0 12px;font-weight:600">' +
+    'ℹ סדרה חדשה נשמרת כפעילה; הסדרה הקודמת (תרגילים, שיבוצים, נוה״ק) נשמרת בארכיון ולא נמחקת.</p>';
   s += _seriesSchedulingRulesBulletsHtml();
   s += Series_variantsRulesHtml();
   s += '<p style="font-size:11px;color:var(--muted);margin:0 0 6px"><b>שטחי אש לשיבוץ</b> (מטבלת שטחי אש)</p>';
@@ -739,7 +739,7 @@ function Series_buildFormHtml(sid) {
   s += '<p style="font-size:11px;color:var(--muted);margin-top:8px">' +
     'דוגמה: 9 תרגילים, 3 גדודים (חיר + חשן + 900) → 3 תרגילים לכל גדוד. בציר הזמן — שורה לכל גדוד.</p>';
   s += '<button type="submit" class="btn btn-primary btn-full" ' +
-    'onclick="return confirm(\'בניית סדרה תמחק את כל התרגילים, השיבוצים וצירי הזמן הקיימים. להמשיך?\')">' +
+    'onclick="return confirm(\'בניית סדרה חדשה תארכב את הסדרה הנוכחית ותיצור סדרה חדשה לכולם. להמשיך?\')">' +
     '► בנה סדרה</button>';
   s += '</form>';
   return s;
@@ -770,12 +770,24 @@ function Exercises_buildSeries(p) {
     });
   }
 
-  const removedCount = Exercises_clearAllBeforeSeries();
+  const battalionConfig = Series_getBattalionConfig() || [];
+  const buildMeta = {
+    start_date: startYmd,
+    end_date: endYmd,
+    label: 'סדרה ' + startYmd + ' — ' + endYmd,
+    battalion_config: battalionConfig,
+    build_params: {
+      locations: locations,
+      queueSize: queue.length,
+      totalRequested: queue.length
+    }
+  };
+  const prep = Series_prepareNewBuild(u.id, buildMeta);
+  const seriesId = prep.seriesId;
 
   const exRows = [];
+  const createdIds = [];
   const baseTs = Date.now();
-
-  const battalionConfig = Series_getBattalionConfig() || [];
 
   let rowIdx = 0;
   result.placed.forEach(function(item) {
@@ -790,6 +802,7 @@ function Exercises_buildSeries(p) {
       const seq = rowIdx + 1;
       const id = 'E' + baseTs + '_' + rowIdx;
       rowIdx++;
+      createdIds.push(id);
       const locPart = location ? (' · ' + location) : '';
       const title = _seriesExerciseTitle(seq, location, forceName);
 
@@ -809,17 +822,23 @@ function Exercises_buildSeries(p) {
         _seriesMsToHm(plan.startMs),
         _seriesMsToHm(plan.endMs),
         String(item.forceSlot),
-        fieldForceId
+        fieldForceId,
+        seriesId
       ]);
     });
   });
 
   if (exRows.length) Exercises_appendRows(exRows);
+  Series_finalizeBuild(seriesId, createdIds);
 
   const createdCount = exRows.length;
   const scheduledCount = result.requestedCount - result.skippedCount;
   let info = '✅';
-  if (removedCount) info += ' נוקו ' + removedCount + ' תרגילים קיימים ·';
+  if (prep.archived) {
+    info += ' הסדרה הקודמת נשמרה בארכיון (' +
+      prep.archived.counts.exercises + ' תרגילים, ' +
+      prep.archived.counts.assignments + ' שיבוצים) ·';
+  }
   info += ' שובצו ' + scheduledCount + ' מקומות בלוז · נוצרו ' + createdCount + ' תרגילים';
   const byType = {};
   exRows.forEach(function(row) {
@@ -840,6 +859,21 @@ function Exercises_buildSeries(p) {
   }
   info += '. מיקומים: ' + locations.join(', ');
   info += '. (ימי חסימה בטווח: ' + result.holyDayCount + ')';
+
+  SystemLog_write({
+    user_id: u.id,
+    action: 'series.build',
+    entity_type: 'series',
+    entity_id: seriesId,
+    details: {
+      archived_series_id: prep.archived ? prep.archived.seriesId : '',
+      created_exercises: createdCount,
+      scheduled: scheduledCount,
+      skipped: result.skippedCount,
+      date_range: [startYmd, endYmd],
+      locations: locations
+    }
+  });
 
   return Views_exercises({ sid: p.sid, info: info });
 }
