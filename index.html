@@ -162,10 +162,50 @@ body {
       min-height: 44px;
     }
     .topbar-back-btn {
-      flex-shrink: 0;
+      display: none !important;
+    }
+    /* ── FLOAT NAV (חזרה / קדימה) ── */
+    .app-float-nav {
+      position: fixed;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      inset-inline-start: max(14px, env(safe-area-inset-left));
+      z-index: 12500;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .app-float-nav:not([hidden]) {
+      pointer-events: auto;
+    }
+    .app-float-nav-btn {
       font-family: var(--mono);
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px 16px;
+      min-height: 44px;
+      border-radius: 999px;
+      border: 1px solid var(--border2);
+      background: var(--glass-heavy);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--green3);
+      box-shadow: 0 4px 20px rgba(20, 45, 30, 0.22);
+      cursor: pointer;
       white-space: nowrap;
+      transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
+    }
+    .app-float-nav-btn:hover {
+      background: var(--bg4);
+      box-shadow: 0 6px 24px rgba(20, 45, 30, 0.28);
+    }
+    .app-float-nav-btn:active {
+      transform: scale(0.97);
+    }
+    .app-float-nav-btn[hidden] {
+      display: none !important;
     }
     a.topbar-brand {
       text-decoration: none;
@@ -2756,6 +2796,12 @@ body {
 </div>
 
 <div id="app-content"><?!= body ?></div>
+
+<div id="appFloatNav" class="app-float-nav" hidden aria-label="ניווט בין עמודים">
+  <button type="button" id="appFloatBack" class="app-float-nav-btn" data-spa-back hidden title="חזרה לעמוד הקודם">← חזרה</button>
+  <button type="button" id="appFloatForward" class="app-float-nav-btn" data-spa-forward hidden title="לעמוד הבא">לעמוד הבא →</button>
+</div>
+
 <script>
   // ══ Page loader (shared by SPA + assign board) ══
   var MapimLoader = (function() {
@@ -2900,6 +2946,12 @@ body {
     var splashBoot = true;
     var currentRoute = null;
     var navStack = [];
+    var forwardStack = [];
+
+    function cloneRoute(route) {
+      if (!route) return null;
+      return { page: route.page, params: Object.assign({}, route.params || {}) };
+    }
 
     function routeKey(route) {
       if (!route) return '';
@@ -2913,23 +2965,51 @@ body {
       return pg !== 'dashboard' && pg !== 'login';
     }
 
+    function canGoForward() {
+      return forwardStack.length > 0;
+    }
+
+    function updateNavButtons() {
+      var floatNav = document.getElementById('appFloatNav');
+      var backFloat = document.getElementById('appFloatBack');
+      var fwdFloat = document.getElementById('appFloatForward');
+      var topBack = document.getElementById('appTopbarBack');
+      var showBack = canGoBack();
+      var showFwd = canGoForward();
+      var loggedIn = !!getSid() && currentRoute && currentRoute.page !== 'login';
+      if (topBack) topBack.hidden = true;
+      if (floatNav) floatNav.hidden = !loggedIn || (!showBack && !showFwd);
+      if (backFloat) backFloat.hidden = !showBack;
+      if (fwdFloat) fwdFloat.hidden = !showFwd;
+    }
+
     function updateBackButton() {
-      var btn = document.getElementById('appTopbarBack');
-      if (!btn) return;
-      btn.hidden = !canGoBack();
+      updateNavButtons();
     }
 
     function goBack() {
+      var cur = cloneRoute(currentRoute);
       if (navStack.length) {
         var prev = navStack.pop();
+        if (cur && routeKey(cur) !== routeKey(prev)) forwardStack.push(cur);
         navigate(prev.page, prev.params || {}, { fromBack: true });
         return;
       }
       if (currentRoute && currentRoute.page !== 'dashboard' && getSid()) {
+        if (cur) forwardStack.push(cur);
         navigate('dashboard', {}, { fromBack: true, replace: true });
       } else if (currentRoute && currentRoute.page !== 'login') {
+        if (cur) forwardStack.push(cur);
         navigate('login', {}, { fromBack: true, replace: true });
       }
+    }
+
+    function goForward() {
+      if (!forwardStack.length) return;
+      var next = forwardStack.pop();
+      var cur = cloneRoute(currentRoute);
+      if (cur && routeKey(cur) !== routeKey(next)) navStack.push(cur);
+      navigate(next.page, next.params || {}, { fromForward: true });
     }
 
     function finishBootUi() {
@@ -3149,6 +3229,7 @@ body {
         setSid('');
         setMfaToken('');
         navStack = [];
+        forwardStack = [];
         currentRoute = { page: 'login', params: {} };
       }
       if (result.sid) {
@@ -3156,6 +3237,7 @@ body {
         setMfaToken('');
         if (!result.mfaToken) {
           navStack = [];
+          forwardStack = [];
           currentRoute = { page: 'dashboard', params: {} };
         }
       }
@@ -3182,6 +3264,7 @@ body {
       options = options || {};
       params = params || {};
       page = String(page || 'login').trim();
+      if (!options.fromBack && !options.fromForward) forwardStack = [];
       var prevRoute = currentRoute;
       var nextRoute = { page: page, params: params };
       var myReq = ++reqId;
@@ -3194,7 +3277,7 @@ body {
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
-          if (!options.fromBack && !options.replace && prevRoute) {
+          if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
             if (routeKey(prevRoute) !== routeKey(nextRoute)) {
               navStack.push(prevRoute);
             }
@@ -3202,7 +3285,6 @@ body {
           if (options.replace) navStack = [];
           currentRoute = nextRoute;
           applyResult(result);
-          updateBackButton();
         })
         .withFailureHandler(function(err) {
           if (myReq !== reqId) return;
@@ -3278,13 +3360,19 @@ body {
     }
 
     document.addEventListener('click', function(e) {
-      if (isLocalUiClick(e.target)) return;
-
       if (e.target.closest('[data-spa-back]')) {
         e.preventDefault();
         goBack();
         return;
       }
+
+      if (e.target.closest('[data-spa-forward]')) {
+        e.preventDefault();
+        goForward();
+        return;
+      }
+
+      if (isLocalUiClick(e.target)) return;
 
       var el = e.target.closest('[data-spa-page]');
       if (el) {
@@ -3324,6 +3412,7 @@ body {
 
     return {
       navigate: navigate, runAction: runAction, goBack: goBack, canGoBack: canGoBack,
+      goForward: goForward, canGoForward: canGoForward,
       getSid: getSid, setSid: setSid, userLinkHtml: userLinkHtml, whatsappLinkHtml: whatsappLinkHtml,
       exerciseLinkHtml: exerciseLinkHtml,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
