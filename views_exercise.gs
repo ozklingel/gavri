@@ -374,6 +374,7 @@ function Views_user(p) {
     '<td>' + (target.unit_classification ? _esc(target.unit_classification) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
     '<tr><td style="color:var(--muted);font-family:var(--mono);font-size:12px">תפקיד מיועד</td>' +
     '<td>' + (target.target_role ? _esc(target.target_role) : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
+    (typeof _customProfileFieldsDisplayRows === 'function' ? _customProfileFieldsDisplayRows(target.id) : '') +
     '</tbody></table>' +
     '</div></div>';
 

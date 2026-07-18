@@ -30,7 +30,8 @@ var _rowsCache = {};
 
 var DB_SHEET_NAMES = [
   'Users', 'Credentials', 'Teams', 'Exercises', 'ExerciseDetails',
-  'Assignments', 'FieldForces', 'FireZones', 'HomeConstraints', 'TimelineBlocks'
+  'Assignments', 'FieldForces', 'FireZones', 'HomeConstraints', 'TimelineBlocks',
+  'UserFieldDefs', 'UserFieldValues'
 ];
 // מינימום לעלייה אחרי התחברות — דשבורד, חיפוש, שיבוצים (ללא Credentials / שטחי אש / ציר זמן)
 var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments'];
@@ -275,6 +276,8 @@ function setupSheets() {
   ensure('FireZones', ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night']);
   ensure('HomeConstraints', ['id','user_id','start_date','start_time','end_date','end_time','notes','status','approval_tier','supervisor_id','approved_by','approved_at','rejection_note','created_at']);
   ensure('TimelineBlocks', ['id','label','start_date','end_date','start_time','end_time','lane','created_by']);
+  ensure('UserFieldDefs', ['id','label','field_key','sort_order']);
+  ensure('UserFieldValues', ['user_id','field_key','value']);
   ensureColumn('Users', 'unit_affiliation');
   ensureColumn('Users', 'service_type');
   ensureColumn('Users', 'military_affiliation');

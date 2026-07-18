@@ -381,6 +381,7 @@ function Users_updateProfile(p) {
     sh.getRange(row, 3).setValue(Roles_normalize(p.newRole.trim()));
   }
   _cacheInvalidate('Users');
+  UserProfileFields_saveForUser(targetId, p);
 
   if (p.returnTo === 'user') {
     return Views_user({ sid: p.sid, id: targetId, info: 'פרופיל המשתמש עודכן בהצלחה.' });

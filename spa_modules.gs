@@ -120,7 +120,7 @@ function _cacheWarmForModule(moduleId, p) {
     return;
   }
   if (id.indexOf('users.tab.') === 0) {
-    _cacheWarmSheetsIfNeeded(['Users', 'Teams']);
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues']);
     return;
   }
   if (id.indexOf('statistics.') === 0 || id === 'statistics.main') {

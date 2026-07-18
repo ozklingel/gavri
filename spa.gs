@@ -100,7 +100,7 @@ function _cacheWarmForPage(page, p) {
     return;
   }
   if (pg === 'users') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Teams']);
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues']);
     return;
   }
   if (pg === 'user') {
@@ -198,6 +198,8 @@ function _spaDispatchAction(action, p) {
     case 'deleteUser':         return Users_delete(p);
     case 'updateRole':         return Users_updateRole(p);
     case 'updateProfile':      return Users_updateProfile(p);
+    case 'createUserFieldDef': return UserProfileFields_createDef(p);
+    case 'deleteUserFieldDef': return UserProfileFields_deleteDef(p);
     case 'createTeam':         return Teams_create(p);
     case 'autoSplitTeams':     return Teams_autoSplit(p);
     case 'renameTeam':         return Teams_rename(p);

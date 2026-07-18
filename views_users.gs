@@ -86,6 +86,8 @@ function _usersTab(sid, openSet) {
     _usersNewUserForm(sid, teams), openSet);
   s += _expandablePanel('users', baseParams, 'importCsv', '📥 ייבוא מקובץ CSV',
     _usersImportCsvPanel(), openSet);
+  s += _expandablePanel('users', baseParams, 'fieldDefs', '⚙ שדות פרופיל נוספים',
+    _userFieldDefsAdminHtml(sid), openSet);
   s += '</div>';
   return s;
 }

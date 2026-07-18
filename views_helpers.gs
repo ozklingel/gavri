@@ -360,7 +360,8 @@ function _extraProfileFields(target) {
     _input('phone', '', target.phone || '', 'tel') + '</div>' +
     '<div class="form-row"><label class="form-label">דוא"ל (MFA)</label>' +
     _input('email', 'user@example.com', target.email || '', 'email') + '</div>' +
-    '</div>';
+    '</div>' +
+    (typeof _customProfileFieldsFormHtml === 'function' ? _customProfileFieldsFormHtml(target) : '');
 }
 
 function _roleHe(r) {
