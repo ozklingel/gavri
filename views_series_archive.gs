@@ -11,6 +11,7 @@ function Views_seriesArchive(p) {
 function _viewsSeriesArchiveList(user, sid, p) {
   const active = Series_getActiveRow();
   const archived = Series_archivedList();
+  const sidQ = encodeURIComponent(sid);
 
   let s = _topbar(user, sid) + '<div class="page">' + _flash(p);
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
@@ -19,7 +20,8 @@ function _viewsSeriesArchiveList(user, sid, p) {
   s += '</div>';
 
   s += '<p class="rules-muted" style="font-size:12px;margin:0 0 14px">' +
-    'סדרות בארכיון נשמרות במלואן (תרגילים, שיבוצים, נוה״ק). רק הסדרה הפעילה מוצגת לשאר המערכת.</p>';
+    'סדרות בארכיון נשמרות במלואן (תרגילים, שיבוצים, נוה״ק). רק הסדרה הפעילה מוצגת לשאר המערכת. ' +
+    'ניתן למחוק סדרה מארכיון — המחיקה סופית ונרשמת ביומן.</p>';
 
   if (active) {
     s += '<div class="card" style="margin-bottom:14px;border-color:var(--green2)">';
@@ -55,6 +57,13 @@ function _viewsSeriesArchiveList(user, sid, p) {
         '<td>' + _esc(Series_formatCreatedAt(row.created_at)) + '</td>' +
         '<td style="text-align:left">' +
           _a('page=seriesArchive&seriesId=' + encodeURIComponent(row.id), '👁 צפה', 'btn btn-primary btn-sm') +
+          ' ' +
+          _confirmDelete(
+            'action=deleteArchivedSeries&seriesId=' + encodeURIComponent(row.id) + '&sid=' + sidQ,
+            'למחוק לצמיתות את הסדרה «' + (row.label || row.id) + '»?\n\n' +
+              'יימחקו ' + (row.exercise_count || 0) + ' תרגילים, ' +
+              (row.assignment_count || 0) + ' שיבוצים ו-' + (row.detail_count || 0) + ' רשומות נוה״ק.\n\nלא ניתן לשחזר.'
+          ) +
         '</td></tr>';
     });
     s += '</tbody></table>';
@@ -76,6 +85,7 @@ function _viewsSeriesArchiveDetail(user, sid, p, seriesId) {
   Series_updateCounts(seriesId);
   const fresh = Series_get(seriesId) || series;
   const exercises = Exercises_bySeriesId(seriesId);
+  const sidQ = encodeURIComponent(sid);
   const mpCounts = {};
   Assignments_all(true).forEach(function(a) {
     if (String(a.exercise_id)) {
@@ -89,6 +99,14 @@ function _viewsSeriesArchiveDetail(user, sid, p, seriesId) {
   s += '<h1 class="page-title" style="margin:0">🗄 ' + _esc(fresh.label || fresh.id) + '</h1>';
   s += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
   s += _a('page=seriesArchive', '← חזרה לארכיון', 'btn btn-ghost btn-sm');
+  if (fresh.status === 'archived') {
+    s += _confirmDelete(
+      'action=deleteArchivedSeries&seriesId=' + encodeURIComponent(fresh.id) + '&sid=' + sidQ,
+      'למחוק לצמיתות את הסדרה «' + (fresh.label || fresh.id) + '»?\n\n' +
+        'יימחקו ' + (fresh.exercise_count || 0) + ' תרגילים, ' +
+        (fresh.assignment_count || 0) + ' שיבוצים ו-' + (fresh.detail_count || 0) + ' רשומות נוה״ק.\n\nלא ניתן לשחזר.'
+    );
+  }
   s += '</div></div>';
 
   s += '<div class="card" style="margin-bottom:14px">';

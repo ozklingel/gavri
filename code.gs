@@ -37,9 +37,11 @@ var DB_SHEET_NAMES = [
 var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
 var DB_BOOT_SHEETS = DB_SESSION_SHEETS;
 var DB_TIMELINE_SHEETS = ['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces', 'FireZones'];
-var DB_CACHE_TTL_SEC = 600;
+var DB_CACHE_TTL_SEC = 21600;
 var DB_CACHE_PREFIX = 'mdb:';
 var DB_CACHE_CHUNK = 90000;
+// כל הגיליונות למעט Credentials — נטען בכניסה (עלייה איטית, ניווט מהיר)
+var DB_FULL_CACHE_SHEETS = DB_SHEET_NAMES.filter(function(n) { return n !== 'Credentials'; });
 
 function _dbCacheKey(name, part) {
   return DB_CACHE_PREFIX + name + (part == null ? '' : ':' + part);
@@ -128,8 +130,12 @@ function _cacheWarmSheetsIfNeeded(names) {
   });
 }
 
+function _cacheWarmFullIfNeeded() {
+  _cacheWarmSheetsIfNeeded(DB_FULL_CACHE_SHEETS);
+}
+
 function _cacheWarmAllIfNeeded() {
-  _cacheWarmSheetsIfNeeded(DB_SHEET_NAMES);
+  _cacheWarmFullIfNeeded();
 }
 
 function _cacheWarmAll(force) {
@@ -148,8 +154,13 @@ function apiWarmCache(sid) {
   } catch (e) {
     return { ok: true, sheets: 0, scope: 'none' };
   }
-  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
-  return { ok: true, sheets: DB_SESSION_SHEETS.length, scope: 'session' };
+  _cacheWarmFullIfNeeded();
+  return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length, scope: 'full' };
+}
+
+/** חימום מלא ברקע — כל הגיליונות (למעט Credentials) לקאש ל-6 שעות */
+function apiWarmFullCache(sid) {
+  return apiWarmCache(sid);
 }
 
 function _cacheWarmTimelineSheets() {
@@ -171,11 +182,11 @@ function apiWarmPageCache(sid, page) {
     return { ok: true, sheets: DB_TIMELINE_SHEETS.length, page: pg };
   }
   if (pg === 'assign') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'HomeConstraints']);
-    return { ok: true, sheets: 6, page: pg };
+    _cacheWarmFullIfNeeded();
+    return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length, page: pg };
   }
-  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
-  return { ok: true, sheets: DB_SESSION_SHEETS.length, page: pg };
+  _cacheWarmFullIfNeeded();
+  return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length, page: pg };
 }
 
 function _cacheFlush() {

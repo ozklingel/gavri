@@ -2828,6 +2828,7 @@ body {
       'action=complete': '// UPDATING...',
       'action=autoAssignAll': '// AUTO-ASSIGNING...',
       'action=clearAllAssignments': '// CLEARING...',
+      'action=deleteArchivedSeries': '// DELETING SERIES...',
       'action=importUsers': '// IMPORTING...',
       'page=dashboard': '// LOADING DASHBOARD...',
       'page=exercise': '// LOADING EXERCISE...',
@@ -3076,6 +3077,19 @@ body {
     }
 
     var warmPageScheduled = {};
+    var fullCacheWarmScheduled = false;
+    function scheduleFullCacheWarm() {
+      if (fullCacheWarmScheduled || !getSid()) return;
+      fullCacheWarmScheduled = true;
+      var run = function() {
+        try { google.script.run.apiWarmFullCache(getSid()); } catch (e1) {}
+      };
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(run, { timeout: 8000 });
+      } else {
+        setTimeout(run, 2500);
+      }
+    }
     function scheduleWarmPageCache(page) {
       page = String(page || '').trim();
       if (!page || warmPageScheduled[page] || !getSid()) return;
@@ -3253,6 +3267,7 @@ body {
       finishBootUi();
       loading = false;
       if (currentRoute.page === 'dashboard') scheduleWarmPageCache('timeline');
+      if (getSid() && currentRoute.page !== 'login') scheduleFullCacheWarm();
     }
 
     function fail(err) {
@@ -3933,6 +3948,7 @@ body {
       complete: 'סימון שיבוץ כהושלם',
       autoAssignAll: 'שיבוץ אוטומטי לכל התרגילים (נדרש אישור)',
       clearAllAssignments: 'מחיקת כל השיבוצים במערכת (נדרש אישור)',
+      deleteArchivedSeries: 'מחיקת סדרה מארכיון לצמיתות (נדרש אישור)',
       createUser: 'יצירת משתמש חדש',
       importUsers: 'ייבוא משתמשים מקובץ',
       deleteUser: 'מחיקת משתמש (נדרש אישור)',

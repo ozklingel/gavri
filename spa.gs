@@ -78,78 +78,8 @@ function _spaEnsureWrap(result) {
 }
 
 function _cacheWarmForPage(page, p) {
-  const pg = String(page || 'login').trim();
-  if (pg === 'login') return;
-
-  if (pg === 'dashboard') {
-    const tab = String((p && p.tab) || 'search').trim();
-    if (tab === 'team' || tab === 'exercise') {
-      _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
-    } else if (tab === 'conflicts') {
-      _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'Assignments']);
-    } else if (tab === 'search') {
-      _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
-    } else {
-      _cacheWarmSheetsIfNeeded(DB_BOOT_SHEETS);
-    }
-    return;
-  }
-
-  if (pg === 'exercise') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'Assignments', 'FieldForces', 'FireZones']);
-    return;
-  }
-  if (pg === 'users') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues']);
-    return;
-  }
-  if (pg === 'user') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'Assignments']);
-    return;
-  }
-  if (pg === 'feedback') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'Assignments']);
-    return;
-  }
-  if (pg === 'teamMatrix' || pg === 'exerciseMatrix') {
-    _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
-    return;
-  }
-
-  if (pg === 'fieldForces' || pg === 'fieldForce') {
-    _cacheWarmSheetsIfNeeded(['Users', 'FieldForces']);
-    return;
-  }
-  if (pg === 'fireZones' || pg === 'fireZone') {
-    _cacheWarmSheetsIfNeeded(['Users', 'FireZones']);
-    return;
-  }
-  if (pg === 'homeConstraints') {
-    _cacheWarmSheetsIfNeeded(['Users', 'HomeConstraints']);
-    return;
-  }
-  if (pg === 'timeline') {
-    _cacheWarmTimelineSheets();
-    return;
-  }
-  if (pg === 'exercises') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'FieldForces', 'FireZones']);
-    return;
-  }
-  if (pg === 'seriesArchive') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series', 'SystemLog']);
-    return;
-  }
-  if (pg === 'assign') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'HomeConstraints']);
-    return;
-  }
-  if (pg === 'statistics') {
-    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'Assignments']);
-    return;
-  }
-
-  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
+  if (String(page || 'login').trim() === 'login') return;
+  _cacheWarmFullIfNeeded();
 }
 
 function _spaDispatchPage(page, p) {
@@ -184,6 +114,7 @@ function _spaDispatchAction(action, p) {
     case 'logout':             return Auth_logout(p);
     case 'createExercise':     return Exercises_create(p);
     case 'buildSeries':        return Exercises_buildSeries(p);
+    case 'deleteArchivedSeries': return Series_deleteArchived(p);
     case 'editExercise':       return Exercises_edit(p);
     case 'duplicateExercise':  return Exercises_duplicate(p);
     case 'deleteExercise':     return Exercises_delete(p);

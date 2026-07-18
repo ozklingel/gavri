@@ -329,3 +329,82 @@ function Series_finalizeBuild(seriesId, createdExerciseIds) {
   }
   if (seriesId) Series_updateCounts(seriesId);
 }
+
+/** מוחק סדרה מארכיון + כל התרגילים, השיבוצים ונוה״ק שלה (לא ניתן למחוק סדרה פעילה). */
+function Series_deleteArchived(p) {
+  const u = Auth_requireRole(p, ['admin']);
+  const seriesId = String(p.seriesId || p.id || '').trim();
+  if (!seriesId) throw new Error('חסר מזהה סדרה.');
+
+  const series = Series_get(seriesId);
+  if (!series) throw new Error('הסדרה לא נמצאה.');
+  if (series.status === 'active') {
+    throw new Error('לא ניתן למחוק סדרה פעילה — רק סדרות בארכיון.');
+  }
+
+  const counts = Series_countsFor(seriesId);
+  const exIds = Series_exerciseIdsFor(seriesId);
+
+  const assignSh = _sheet('Assignments');
+  const assignData = _rows('Assignments').data;
+  let removedAssignments = 0;
+  for (let i = assignData.length - 1; i >= 0; i--) {
+    if (!exIds[String(assignData[i][1])]) continue;
+    assignSh.deleteRow(i + 2);
+    removedAssignments++;
+  }
+  _cacheInvalidate('Assignments');
+  if (typeof _assignmentsClearDerived === 'function') _assignmentsClearDerived();
+
+  const detailSh = _sheet('ExerciseDetails');
+  const detailData = _rows('ExerciseDetails').data;
+  let removedDetails = 0;
+  for (let i = detailData.length - 1; i >= 0; i--) {
+    if (!exIds[String(detailData[i][1])]) continue;
+    detailSh.deleteRow(i + 2);
+    removedDetails++;
+  }
+  _cacheInvalidate('ExerciseDetails');
+  if (typeof _exercisesClearDerived === 'function') _exercisesClearDerived();
+
+  const exSh = _sheet('Exercises');
+  const exData = _rows('Exercises').data;
+  let removedExercises = 0;
+  for (let i = exData.length - 1; i >= 0; i--) {
+    if (!exIds[String(exData[i][0])]) continue;
+    exSh.deleteRow(i + 2);
+    removedExercises++;
+  }
+  _cacheInvalidate('Exercises');
+  if (typeof _exercisesClearDerived === 'function') _exercisesClearDerived();
+
+  const seriesRow = _findRowIndex('Series', seriesId);
+  if (seriesRow >= 0) _sheet('Series').deleteRow(seriesRow);
+  Series_invalidateCache();
+
+  SystemLog_write({
+    user_id: u.id,
+    action: 'series.delete',
+    entity_type: 'series',
+    entity_id: seriesId,
+    details: {
+      label: series.label,
+      status: series.status,
+      removed: {
+        exercises: removedExercises,
+        assignments: removedAssignments,
+        details: removedDetails
+      },
+      previous_counts: counts
+    }
+  });
+
+  _cacheFlush();
+
+  return Views_seriesArchive({
+    sid: p.sid,
+    info: '🗑 הסדרה «' + (series.label || seriesId) + '» נמחקה (' +
+      removedExercises + ' תרגילים, ' + removedAssignments + ' שיבוצים, ' +
+      removedDetails + ' רשומות נוה״ק).'
+  });
+}
