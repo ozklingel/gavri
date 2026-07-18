@@ -136,6 +136,10 @@ function _cacheWarmForPage(page, p) {
     _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'FieldForces', 'FireZones']);
     return;
   }
+  if (pg === 'seriesArchive') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series', 'SystemLog']);
+    return;
+  }
   if (pg === 'assign') {
     _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'HomeConstraints']);
     return;
@@ -154,6 +158,7 @@ function _spaDispatchPage(page, p) {
     case 'dashboard': return Views_dashboard(p);
     case 'exercise':  return Views_exercise(p);
     case 'exercises': return Views_exercises(p);
+    case 'seriesArchive': return Views_seriesArchive(p);
     case 'users':     return Views_users(p);
     case 'timeline':  return Views_timeline(p);
     case 'user':      return Views_user(p);

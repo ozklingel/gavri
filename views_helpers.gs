@@ -433,6 +433,7 @@ function _drawerNavItems(user) {
   const items = [{ page: 'dashboard', label: 'מסך הבית', icon: '⊞' }];
   if (Roles_hasAdminAccess(user.role)) {
     items.push({ page: 'exercises', label: 'תרגילים', icon: '🎯' });
+    items.push({ page: 'seriesArchive', label: 'ארכיון סדרות', icon: '🗄' });
     items.push(
       { page: 'assign', label: 'לוח שיבוץ', icon: '🔀' },
       { page: 'timeline', label: 'ציר זמן', icon: '📅' },

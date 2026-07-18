@@ -25,6 +25,9 @@ function Views_exercises(p) {
   }
 
   s += '<div class="expandable-stack" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">' +
+    _expandablePanel('exercises', { tab: tab }, 'seriesArchive', '🗄 ארכיון סדרות',
+      '<p class="rules-muted" style="font-size:12px;margin:0 0 10px">סדרות קודמות נשמרות במלואן — תרגילים, שיבוצים ונוה״ק.</p>' +
+      _a('page=seriesArchive', 'פתח ארכיון סדרות', 'btn btn-secondary btn-sm'), openSet) +
     _expandablePanel('exercises', { tab: tab }, 'seriesRules', '📅 הסבר — לוגיקת בניית סדרה',
       Series_rulesExplainHtml(), openSet) +
     '</div>';

@@ -33,6 +33,36 @@ function Series_rowFromData(r) {
   };
 }
 
+function Series_get(seriesId) {
+  const id = String(seriesId || '').trim();
+  if (!id) return null;
+  const rows = _rows('Series').data;
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]) === id) return Series_rowFromData(rows[i]);
+  }
+  return null;
+}
+
+function Series_archivedList() {
+  return Series_all(true).filter(function(s) {
+    return s.status === 'archived';
+  }).sort(function(a, b) {
+    return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+  });
+}
+
+function Series_formatCreatedAt(iso) {
+  const s = String(iso || '').trim();
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s.slice(0, 16).replace('T', ' ');
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0') + ' ' +
+    String(d.getHours()).padStart(2, '0') + ':' +
+    String(d.getMinutes()).padStart(2, '0');
+}
+
 function Series_all(includeArchived) {
   return _rows('Series').data.map(Series_rowFromData).filter(function(s) {
     if (includeArchived) return true;

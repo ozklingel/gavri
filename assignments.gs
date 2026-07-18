@@ -130,6 +130,13 @@ function Assignments_byExercise(exerciseId) {
   return list ? list.slice() : [];
 }
 
+function Assignments_byExerciseAny(exerciseId) {
+  const eid = String(exerciseId || '');
+  return Assignments_all(true).filter(function(a) {
+    return String(a.exercise_id) === eid;
+  });
+}
+
 // Assign a single user to an exercise (admin only)
 function Assignments_assign(p) {
   Auth_requireRole(p, ['admin']);

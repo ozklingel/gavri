@@ -30,23 +30,38 @@ function Views_exercise(p) {
   const sid = user.id;
   const exId = String((p && (p.id || p.exerciseId)) || '').trim();
   if (!exId) return Views_error('חסר מזהה תרגיל.', p);
-  const ex  = Exercises_get(exId);
+  const archiveView = _parseBool(p.archive);
+  const ex  = archiveView ? Exercises_getAny(exId) : Exercises_get(exId);
   if (!ex) return Views_error('התרגיל לא נמצא.', p);
-  if (!_canViewExercise(user, exId)) {
+  if (archiveView) {
+    if (!Roles_hasAdminAccess(user.role)) {
+      return Views_error('אין הרשאה לצפות בתרגיל בארכיון.', p);
+    }
+  } else if (!_canViewExercise(user, exId)) {
     return Views_error('אין הרשאה לצפות בתרגיל זה.', p);
   }
   const sidQ = encodeURIComponent(sid);
   const openSet = _parseOpenSections(p);
   const exParams = { id: ex.id };
+  if (archiveView) exParams.archive = '1';
 
   let s = _topbar(user, sid) + '<div class="page">';
   s += _flash(p);
+
+  if (archiveView) {
+    s += '<div class="flash flash-info" style="margin-bottom:12px">📦 תרגיל מסדרה בארכיון — צפייה בלבד</div>';
+    if (ex.series_id) {
+      s += '<div style="margin-bottom:12px">' +
+        _a('page=seriesArchive&seriesId=' + encodeURIComponent(ex.series_id), '← חזרה לסדרה בארכיון', 'btn btn-ghost btn-sm') +
+        '</div>';
+    }
+  }
 
   // Page header with action buttons
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<div class="page-title" style="margin:0">' + _esc(ex.title) + '</div>' +
     '<div style="display:flex;gap:6px">';
-  if (Roles_hasAdminAccess(user.role)) {
+  if (Roles_hasAdminAccess(user.role) && !archiveView) {
     s += _confirmAction(
       'action=duplicateExercise&id=' + encodeURIComponent(ex.id) + '&sid=' + sidQ,
       '⎘ שכפל',
@@ -89,7 +104,7 @@ s += _confirmDelete(
   s += '<div class="grid-2" style="margin-bottom:14px">';
 
   // Timeline (נוהל קרב)
-  const details = Exercises_details(ex.id);
+  const details = archiveView ? Exercises_detailsAny(ex.id) : Exercises_details(ex.id);
   const tlProfile = ExerciseTimeline_profile(ex);
   const tlProfileLabel = ExerciseTimeline_profileLabel(tlProfile);
   let tlHtml = '<div class="card" id="exercise-procedure-card">' +
@@ -97,7 +112,7 @@ s += _confirmDelete(
     '<span class="card-title">⚔ נוהל קרב (' + details.length + ')</span>' +
     '<span style="font-size:11px;color:var(--muted)">תבנית: ' + _esc(tlProfileLabel) + '</span>';
 
-  if (Roles_hasAdminAccess(user.role)) {
+  if (Roles_hasAdminAccess(user.role) && !archiveView) {
     const genMsg = details.length
       ? 'ליצור מחדש ציר זמן נוה"ק לפי תבנית "' + tlProfileLabel + '"? הרשומות הקיימות (' + details.length + ') יימחקו.'
       : 'ליצור ציר זמן נוה"ק לפי תבנית "' + tlProfileLabel + '"? (17 אירועי נוה"ק)';
@@ -107,7 +122,7 @@ s += _confirmDelete(
   }
   tlHtml += '</div>';
 
-  if (Roles_hasAdminAccess(user.role)) {
+  if (Roles_hasAdminAccess(user.role) && !archiveView) {
     tlHtml += '<button type="button" class="collapsible-toggle" id="proc-add-toggle" ' +
       'style="margin:0;border-radius:0;border-left:none;border-right:none;border-top:none">' +
       '<span>➕ הוסף אירוע לנוה"ק</span><span class="arrow">▾</span></button>' +
@@ -134,7 +149,7 @@ s += _confirmDelete(
   if (!details.length) {
     tlHtml += '<div class="empty">אין רישומים — הוסף אירוע או צור תבנית נוה"ק</div>';
   } else {
-    const showActions = Roles_hasAdminAccess(user.role);
+    const showActions = Roles_hasAdminAccess(user.role) && !archiveView;
     tlHtml += '<div class="card-body" style="padding:0"><table class="tbl proc-tbl"><thead><tr>' +
       '<th>תאריך ושעה</th><th>מיקום</th><th>תיאור</th>' +
       (showActions ? '<th class="proc-actions-head">פעולות</th>' : '') +
@@ -186,13 +201,13 @@ s += _confirmDelete(
   s += tlHtml;
 
   // Participants
-  const parts = Assignments_byExercise(ex.id);
+  const parts = archiveView ? Assignments_byExerciseAny(ex.id) : Assignments_byExercise(ex.id);
   let pHtml = '<div class="card">' +
     '<div class="card-header"><span class="card-title">👥 משתתפים (' + parts.length + ')</span></div>';
 
   if (!parts.length) {
     pHtml += '<div class="empty">אין משתתפים</div>';
-  } else if (Roles_hasAdminAccess(user.role)) {
+  } else if (Roles_hasAdminAccess(user.role) && !archiveView) {
     const allUsers = Users_all();
     const tutorOpts = [['', '— ללא חונך —']].concat(
       allUsers.map(function(u) { return [u.id, u.name + ' (' + _roleHe(u.role) + ')']; })

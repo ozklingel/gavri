@@ -556,6 +556,36 @@ function Exercises_get(id) {
   return Exercises_byIdMap()[String(id)] || null;
 }
 
+function Exercises_getAny(id) {
+  const key = String(id || '').trim();
+  if (!key) return null;
+  const hit = Exercises_all(true).find(function(e) { return e.id === key; });
+  return hit || null;
+}
+
+function Exercises_bySeriesId(seriesId) {
+  const sid = String(seriesId || '').trim();
+  if (!sid) return [];
+  return Exercises_all(true).filter(function(e) {
+    return String(e.series_id || '') === sid;
+  }).sort(function(a, b) {
+    return String(a.rawStartDate || '').localeCompare(String(b.rawStartDate || ''));
+  });
+}
+
+function Exercises_detailsAny(exerciseId) {
+  const exId = String(exerciseId || '');
+  const out = [];
+  _rows('ExerciseDetails').data.forEach(function(r) {
+    if (String(r[1]) !== exId) return;
+    out.push(_exerciseDetailFromRow(r));
+  });
+  out.sort(function(a, b) {
+    return _exerciseDetailSortMs(a.rawTime) - _exerciseDetailSortMs(b.rawTime);
+  });
+  return out;
+}
+
 function _exerciseDetailFromRow(r) {
   return {
     id: String(r[0]),
