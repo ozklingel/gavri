@@ -35,6 +35,8 @@ var DB_SHEET_NAMES = [
 ];
 // מינימום לעלייה אחרי התחברות — דשבורד, חיפוש, שיבוצים (ללא Credentials / שטחי אש / ציר זמן)
 var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
+// כל מה שטאבי הדשבורד (חיפוש / צוות / תרגיל / התנגשויות) קוראים
+var DB_DASHBOARD_SHEETS = DB_SESSION_SHEETS;
 var DB_BOOT_SHEETS = DB_SESSION_SHEETS;
 var DB_TIMELINE_SHEETS = ['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces', 'FireZones'];
 var DB_CACHE_TTL_SEC = 21600;
@@ -288,6 +290,28 @@ function _cacheWarmAll(force) {
   DB_FULL_CACHE_SHEETS.forEach(function(name) { _cacheWarmSheet(name); });
   _cacheMarkWarmed();
   return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length };
+}
+
+/** מוחק קאש של גיליונות וקורא אותם מחדש מה-Spreadsheet. */
+function _cacheForceReloadSheets(names) {
+  const list = names && names.length ? names : DB_FULL_CACHE_SHEETS;
+  _cacheClearWarmFlag();
+  _htmlCacheBump();
+  const cache = CacheService.getScriptCache();
+  list.forEach(function(name) {
+    delete _rowsCache[name];
+    try {
+      cache.remove(_dbCacheKey(name));
+      cache.remove(_dbCacheKey(name, 'parts'));
+      for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
+    } catch (e0) {}
+    try {
+      const fresh = _readSheetFromSpreadsheet(name);
+      _putScriptCacheRows(name, fresh);
+      _rowsCache[name] = fresh;
+    } catch (e1) {}
+  });
+  return { ok: true, sheets: list.length, forced: true };
 }
 
 function apiWarmCache(sid) {

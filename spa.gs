@@ -76,6 +76,77 @@ function apiRunAction(sid, action, paramsJson) {
   }
 }
 
+/**
+ * לפני הצגת דשבורד:
+ * 1) מנקה וטוען מחדש את כל הגיליונות שטאבי הדשבורד צריכים
+ * 2) מרנדר את כל הטאבים (search/exercise/team/conflicts)
+ * הלקוח מציג דשבורד רק אחרי שהתשובה הזו חוזרת.
+ */
+function apiReadyDashboard(sid) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, error: 'missing sid' };
+
+  let user;
+  try {
+    user = Auth_current({ sid: s });
+  } catch (e0) {
+    return { ok: false, error: e0 && e0.message ? e0.message : String(e0) };
+  }
+  if (!user) return { ok: false, error: 'not logged in' };
+
+  // נתוני DB לטאבים — תמיד fresh מהגיליון
+  const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
+    ? DB_DASHBOARD_SHEETS
+    : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
+  _cacheForceReloadSheets(dashSheets);
+
+  // שאר ה-DB גם (לניווט אחרי הדשבורד) — באותה כניסה
+  const rest = DB_FULL_CACHE_SHEETS.filter(function(name) {
+    return dashSheets.indexOf(name) < 0;
+  });
+  if (rest.length) _cacheForceReloadSheets(rest);
+  _cacheMarkWarmed();
+
+  const pages = [];
+  function pushTab(tab) {
+    try {
+      const result = _spaEnsureWrap(Views_dashboard({ sid: s, tab: tab }));
+      if (result && result.body != null) {
+        pages.push({
+          page: 'dashboard',
+          params: { tab: tab },
+          body: result.body,
+          title: result.title || 'מסך הבית'
+        });
+      }
+    } catch (err) {}
+  }
+
+  pushTab('search');
+  pushTab('exercise');
+  if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
+    pushTab('team');
+  }
+  if (Roles_hasAdminAccess(user.role)) {
+    pushTab('conflicts');
+  }
+
+  const dash = pages.filter(function(p) {
+    return p.params && p.params.tab === 'search';
+  })[0] || pages[0] || null;
+
+  if (!dash) {
+    return { ok: false, error: 'dashboard render failed', pages: [] };
+  }
+
+  return {
+    ok: true,
+    sheets: dashSheets.length,
+    pages: pages,
+    dashboard: dash
+  };
+}
+
 /** רשימת דפים/טאבים לטעינה מלאה אחרי התחברות (לפי הרשאות). */
 function apiPrefetchPlan(sid) {
   const s = String(sid || '').trim();

@@ -149,11 +149,13 @@ function _authUserEmail(user) {
 }
 
 function _authCompleteLogin(user) {
-  _cacheClearWarmFlag();
-  _cacheEnsureFullWarm();
-  const page = Views_dashboard({ sid: user.id });
-  page.sid = user.id;
-  return page;
+  // לוגאין מהיר — נתוני דשבורד + כל הטאבים נטענים ב-apiReadyDashboard לפני הצגה
+  return {
+    body: '',
+    title: 'טוען מערכת...',
+    sid: user.id,
+    deferDashboard: true
+  };
 }
 
 function _authGenerateMfaToken() {
