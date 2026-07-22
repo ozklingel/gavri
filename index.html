@@ -2896,27 +2896,62 @@ body {
   window.MapimSpaShowLoader = function(msg) { MapimLoader.show(msg); };
   window.MapimSpaHideLoader = function() { MapimLoader.hide(); };
 
-  // ══ Lazy module slots (exercises page legacy shells) ══
+  // ══ Lazy module slots (with client cache after priming) ══
   var MapimModules = (function() {
+    var moduleCache = {};
+    var moduleEpoch = 0;
+
+    function moduleKey(moduleId, params) {
+      return String(moduleId || '') + '::' + JSON.stringify(params || {});
+    }
+
+    function invalidate() {
+      moduleCache = {};
+      moduleEpoch++;
+    }
+
+    function store(moduleId, params, html) {
+      if (!moduleId || html == null) return;
+      moduleCache[moduleKey(moduleId, params)] = { html: html, epoch: moduleEpoch };
+    }
+
+    function get(moduleId, params) {
+      var hit = moduleCache[moduleKey(moduleId, params)];
+      if (!hit || hit.epoch !== moduleEpoch) return null;
+      return hit.html;
+    }
+
+    function fillSlot(slot, html) {
+      slot.innerHTML = html;
+      if (window.MapimSpa) {
+        if (MapimSpa.runScripts) MapimSpa.runScripts(slot);
+        if (MapimSpa.afterRender) MapimSpa.afterRender();
+      }
+      slot.setAttribute('data-spa-module-loaded', '1');
+    }
+
     function loadSlot(slot) {
       if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return;
       var moduleId = slot.getAttribute('data-spa-module');
       if (!moduleId) return;
+      var params = window.MapimSpa && MapimSpa.parseSpaParams
+        ? MapimSpa.parseSpaParams(slot) : {};
+      var cached = get(moduleId, params);
+      if (cached != null) {
+        fillSlot(slot, cached);
+        return;
+      }
       slot.setAttribute('data-spa-module-loaded', 'pending');
-      var params = window.MapimSpa ? MapimSpa.parseSpaParams(slot) : {};
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || res.html == null) {
             slot.innerHTML = '<div class="flash flash-error">⚠ ' +
               (res && res.error ? res.error : 'שגיאת טעינת מודול') + '</div>';
+            slot.setAttribute('data-spa-module-loaded', '1');
           } else {
-            slot.innerHTML = res.html;
-            if (window.MapimSpa) {
-              MapimSpa.runScripts(slot);
-              MapimSpa.afterRender();
-            }
+            store(moduleId, params, res.html);
+            fillSlot(slot, res.html);
           }
-          slot.setAttribute('data-spa-module-loaded', '1');
         })
         .withFailureHandler(function(err) {
           slot.innerHTML = '<div class="flash flash-error">⚠ ' +
@@ -2935,7 +2970,7 @@ body {
         loadSlot(slot);
       });
     }
-    return { load: load, loadSlot: loadSlot };
+    return { load: load, loadSlot: loadSlot, store: store, invalidate: invalidate };
   })();
 
   // ══ SPA router — fixed URL, no full page reloads ══
@@ -3077,32 +3112,39 @@ body {
     }
 
     var warmPageScheduled = {};
-    var fullCacheWarmScheduled = false;
     var pageCache = {};
     var pageCacheEpoch = 0;
-    var prefetchStarted = false;
-    var PREFETCH_PAGES = [
-      { page: 'timeline', params: {} },
-      { page: 'exercises', params: {} },
-      { page: 'assign', params: {} },
-      { page: 'users', params: { tab: 'users' } },
-      { page: 'statistics', params: {} },
-      { page: 'fieldForces', params: {} },
-      { page: 'fireZones', params: {} },
-      { page: 'homeConstraints', params: {} },
-      { page: 'seriesArchive', params: {} }
-    ];
+    var appPrimed = false;
+    var primingInProgress = false;
+    var PREFETCH_BATCH = 3;
+
+    function normalizeRoute(page, params) {
+      page = String(page || '').trim();
+      params = Object.assign({}, params || {});
+      delete params.sid;
+      delete params.action;
+      delete params.error;
+      delete params.info;
+      if (page === 'dashboard' && !params.tab) params.tab = 'search';
+      if (page === 'exercises' && !params.tab) params.tab = 'list';
+      if (page === 'users' && !params.tab) params.tab = 'users';
+      if (page === 'statistics' && !params.section) params.section = 'kpi';
+      return { page: page, params: params };
+    }
 
     function invalidateClientPageCache() {
       pageCache = {};
       pageCacheEpoch++;
+      appPrimed = false;
+      if (window.MapimModules && MapimModules.invalidate) MapimModules.invalidate();
     }
 
     function storeClientPage(route, result) {
       if (!route || !result || result.body == null) return;
       if (result.clearSid || result.mfaToken) return;
       if (route.page === 'login') return;
-      pageCache[routeKey(route)] = {
+      var norm = normalizeRoute(route.page, route.params);
+      pageCache[routeKey(norm)] = {
         body: result.body,
         title: result.title || '',
         epoch: pageCacheEpoch
@@ -3111,57 +3153,116 @@ body {
 
     function getClientPage(route) {
       if (!route || route.page === 'login') return null;
-      var hit = pageCache[routeKey(route)];
+      var norm = normalizeRoute(route.page, route.params);
+      var hit = pageCache[routeKey(norm)];
       if (!hit || hit.epoch !== pageCacheEpoch) return null;
       return { body: hit.body, title: hit.title };
     }
 
-    function schedulePrefetchPages() {
-      if (prefetchStarted || !getSid()) return;
-      prefetchStarted = true;
-      var i = 0;
-      function next() {
-        if (!getSid() || i >= PREFETCH_PAGES.length) return;
-        var item = PREFETCH_PAGES[i++];
-        var route = { page: item.page, params: item.params || {} };
-        if (getClientPage(route)) {
-          setTimeout(next, 80);
-          return;
-        }
-        try {
-          google.script.run
-            .withSuccessHandler(function(result) {
-              storeClientPage(route, result);
-              setTimeout(next, 200);
-            })
-            .withFailureHandler(function() { setTimeout(next, 200); })
-            .apiRenderPage(getSid(), route.page, JSON.stringify(route.params || {}));
-        } catch (e1) {
-          setTimeout(next, 400);
-        }
+    function finishPriming(opts) {
+      opts = opts || {};
+      primingInProgress = false;
+      appPrimed = true;
+      if (!opts.background) {
+        MapimLoader.hide();
+        finishBootUi();
       }
-      setTimeout(next, 600);
     }
 
-    function scheduleFullCacheWarm() {
-      if (fullCacheWarmScheduled || !getSid()) return;
-      fullCacheWarmScheduled = true;
-      var run = function() {
-        try {
-          google.script.run
-            .withSuccessHandler(function() { schedulePrefetchPages(); })
-            .withFailureHandler(function() { schedulePrefetchPages(); })
-            .apiWarmFullCache(getSid());
-        } catch (e1) {
-          schedulePrefetchPages();
-        }
-      };
-      if (typeof requestIdleCallback === 'function') {
-        requestIdleCallback(run, { timeout: 8000 });
-      } else {
-        setTimeout(run, 2500);
+    function prefetchModulesList(modules, opts) {
+      if (!modules || !modules.length) {
+        finishPriming(opts);
+        return;
       }
+      if (!opts.background) {
+        MapimLoader.show('// PREPARING MODULES...');
+      }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          var list = (res && res.modules) || [];
+          list.forEach(function(item) {
+            if (item && item.html != null && window.MapimModules && MapimModules.store) {
+              MapimModules.store(item.moduleId, item.params || {}, item.html);
+            }
+          });
+          finishPriming(opts);
+        })
+        .withFailureHandler(function() { finishPriming(opts); })
+        .apiPrefetchModules(getSid(), JSON.stringify(modules));
     }
+
+    function prefetchPageBatches(pages, modules, offset, opts) {
+      if (!getSid()) {
+        primingInProgress = false;
+        return;
+      }
+      if (offset >= pages.length) {
+        prefetchModulesList(modules, opts);
+        return;
+      }
+      var chunk = pages.slice(offset, offset + PREFETCH_BATCH);
+      var done = Math.min(offset + chunk.length, pages.length);
+      var pct = Math.round((done / Math.max(pages.length, 1)) * 100);
+      if (!opts.background) {
+        MapimLoader.show('// PREPARING APP ' + done + '/' + pages.length + ' (' + pct + '%)');
+      }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          var list = (res && res.pages) || [];
+          list.forEach(function(item) {
+            if (item && item.body != null) {
+              storeClientPage(
+                { page: item.page, params: item.params || {} },
+                { body: item.body, title: item.title || '' }
+              );
+            }
+          });
+          prefetchPageBatches(pages, modules, offset + PREFETCH_BATCH, opts);
+        })
+        .withFailureHandler(function() {
+          prefetchPageBatches(pages, modules, offset + PREFETCH_BATCH, opts);
+        })
+        .apiPrefetchPages(getSid(), JSON.stringify(chunk));
+    }
+
+    /** אחרי לוגאין: מחמם DB + טוען את כל הדפים/טאבים לקאש לקוח (עד ~20ש׳). */
+    function startAppPriming(opts) {
+      opts = opts || {};
+      if (!getSid()) return;
+      if (primingInProgress) return;
+      if (appPrimed && !opts.force) return;
+      primingInProgress = true;
+      appPrimed = false;
+      if (!opts.background) {
+        MapimLoader.show('// PREPARING APP...');
+      }
+      google.script.run
+        .withSuccessHandler(function(plan) {
+          var pages = (plan && plan.pages) || [];
+          var modules = (plan && plan.modules) || [];
+          google.script.run
+            .withSuccessHandler(function() {
+              if (!pages.length) {
+                prefetchModulesList(modules, opts);
+                return;
+              }
+              prefetchPageBatches(pages, modules, 0, opts);
+            })
+            .withFailureHandler(function() {
+              if (!pages.length) {
+                finishPriming(opts);
+                return;
+              }
+              prefetchPageBatches(pages, modules, 0, opts);
+            })
+            .apiWarmFullCache(getSid());
+        })
+        .withFailureHandler(function() {
+          finishPriming(opts);
+        })
+        .apiPrefetchPlan(getSid());
+    }
+
     function scheduleWarmPageCache(page) {
       page = String(page || '').trim();
       if (!page || warmPageScheduled[page] || !getSid()) return;
@@ -3320,8 +3421,7 @@ body {
         forwardStack = [];
         currentRoute = { page: 'login', params: {} };
         invalidateClientPageCache();
-        prefetchStarted = false;
-        fullCacheWarmScheduled = false;
+        primingInProgress = false;
       }
       if (result.sid) {
         setSid(result.sid);
@@ -3329,7 +3429,7 @@ body {
         if (!result.mfaToken) {
           navStack = [];
           forwardStack = [];
-          currentRoute = { page: 'dashboard', params: {} };
+          currentRoute = normalizeRoute('dashboard', {});
           invalidateClientPageCache();
         }
       }
@@ -3341,16 +3441,26 @@ body {
         afterRender();
       }
       if (result.title) document.title = result.title;
+
+      var shouldPrime = !!getSid() && currentRoute && currentRoute.page !== 'login' && !result.mfaToken;
+      if (shouldPrime && !appPrimed && !primingInProgress && !opts.fromClientCache && !opts.skipPrime) {
+        // לא מסתירים loader — ממשיכים לטעינת כל האפליקציה
+        loading = false;
+        if (currentRoute) storeClientPage(currentRoute, result);
+        startAppPriming({ background: false });
+        return;
+      }
+
       finishBootUi();
       loading = false;
       if (!opts.fromClientCache && currentRoute) storeClientPage(currentRoute, result);
       if (currentRoute && currentRoute.page === 'dashboard') scheduleWarmPageCache('timeline');
-      if (getSid() && currentRoute && currentRoute.page !== 'login') scheduleFullCacheWarm();
     }
 
     function fail(err) {
       finishBootUi();
       loading = false;
+      primingInProgress = false;
       alert(err && err.message ? err.message : String(err));
     }
 
@@ -3360,7 +3470,23 @@ body {
       page = String(page || 'login').trim();
       if (!options.fromBack && !options.fromForward) forwardStack = [];
       var prevRoute = currentRoute;
-      var nextRoute = { page: page, params: params };
+      var nextRoute = normalizeRoute(page, params);
+
+      // בזמן priming — רק מקאש (בלי קריאת שרת)
+      if (primingInProgress && page !== 'login' && !options.force) {
+        var primingHit = getClientPage(nextRoute);
+        if (primingHit) {
+          if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
+            if (routeKey(prevRoute) !== routeKey(nextRoute)) navStack.push(prevRoute);
+          }
+          if (options.replace) navStack = [];
+          currentRoute = nextRoute;
+          applyResult(primingHit, { fromClientCache: true });
+          return;
+        }
+        MapimLoader.show('// STILL PREPARING APP...');
+        return;
+      }
 
       // קאש לקוח — ניווט מיידי בלי קריאת שרת/גיליונות
       if (!options.force && !options.skipCache && page !== 'login') {
@@ -3399,7 +3525,7 @@ body {
           if (myReq !== reqId) return;
           fail(err);
         })
-        .apiRenderPage(getSid(), page, JSON.stringify(params || {}));
+        .apiRenderPage(getSid(), page, JSON.stringify(nextRoute.params || {}));
     }
 
     function runAction(action, params) {
@@ -3409,10 +3535,13 @@ body {
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
-          // כתיבה — מבטל קאש דפים; התוצאה החדשה נשמרת מחדש
           invalidateClientPageCache();
-          prefetchStarted = false;
-          applyResult(result);
+          applyResult(result, { skipPrime: true });
+          if (getSid()) {
+            setTimeout(function() {
+              startAppPriming({ background: true, force: true });
+            }, 400);
+          }
         })
         .withFailureHandler(function(err) {
           if (myReq !== reqId) return;
@@ -3528,6 +3657,8 @@ body {
       getSid: getSid, setSid: setSid, userLinkHtml: userLinkHtml, whatsappLinkHtml: whatsappLinkHtml,
       exerciseLinkHtml: exerciseLinkHtml,
       invalidatePageCache: invalidateClientPageCache,
+      startAppPriming: startAppPriming,
+      parseSpaParams: parseSpaParams, runScripts: runScripts, afterRender: afterRender,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();
@@ -5114,6 +5245,9 @@ body {
           bar.setAttribute('data-orig-start', String(startMs));
           bar.setAttribute('data-orig-end', String(endMs));
           if (window.MapimSpa && MapimSpa.invalidatePageCache) MapimSpa.invalidatePageCache();
+          if (window.MapimSpa && typeof MapimSpa.startAppPriming === 'function') {
+            setTimeout(function() { MapimSpa.startAppPriming({ background: true, force: true }); }, 400);
+          }
           if (result && result.info) showTimelineFlash(result.info);
         })
         .withFailureHandler(function(err) {

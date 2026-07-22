@@ -76,6 +76,146 @@ function apiRunAction(sid, action, paramsJson) {
   }
 }
 
+/** רשימת דפים/טאבים לטעינה מלאה אחרי התחברות (לפי הרשאות). */
+function apiPrefetchPlan(sid) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, pages: [], modules: [] };
+  let user;
+  try {
+    user = Auth_current({ sid: s });
+  } catch (e1) {
+    return { ok: false, pages: [], modules: [] };
+  }
+  if (!user) return { ok: false, pages: [], modules: [] };
+
+  const pages = [
+    { page: 'dashboard', params: { tab: 'search' } },
+    { page: 'dashboard', params: { tab: 'exercise' } },
+    { page: 'homeConstraints', params: {} },
+    { page: 'fieldForces', params: {} },
+    { page: 'fireZones', params: {} }
+  ];
+
+  if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
+    pages.push({ page: 'dashboard', params: { tab: 'team' } });
+  }
+  if (Roles_hasTimelineAccess(user.role)) {
+    pages.push({ page: 'timeline', params: {} });
+  }
+  if (Roles_hasAdminAccess(user.role)) {
+    pages.push(
+      { page: 'dashboard', params: { tab: 'conflicts' } },
+      { page: 'exercises', params: { tab: 'list' } },
+      { page: 'exercises', params: { tab: 'calendar' } },
+      { page: 'exercises', params: { tab: 'new' } },
+      { page: 'assign', params: {} },
+      { page: 'users', params: { tab: 'users' } },
+      { page: 'users', params: { tab: 'teams' } },
+      { page: 'statistics', params: { section: 'kpi' } },
+      { page: 'statistics', params: { section: 'team' } },
+      { page: 'statistics', params: { section: 'compare' } },
+      { page: 'statistics', params: { section: 'trainees' } },
+      { page: 'statistics', params: { section: 'types' } },
+      { page: 'seriesArchive', params: {} },
+      { page: 'feedback', params: {} },
+      { page: 'teamMatrix', params: {} },
+      { page: 'exerciseMatrix', params: {} }
+    );
+  }
+
+  return {
+    ok: true,
+    pages: pages,
+    modules: ['drawer.panels']
+  };
+}
+
+/**
+ * טעינת אצווה של דפים לקאש לקוח — חימום Sheets פעם אחת ואז רינדור מזיכרון.
+ * pagesJson: [{ page, params }, ...]
+ */
+function apiPrefetchPages(sid, pagesJson) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, pages: [] };
+  try {
+    Auth_current({ sid: s });
+  } catch (e1) {
+    return { ok: false, pages: [] };
+  }
+
+  _cacheEnsureFullWarm();
+
+  let list = [];
+  try {
+    list = JSON.parse(pagesJson || '[]');
+  } catch (e2) {
+    list = [];
+  }
+  if (!list || !list.length) return { ok: true, pages: [] };
+
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i] || {};
+    const page = String(item.page || '').trim();
+    if (!page || page === 'login') continue;
+    const params = Object.assign({}, item.params || {});
+    const p = Object.assign({}, params, { sid: s });
+    try {
+      const result = _spaEnsureWrap(_spaDispatchPage(page, p));
+      if (result && result.body != null) {
+        _htmlCachePut(s, page, p, result);
+        out.push({
+          page: page,
+          params: params,
+          body: result.body,
+          title: result.title || ''
+        });
+      }
+    } catch (err) {
+      out.push({
+        page: page,
+        params: params,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  }
+  return { ok: true, pages: out };
+}
+
+function apiPrefetchModules(sid, modulesJson) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, modules: [] };
+  try {
+    Auth_current({ sid: s });
+  } catch (e1) {
+    return { ok: false, modules: [] };
+  }
+  _cacheEnsureFullWarm();
+
+  let list = [];
+  try {
+    list = JSON.parse(modulesJson || '[]');
+  } catch (e2) {
+    list = [];
+  }
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const moduleId = String(list[i] || '').trim();
+    if (!moduleId) continue;
+    try {
+      const html = SpaModule_render(moduleId, { sid: s });
+      out.push({ moduleId: moduleId, params: {}, html: html || '' });
+    } catch (err) {
+      out.push({
+        moduleId: moduleId,
+        params: {},
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  }
+  return { ok: true, modules: out };
+}
+
 function _spaMergeParams(sid, paramsJson) {
   let extra = {};
   if (paramsJson) {
