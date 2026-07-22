@@ -40,11 +40,143 @@ var DB_TIMELINE_SHEETS = ['Users', 'Exercises', 'ExerciseDetails', 'TimelineBloc
 var DB_CACHE_TTL_SEC = 21600;
 var DB_CACHE_PREFIX = 'mdb:';
 var DB_CACHE_CHUNK = 90000;
+var DB_WARM_FLAG = 'warmed';
+var DB_HTML_GEN_KEY = 'htmlgen';
 // כל הגיליונות למעט Credentials — נטען בכניסה (עלייה איטית, ניווט מהיר)
 var DB_FULL_CACHE_SHEETS = DB_SHEET_NAMES.filter(function(n) { return n !== 'Credentials'; });
 
 function _dbCacheKey(name, part) {
   return DB_CACHE_PREFIX + name + (part == null ? '' : ':' + part);
+}
+
+function _cacheIsFullyWarmed() {
+  try {
+    return CacheService.getScriptCache().get(_dbCacheKey(DB_WARM_FLAG)) === '1';
+  } catch (e1) {
+    return false;
+  }
+}
+
+function _cacheMarkWarmed() {
+  try {
+    CacheService.getScriptCache().put(_dbCacheKey(DB_WARM_FLAG), '1', DB_CACHE_TTL_SEC);
+  } catch (e1) {}
+}
+
+function _cacheClearWarmFlag() {
+  try {
+    CacheService.getScriptCache().remove(_dbCacheKey(DB_WARM_FLAG));
+  } catch (e1) {}
+}
+
+/** מחמם את כל הגיליונות פעם אחת; בקשות הבאות משתמשות רק ב-Script Cache (ללא Sheets). */
+function _cacheEnsureFullWarm() {
+  if (_cacheIsFullyWarmed()) {
+    // וידוא מהיר שהקאש לא התרוקן
+    if (_getScriptCacheRows('Users')) return { ok: true, warmed: true, skipped: true };
+    _cacheClearWarmFlag();
+  }
+  _cacheWarmSheetsIfNeeded(DB_FULL_CACHE_SHEETS);
+  _cacheMarkWarmed();
+  return { ok: true, warmed: true, sheets: DB_FULL_CACHE_SHEETS.length };
+}
+
+function _htmlCacheGen() {
+  try {
+    const g = CacheService.getScriptCache().get(_dbCacheKey(DB_HTML_GEN_KEY));
+    return g || '0';
+  } catch (e1) {
+    return '0';
+  }
+}
+
+function _htmlCacheBump() {
+  try {
+    CacheService.getScriptCache().put(
+      _dbCacheKey(DB_HTML_GEN_KEY),
+      String(Date.now()),
+      DB_CACHE_TTL_SEC
+    );
+  } catch (e1) {}
+}
+
+function _htmlCacheKey(sid, page, params) {
+  const clean = {};
+  const src = params || {};
+  Object.keys(src).forEach(function(k) {
+    if (k === 'sid' || k === 'action' || k === 'error' || k === 'info') return;
+    clean[k] = src[k];
+  });
+  let hash = '';
+  try {
+    hash = Utilities.base64EncodeWebSafe(
+      Utilities.computeDigest(
+        Utilities.DigestAlgorithm.MD5,
+        JSON.stringify(clean)
+      )
+    ).substring(0, 16);
+  } catch (e1) {
+    hash = String(JSON.stringify(clean).length);
+  }
+  return DB_CACHE_PREFIX + 'html:' + _htmlCacheGen() + ':' +
+    String(sid || '') + ':' + String(page || '') + ':' + hash;
+}
+
+function _htmlCacheGet(sid, page, params) {
+  const key = _htmlCacheKey(sid, page, params);
+  const cache = CacheService.getScriptCache();
+  try {
+    const direct = cache.get(key);
+    if (direct) {
+      const parsed = JSON.parse(direct);
+      if (parsed && parsed.body != null) return parsed;
+    }
+    const partsStr = cache.get(key + ':parts');
+    if (!partsStr) return null;
+    const parts = parseInt(partsStr, 10);
+    if (!parts || parts < 1) return null;
+    let json = '';
+    for (let i = 0; i < parts; i++) {
+      const chunk = cache.get(key + ':c' + i);
+      if (chunk == null) return null;
+      json += chunk;
+    }
+    const parsed2 = JSON.parse(json);
+    if (parsed2 && parsed2.body != null) return parsed2;
+  } catch (e1) {}
+  return null;
+}
+
+function _htmlCachePut(sid, page, params, result) {
+  if (!result || result.body == null) return;
+  if (result.clearSid || result.mfaToken) return;
+  // דפים עם flash חד-פעמי — לא לקאש
+  if (params && (params.error || params.info)) return;
+  const payload = {
+    body: result.body,
+    title: result.title || '',
+    sid: result.sid || null
+  };
+  const json = JSON.stringify(payload);
+  // מעל ~350KB לא שווה לקאש בשרת (מגבלות CacheService)
+  if (json.length > 350000) return;
+  const key = _htmlCacheKey(sid, page, params);
+  const cache = CacheService.getScriptCache();
+  try {
+    if (json.length <= DB_CACHE_CHUNK) {
+      cache.put(key, json, DB_CACHE_TTL_SEC);
+      return;
+    }
+    const parts = Math.ceil(json.length / DB_CACHE_CHUNK);
+    cache.put(key + ':parts', String(parts), DB_CACHE_TTL_SEC);
+    for (let i = 0; i < parts; i++) {
+      cache.put(
+        key + ':c' + i,
+        json.substring(i * DB_CACHE_CHUNK, (i + 1) * DB_CACHE_CHUNK),
+        DB_CACHE_TTL_SEC
+      );
+    }
+  } catch (e1) {}
 }
 
 function _readSheetFromSpreadsheet(name) {
@@ -81,22 +213,32 @@ function _getScriptCacheRows(name) {
 
 function _putScriptCacheRows(name, result) {
   const cache = CacheService.getScriptCache();
-  const json = JSON.stringify(result);
-  if (json.length <= DB_CACHE_CHUNK) {
-    cache.put(_dbCacheKey(name), json, DB_CACHE_TTL_SEC);
-    cache.remove(_dbCacheKey(name, 'parts'));
-    for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
-    return;
+  let json;
+  try {
+    json = JSON.stringify(result);
+  } catch (e0) {
+    return false;
   }
-  const parts = Math.ceil(json.length / DB_CACHE_CHUNK);
-  cache.put(_dbCacheKey(name, 'parts'), String(parts), DB_CACHE_TTL_SEC);
-  cache.remove(_dbCacheKey(name));
-  for (let i = 0; i < parts; i++) {
-    cache.put(
-      _dbCacheKey(name, 'c' + i),
-      json.substring(i * DB_CACHE_CHUNK, (i + 1) * DB_CACHE_CHUNK),
-      DB_CACHE_TTL_SEC
-    );
+  try {
+    if (json.length <= DB_CACHE_CHUNK) {
+      cache.put(_dbCacheKey(name), json, DB_CACHE_TTL_SEC);
+      cache.remove(_dbCacheKey(name, 'parts'));
+      for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
+      return true;
+    }
+    const parts = Math.ceil(json.length / DB_CACHE_CHUNK);
+    cache.put(_dbCacheKey(name, 'parts'), String(parts), DB_CACHE_TTL_SEC);
+    cache.remove(_dbCacheKey(name));
+    for (let i = 0; i < parts; i++) {
+      cache.put(
+        _dbCacheKey(name, 'c' + i),
+        json.substring(i * DB_CACHE_CHUNK, (i + 1) * DB_CACHE_CHUNK),
+        DB_CACHE_TTL_SEC
+      );
+    }
+    return true;
+  } catch (e1) {
+    return false;
   }
 }
 
@@ -131,7 +273,7 @@ function _cacheWarmSheetsIfNeeded(names) {
 }
 
 function _cacheWarmFullIfNeeded() {
-  _cacheWarmSheetsIfNeeded(DB_FULL_CACHE_SHEETS);
+  return _cacheEnsureFullWarm();
 }
 
 function _cacheWarmAllIfNeeded() {
@@ -140,10 +282,12 @@ function _cacheWarmAllIfNeeded() {
 
 function _cacheWarmAll(force) {
   if (force) {
-    DB_SHEET_NAMES.forEach(function(name) { _cacheInvalidate(name); });
+    DB_SHEET_NAMES.forEach(function(name) { _cacheInvalidate(name, { skipRewarm: true }); });
+    _cacheClearWarmFlag();
   }
-  DB_SHEET_NAMES.forEach(function(name) { _cacheWarmSheet(name); });
-  return { ok: true, sheets: DB_SHEET_NAMES.length };
+  DB_FULL_CACHE_SHEETS.forEach(function(name) { _cacheWarmSheet(name); });
+  _cacheMarkWarmed();
+  return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length };
 }
 
 function apiWarmCache(sid) {
@@ -154,8 +298,13 @@ function apiWarmCache(sid) {
   } catch (e) {
     return { ok: true, sheets: 0, scope: 'none' };
   }
-  _cacheWarmFullIfNeeded();
-  return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length, scope: 'full' };
+  const r = _cacheEnsureFullWarm();
+  return {
+    ok: true,
+    sheets: DB_FULL_CACHE_SHEETS.length,
+    scope: 'full',
+    skipped: !!(r && r.skipped)
+  };
 }
 
 /** חימום מלא ברקע — כל הגיליונות (למעט Credentials) לקאש ל-6 שעות */
@@ -177,15 +326,8 @@ function apiWarmPageCache(sid, page) {
   } catch (e) {
     return { ok: true, sheets: 0, page: pg };
   }
-  if (pg === 'timeline') {
-    _cacheWarmTimelineSheets();
-    return { ok: true, sheets: DB_TIMELINE_SHEETS.length, page: pg };
-  }
-  if (pg === 'assign') {
-    _cacheWarmFullIfNeeded();
-    return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length, page: pg };
-  }
-  _cacheWarmFullIfNeeded();
+  // אחרי חימום מלא — מספיק לוודא שהקאש חם; אין קריאות Sheets
+  _cacheEnsureFullWarm();
   return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length, page: pg };
 }
 
@@ -198,6 +340,7 @@ function _rows(name) {
 
   let result = _getScriptCacheRows(name);
   if (!result) {
+    // אחרי warm — נדיר; קריאת Sheets רק כשיש miss (או Credentials)
     result = _readSheetFromSpreadsheet(name);
     _putScriptCacheRows(name, result);
   }
@@ -205,12 +348,30 @@ function _rows(name) {
   return result;
 }
 
-function _cacheInvalidate(name) {
+/**
+ * ביטול קאש אחרי כתיבה.
+ * כברירת מחדל: write-through — קורא את הגיליון פעם אחת ומחזיר לקאש,
+ * כדי שניווט הבא לא ייפול חזרה ל-Sheets.
+ */
+function _cacheInvalidate(name, options) {
+  options = options || {};
   delete _rowsCache[name];
   const cache = CacheService.getScriptCache();
   cache.remove(_dbCacheKey(name));
   cache.remove(_dbCacheKey(name, 'parts'));
   for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
+  _htmlCacheBump();
+  if (options.skipRewarm) {
+    _cacheClearWarmFlag();
+    return;
+  }
+  try {
+    const fresh = _readSheetFromSpreadsheet(name);
+    _putScriptCacheRows(name, fresh);
+    _rowsCache[name] = fresh;
+  } catch (e1) {
+    _cacheClearWarmFlag();
+  }
 }
 
 function _colIndex(sheetName, columnName) {
@@ -218,9 +379,26 @@ function _colIndex(sheetName, columnName) {
   return header.indexOf(columnName);
 }
 
+function _cachePatchAppend(name, rows) {
+  if (!rows || !rows.length) {
+    _htmlCacheBump();
+    return;
+  }
+  let cur = _rowsCache[name];
+  if (!cur || !cur.data) cur = _getScriptCacheRows(name);
+  if (cur && cur.data) {
+    for (let i = 0; i < rows.length; i++) cur.data.push(rows[i]);
+    _rowsCache[name] = cur;
+    _putScriptCacheRows(name, cur);
+    _htmlCacheBump();
+    return;
+  }
+  _cacheInvalidate(name);
+}
+
 function _append(name, row) {
   _sheet(name).appendRow(row);
-  _cacheInvalidate(name);   // keep cache consistent after write
+  _cachePatchAppend(name, [row]);
 }
 
 // Batch-append multiple rows at once — far faster than N appendRow() calls
@@ -229,7 +407,7 @@ function _appendBatch(name, rows) {
   const sh   = _sheet(name);
   const last = sh.getLastRow();
   sh.getRange(last + 1, 1, rows.length, rows[0].length).setValues(rows);
-  _cacheInvalidate(name);
+  _cachePatchAppend(name, rows);
 }
 
 function _nextId(name) {

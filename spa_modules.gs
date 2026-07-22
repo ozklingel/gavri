@@ -103,5 +103,5 @@ function _dashboardTabSearchModule(user, p) {
 }
 
 function _cacheWarmForModule(moduleId, p) {
-  if (String(moduleId || '').trim()) _cacheWarmFullIfNeeded();
+  if (String(moduleId || '').trim()) _cacheEnsureFullWarm();
 }

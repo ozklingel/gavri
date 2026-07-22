@@ -2,9 +2,20 @@
 
 function apiRenderPage(sid, page, paramsJson) {
   const p = _spaMergeParams(sid, paramsJson);
-  _cacheWarmForPage(page || 'login', p);
+  const pg = String(page || 'login').trim();
+  if (pg !== 'login') {
+    _cacheEnsureFullWarm();
+    const cached = _htmlCacheGet(sid, pg, p);
+    if (cached) {
+      return _spaEnsureWrap(cached);
+    }
+  } else {
+    // login — אל תחמם הכול
+  }
   try {
-    return _spaEnsureWrap(_spaDispatchPage(page || 'login', p));
+    const result = _spaEnsureWrap(_spaDispatchPage(pg, p));
+    if (pg !== 'login') _htmlCachePut(sid, pg, p, result);
+    return result;
   } catch (err) {
     return _spaEnsureWrap(Views_error(err && err.message ? err.message : String(err), p));
   }
@@ -25,7 +36,9 @@ function apiUpdateExerciseTimes(sid, exerciseId, startDate, startTime, endDate, 
     timelineInline: true
   };
   try {
-    return _spaEnsureWrap(Exercises_updateTimes(p));
+    const result = _spaEnsureWrap(Exercises_updateTimes(p));
+    _htmlCacheBump();
+    return result;
   } catch (err) {
     return _spaEnsureWrap(Views_error(err && err.message ? err.message : String(err), p));
   }
@@ -42,7 +55,9 @@ function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, respo
     tutor: tutor == null ? '' : String(tutor)
   };
   try {
-    return _spaEnsureWrap(Assignments_update(p));
+    const result = _spaEnsureWrap(Assignments_update(p));
+    _htmlCacheBump();
+    return result;
   } catch (err) {
     return _spaEnsureWrap(Views_error(err && err.message ? err.message : String(err), p));
   }
@@ -52,7 +67,10 @@ function apiRunAction(sid, action, paramsJson) {
   const p = _spaMergeParams(sid, paramsJson);
   p.action = action;
   try {
-    return _spaEnsureWrap(_spaDispatchAction(action, p));
+    const result = _spaEnsureWrap(_spaDispatchAction(action, p));
+    // כל כתיבה מבטלת קאש HTML בשרת (הגיליונות כבר write-through ב-_cacheInvalidate)
+    _htmlCacheBump();
+    return result;
   } catch (err) {
     return _spaEnsureWrap(Views_error(err && err.message ? err.message : String(err), p));
   }
@@ -79,7 +97,7 @@ function _spaEnsureWrap(result) {
 
 function _cacheWarmForPage(page, p) {
   if (String(page || 'login').trim() === 'login') return;
-  _cacheWarmFullIfNeeded();
+  _cacheEnsureFullWarm();
 }
 
 function _spaDispatchPage(page, p) {

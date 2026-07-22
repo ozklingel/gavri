@@ -3078,11 +3078,83 @@ body {
 
     var warmPageScheduled = {};
     var fullCacheWarmScheduled = false;
+    var pageCache = {};
+    var pageCacheEpoch = 0;
+    var prefetchStarted = false;
+    var PREFETCH_PAGES = [
+      { page: 'timeline', params: {} },
+      { page: 'exercises', params: {} },
+      { page: 'assign', params: {} },
+      { page: 'users', params: { tab: 'users' } },
+      { page: 'statistics', params: {} },
+      { page: 'fieldForces', params: {} },
+      { page: 'fireZones', params: {} },
+      { page: 'homeConstraints', params: {} },
+      { page: 'seriesArchive', params: {} }
+    ];
+
+    function invalidateClientPageCache() {
+      pageCache = {};
+      pageCacheEpoch++;
+    }
+
+    function storeClientPage(route, result) {
+      if (!route || !result || result.body == null) return;
+      if (result.clearSid || result.mfaToken) return;
+      if (route.page === 'login') return;
+      pageCache[routeKey(route)] = {
+        body: result.body,
+        title: result.title || '',
+        epoch: pageCacheEpoch
+      };
+    }
+
+    function getClientPage(route) {
+      if (!route || route.page === 'login') return null;
+      var hit = pageCache[routeKey(route)];
+      if (!hit || hit.epoch !== pageCacheEpoch) return null;
+      return { body: hit.body, title: hit.title };
+    }
+
+    function schedulePrefetchPages() {
+      if (prefetchStarted || !getSid()) return;
+      prefetchStarted = true;
+      var i = 0;
+      function next() {
+        if (!getSid() || i >= PREFETCH_PAGES.length) return;
+        var item = PREFETCH_PAGES[i++];
+        var route = { page: item.page, params: item.params || {} };
+        if (getClientPage(route)) {
+          setTimeout(next, 80);
+          return;
+        }
+        try {
+          google.script.run
+            .withSuccessHandler(function(result) {
+              storeClientPage(route, result);
+              setTimeout(next, 200);
+            })
+            .withFailureHandler(function() { setTimeout(next, 200); })
+            .apiRenderPage(getSid(), route.page, JSON.stringify(route.params || {}));
+        } catch (e1) {
+          setTimeout(next, 400);
+        }
+      }
+      setTimeout(next, 600);
+    }
+
     function scheduleFullCacheWarm() {
       if (fullCacheWarmScheduled || !getSid()) return;
       fullCacheWarmScheduled = true;
       var run = function() {
-        try { google.script.run.apiWarmFullCache(getSid()); } catch (e1) {}
+        try {
+          google.script.run
+            .withSuccessHandler(function() { schedulePrefetchPages(); })
+            .withFailureHandler(function() { schedulePrefetchPages(); })
+            .apiWarmFullCache(getSid());
+        } catch (e1) {
+          schedulePrefetchPages();
+        }
       };
       if (typeof requestIdleCallback === 'function') {
         requestIdleCallback(run, { timeout: 8000 });
@@ -3238,7 +3310,8 @@ body {
       if (e.key === 'Escape' && window.MapimDrawer) MapimDrawer.close();
     });
 
-    function applyResult(result) {
+    function applyResult(result, opts) {
+      opts = opts || {};
       if (!result) return;
       if (result.clearSid) {
         setSid('');
@@ -3246,6 +3319,9 @@ body {
         navStack = [];
         forwardStack = [];
         currentRoute = { page: 'login', params: {} };
+        invalidateClientPageCache();
+        prefetchStarted = false;
+        fullCacheWarmScheduled = false;
       }
       if (result.sid) {
         setSid(result.sid);
@@ -3254,6 +3330,7 @@ body {
           navStack = [];
           forwardStack = [];
           currentRoute = { page: 'dashboard', params: {} };
+          invalidateClientPageCache();
         }
       }
       if (result.mfaToken) setMfaToken(result.mfaToken);
@@ -3266,8 +3343,9 @@ body {
       if (result.title) document.title = result.title;
       finishBootUi();
       loading = false;
-      if (currentRoute.page === 'dashboard') scheduleWarmPageCache('timeline');
-      if (getSid() && currentRoute.page !== 'login') scheduleFullCacheWarm();
+      if (!opts.fromClientCache && currentRoute) storeClientPage(currentRoute, result);
+      if (currentRoute && currentRoute.page === 'dashboard') scheduleWarmPageCache('timeline');
+      if (getSid() && currentRoute && currentRoute.page !== 'login') scheduleFullCacheWarm();
     }
 
     function fail(err) {
@@ -3283,6 +3361,21 @@ body {
       if (!options.fromBack && !options.fromForward) forwardStack = [];
       var prevRoute = currentRoute;
       var nextRoute = { page: page, params: params };
+
+      // קאש לקוח — ניווט מיידי בלי קריאת שרת/גיליונות
+      if (!options.force && !options.skipCache && page !== 'login') {
+        var cached = getClientPage(nextRoute);
+        if (cached) {
+          if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
+            if (routeKey(prevRoute) !== routeKey(nextRoute)) navStack.push(prevRoute);
+          }
+          if (options.replace) navStack = [];
+          currentRoute = nextRoute;
+          applyResult(cached, { fromClientCache: true });
+          return;
+        }
+      }
+
       var myReq = ++reqId;
       loading = true;
       var booting = initialBoot;
@@ -3316,6 +3409,9 @@ body {
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
+          // כתיבה — מבטל קאש דפים; התוצאה החדשה נשמרת מחדש
+          invalidateClientPageCache();
+          prefetchStarted = false;
           applyResult(result);
         })
         .withFailureHandler(function(err) {
@@ -3431,6 +3527,7 @@ body {
       goForward: goForward, canGoForward: canGoForward,
       getSid: getSid, setSid: setSid, userLinkHtml: userLinkHtml, whatsappLinkHtml: whatsappLinkHtml,
       exerciseLinkHtml: exerciseLinkHtml,
+      invalidatePageCache: invalidateClientPageCache,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();
@@ -5016,6 +5113,7 @@ body {
           MapimSpa.hideLoader();
           bar.setAttribute('data-orig-start', String(startMs));
           bar.setAttribute('data-orig-end', String(endMs));
+          if (window.MapimSpa && MapimSpa.invalidatePageCache) MapimSpa.invalidatePageCache();
           if (result && result.info) showTimelineFlash(result.info);
         })
         .withFailureHandler(function(err) {
