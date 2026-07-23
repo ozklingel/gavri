@@ -1059,6 +1059,12 @@ body {
     .collapsible { }
     .collapsible-toggle {
       width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      text-align: right;
+      cursor: pointer;
       background: var(--bg3);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -1067,12 +1073,8 @@ body {
       font-family: var(--mono);
       font-size: 13px;
       font-weight: bold;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      text-align: right;
       margin-bottom: 2px;
+      box-sizing: border-box;
     }
     .collapsible-toggle:hover { border-color: var(--border2); background: var(--bg4); }
     .collapsible-toggle .arrow { transition: transform 0.2s; }
@@ -2479,12 +2481,27 @@ body {
       opacity:0;pointer-events:none;transition:opacity .18s ease;
     }
     #page-loader.visible{opacity:1;pointer-events:all;}
+    .loader-logo{
+      max-width:min(260px,72vw);
+      max-height:42vh;
+      width:auto;
+      height:auto;
+      object-fit:contain;
+      border-radius:10px;
+      box-shadow:var(--shadow-lg);
+      animation:loader-logo-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes loader-logo-pulse{
+      0%,100%{opacity:.92;transform:scale(1);}
+      50%{opacity:1;transform:scale(1.03);}
+    }
     .loader-ring{
       width:52px;height:52px;border-radius:50%;
       border:3px solid var(--border);border-top-color:var(--green);
       animation:spin .75s linear infinite;
       box-shadow:0 0 18px rgba(74,222,128,.25);
     }
+    #page-loader.has-logo .loader-ring{display:none;}
     .loader-dots{display:flex;gap:7px;}
     .loader-dots span{
       width:7px;height:7px;border-radius:50%;background:var(--green);
@@ -2789,7 +2806,14 @@ body {
   </div>
 </div>
 
-<div id="page-loader">
+<div id="page-loader" class="has-logo">
+  <img
+    class="loader-logo"
+    src="https://upload.wikimedia.org/wikipedia/commons/7/72/%D7%A7%D7%95%D7%A8%D7%A1_%D7%9E%22%D7%A4.jpg"
+    alt="קורס מייפים"
+    width="260"
+    height="260"
+    decoding="async">
   <div class="loader-ring"></div>
   <div class="loader-dots"><span></span><span></span><span></span></div>
   <div class="loader-text" id="loader-text">// LOADING...</div>
@@ -3162,6 +3186,10 @@ body {
       } else if (page === 'feedback') {
         if (src.assignmentId) out.assignmentId = String(src.assignmentId);
         if (src.exerciseId) out.exerciseId = String(src.exerciseId);
+      }
+      // מצב לשונית נפתחת — מפתח קאש נפרד (למקרה של קישורים ישנים)
+      if (src.open != null && String(src.open).trim()) {
+        out.open = String(src.open).trim();
       }
       return { page: page, params: out };
     }
@@ -3759,9 +3787,12 @@ body {
     }
 
     function isLocalUiClick(el) {
+      // לשוניות נפתחות — מקומי, גם אם נשאר data-spa-page מקאש ישן
+      if (el.closest('.collapsible-toggle') ||
+          el.closest('.expandable-closed') ||
+          el.closest('.ex-matrix-tier-toggle')) return true;
       if (el.closest('[data-spa-page]') || el.closest('[data-spa-action]')) return false;
-      return el.closest('button.collapsible-toggle') ||
-        el.closest('.dp-tab') ||
+      return el.closest('.dp-tab') ||
         el.closest('.dp-wrap') ||
         el.closest('.dp-popup') ||
         el.closest('#app-splash') ||
@@ -4649,17 +4680,35 @@ body {
   }
   window.initActionButtonTooltips = initActionButtonTooltips;
 
+  // פתיחה/סגירה של לשוניות — delegation (עובד גם אחרי רינדור SPA מחדש)
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.collapsible-toggle');
+    if (!btn) return;
+    // לא בולעים לחיצות על קישורים פנימיים בתוך התוכן
+    if (e.target.closest('.collapsible-content a[data-spa-page]')) return;
+
+    var panel = btn.closest('.collapsible');
+    var content = panel
+      ? panel.querySelector('.collapsible-content')
+      : btn.nextElementSibling;
+    // תאימות לקאש ישן: expandable-closed בלי תוכן — ניווט SPA עם open
+    if (!content || !content.classList.contains('collapsible-content')) {
+      if (btn.getAttribute('data-spa-page')) return; // יטופל ב-SPA
+      e.preventDefault();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    var isOpen = content.classList.toggle('open');
+    btn.classList.toggle('coll-open', isOpen);
+    if (panel) panel.classList.toggle('open', isOpen);
+    var arrow = btn.querySelector('.arrow');
+    if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
+  });
+
   function initCollapsibles() {
-    document.querySelectorAll('button.collapsible-toggle').forEach(function(btn) {
-      if (btn._collInit) return;
-      btn._collInit = true;
-      btn.addEventListener('click', function() {
-        const content = this.nextElementSibling;
-        if (!content || !content.classList.contains('collapsible-content')) return;
-        const isOpen = content.classList.toggle('open');
-        this.classList.toggle('coll-open', isOpen);
-      });
-    });
+    // no-op — delegation למעלה מטפל בכל הלשוניות
   }
   initCollapsibles();
   if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();

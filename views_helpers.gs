@@ -239,18 +239,12 @@ function _spaSectionTabsBar(page, baseParams, paramKey, items, activeId) {
 function _expandablePanel(page, baseParams, sectionId, title, contentHtml, openSet) {
   openSet = openSet || {};
   const isOpen = !!openSet[sectionId];
-  if (isOpen) {
-    const closeParams = Object.assign({}, baseParams || {});
-    delete closeParams.open;
-    return '<div class="collapsible open" id="panel-' + _esc(sectionId) + '">' +
-      '<a href="#" class="collapsible-toggle coll-open" data-spa-page="' + _esc(page) + '"' +
-      _spaParamsAttr(closeParams) + '>' + title + ' <span class="arrow">▴</span></a>' +
-      '<div class="collapsible-content open expandable-panel-body">' + contentHtml + '</div></div>';
-  }
-  const openParams = Object.assign({}, baseParams || {}, { open: sectionId });
-  return '<div class="expandable-closed-wrap">' +
-    '<a href="#" class="expandable-closed collapsible-toggle" data-spa-page="' + _esc(page) + '"' +
-    _spaParamsAttr(openParams) + '>' + title + ' <span class="arrow">▾</span></a></div>';
+  // תמיד מרנדרים את התוכן ב-DOM — פתיחה/סגירה מקומית בלי ניווט SPA
+  return '<div class="collapsible' + (isOpen ? ' open' : '') + '" id="panel-' + _esc(sectionId) + '">' +
+    '<button type="button" class="collapsible-toggle' + (isOpen ? ' coll-open' : '') + '" data-panel-id="' + _esc(sectionId) + '">' +
+    title + ' <span class="arrow">' + (isOpen ? '▴' : '▾') + '</span></button>' +
+    '<div class="collapsible-content' + (isOpen ? ' open' : '') + ' expandable-panel-body">' +
+    contentHtml + '</div></div>';
 }
 
 function _htmlShell() {
