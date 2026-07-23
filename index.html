@@ -3175,6 +3175,19 @@ body {
       if (window.MapimModules && MapimModules.invalidate) MapimModules.invalidate();
     }
 
+    /** מבטל רק נתיבים שמושפעים מכתיבה — משאיר שאר הקאש לניווט מהיר */
+    function invalidateClientRoutes(pages) {
+      var list = pages || [];
+      Object.keys(pageCache).forEach(function(key) {
+        for (var i = 0; i < list.length; i++) {
+          if (key.indexOf(list[i] + '::') === 0) {
+            delete pageCache[key];
+            break;
+          }
+        }
+      });
+    }
+
     function storeClientPage(route, result) {
       if (!route || !result || result.body == null) return;
       if (result.clearSid || result.mfaToken) return;
@@ -3299,9 +3312,33 @@ body {
         .apiPrefetchPages(getSid(), JSON.stringify(chunk));
     }
 
+    function storePagesList(list) {
+      (list || []).forEach(function(item) {
+        if (item && item.body != null) {
+          storeClientPage(
+            { page: item.page, params: item.params || {} },
+            { body: item.body, title: item.title || '' }
+          );
+        }
+      });
+    }
+
+    function warmRestInBackground() {
+      if (!getSid()) return;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          storePagesList(res && res.pages);
+          startAppPriming({ background: true, force: true });
+        })
+        .withFailureHandler(function() {
+          startAppPriming({ background: true, force: true });
+        })
+        .apiWarmRestAfterDashboard(getSid());
+    }
+
     /**
-     * כניסה: טוען את כל נתוני/טאבי הדשבורד — ורק אז מציג דשבורד.
-     * ברקע אחרי כתיבה: prefetch שאר הדפים בלי לחסום UI.
+     * כניסה: רק נתוני דשבורד (search) — הצגה מהירה.
+     * שאר הטבלאות/טאבים ברקע אחרי ההצגה.
      */
     function startAppPriming(opts) {
       opts = opts || {};
@@ -3330,41 +3367,29 @@ body {
 
       primingInProgress = true;
       appPrimed = false;
-      MapimLoader.showPersistent('// LOADING DASHBOARD DATA...');
-      MapimLoader.showSplashStatus('// LOADING DASHBOARD DATA...');
+      MapimLoader.showPersistent('// LOADING DASHBOARD...');
+      MapimLoader.showSplashStatus('// LOADING DASHBOARD...');
 
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || res.ok === false) {
             revealDashboardFromCache();
+            setTimeout(warmRestInBackground, 200);
             return;
           }
-          var list = res.pages || [];
-          list.forEach(function(item) {
-            if (item && item.body != null) {
-              storeClientPage(
-                { page: item.page, params: item.params || {} },
-                { body: item.body, title: item.title || '' }
-              );
-            }
-          });
+          storePagesList(res.pages);
           if (res.dashboard && res.dashboard.body) {
             storeClientPage(
               normalizeRoute('dashboard', { tab: 'search' }),
               { body: res.dashboard.body, title: res.dashboard.title || 'מסך הבית' }
             );
           }
-          // כל הטאבים בקאש לקוח — עכשיו מציגים
           revealDashboardFromCache();
-          setTimeout(function() {
-            startAppPriming({ background: true, force: true });
-          }, 400);
+          setTimeout(warmRestInBackground, 200);
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(function() {
           revealDashboardFromCache();
-          if (err && err.message) {
-            // לא חוסמים לגמרי — ניסינו גיבוי
-          }
+          setTimeout(warmRestInBackground, 200);
         })
         .apiReadyDashboard(getSid());
     }
@@ -3654,16 +3679,16 @@ body {
           var isAuthEntry = action === 'login' || action === 'verifyMfa';
           if (isAuthEntry) {
             invalidateClientPageCache();
-            applyResult(result); // יריץ apiReadyDashboard לפני הצגת דשבורד
-          } else {
-            invalidateClientPageCache({ keepPrimed: true });
-            applyResult(result, { skipPrime: true });
-            if (getSid()) {
-              setTimeout(function() {
-                startAppPriming({ background: true, force: true });
-              }, 400);
-            }
+            applyResult(result);
+            return;
           }
+          // לא מוחקים את כל הקאש — רק דפים שמושפעים + הדף הנוכחי יוחלף מ-result.body
+          invalidateClientRoutes(['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix']);
+          if (currentRoute && currentRoute.page) {
+            invalidateClientRoutes([currentRoute.page]);
+          }
+          applyResult(result, { skipPrime: true });
+          // בלי reprime מלא אחרי כל כתיבה (זה גרם ל-3–4ש׳ לקליק הבא)
         })
         .withFailureHandler(function(err) {
           if (myReq !== reqId) return;
@@ -3785,6 +3810,7 @@ body {
       getSid: getSid, setSid: setSid, userLinkHtml: userLinkHtml, whatsappLinkHtml: whatsappLinkHtml,
       exerciseLinkHtml: exerciseLinkHtml,
       invalidatePageCache: invalidateClientPageCache,
+      invalidateRoutes: invalidateClientRoutes,
       startAppPriming: startAppPriming,
       isPriming: function() { return !!primingInProgress; },
       parseSpaParams: parseSpaParams, runScripts: runScripts, afterRender: afterRender,
@@ -3792,7 +3818,7 @@ body {
     };
   })();
 
-  // Save participant row — reads data-* on <tr> and fields in the row (no form inside table)
+  // Save participant row — optimistic UI (אין המתנה לרינדור דף מלא)
   function spaSaveAssignmentRow(btn) {
     if (!btn || !window.MapimSpa) return;
     var row = btn.closest('tr');
@@ -3804,14 +3830,56 @@ body {
       return el ? String(el.value || '').trim() : '';
     };
     if (!assignmentId) { alert('חסר מזהה הקצאה'); return; }
-    MapimSpa.runAction('updateAssignment', {
-      assignmentId: assignmentId,
-      exerciseId: exerciseId,
-      status: pick('status'),
-      score: pick('score'),
-      responsibility: pick('responsibility'),
-      tutor: pick('tutor')
-    });
+
+    var status = pick('status');
+    var score = pick('score');
+    var responsibility = pick('responsibility');
+    var tutor = pick('tutor');
+
+    btn.disabled = true;
+    var prevText = btn.textContent;
+    btn.textContent = 'שומר...';
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.textContent = prevText;
+        if (!res || res.ok === false) {
+          alert((res && res.error) || 'שגיאה בשמירה');
+          return;
+        }
+        // optimistic: מסמנים הצלחה בלי רינדור מחדש של כל הדף
+        btn.textContent = '✓ נשמר';
+        setTimeout(function() { btn.textContent = prevText; }, 1200);
+        if (window.MapimSpa && MapimSpa.invalidateRoutes) {
+          MapimSpa.invalidateRoutes(['dashboard', 'assign', 'exercise', 'statistics']);
+        }
+        var flash = document.getElementById('spa-inline-flash');
+        if (!flash) {
+          flash = document.createElement('div');
+          flash.id = 'spa-inline-flash';
+          flash.className = 'flash flash-ok';
+          flash.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:9999;padding:10px 14px;';
+          document.body.appendChild(flash);
+        }
+        flash.textContent = (res && res.info) || 'נשמר';
+        flash.hidden = false;
+        setTimeout(function() { flash.hidden = true; }, 2000);
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.textContent = prevText;
+        alert(err && err.message ? err.message : String(err));
+      })
+      .apiUpdateAssignment(
+        MapimSpa.getSid(),
+        assignmentId,
+        exerciseId,
+        status,
+        score,
+        responsibility,
+        tutor
+      );
   }
   window.spaSaveAssignmentRow = spaSaveAssignmentRow;
 
@@ -5376,9 +5444,8 @@ body {
           MapimSpa.hideLoader();
           bar.setAttribute('data-orig-start', String(startMs));
           bar.setAttribute('data-orig-end', String(endMs));
-          if (window.MapimSpa && MapimSpa.invalidatePageCache) MapimSpa.invalidatePageCache();
-          if (window.MapimSpa && typeof MapimSpa.startAppPriming === 'function') {
-            setTimeout(function() { MapimSpa.startAppPriming({ background: true, force: true }); }, 400);
+          if (window.MapimSpa && MapimSpa.invalidateRoutes) {
+            MapimSpa.invalidateRoutes(['timeline', 'dashboard', 'exercises', 'assign', 'statistics']);
           }
           if (result && result.info) showTimelineFlash(result.info);
         })

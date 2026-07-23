@@ -691,30 +691,54 @@ function Assignments_update(p) {
   if (row < 0) throw new Error('ההקצאה לא נמצאה.');
 
   const sh = _sheet('Assignments');
+  const inline = !!(p.inline || p.optimistic);
 
   if (Roles_isTutor(u.role)) {
     if (!Assignments_canEditScore(u, assignment)) {
       throw new Error('אין הרשאה לעדכן ציון להקצאה זו.');
     }
-    sh.getRange(row, 5).setValue(String(p.score != null ? p.score : '').trim());
-    _assignmentsInvalidate();
+    const newScore = String(p.score != null ? p.score : '').trim();
+    sh.getRange(row, 5).setValue(newScore);
+    _cachePatchRow('Assignments', row, { 5: newScore });
+    _assignmentsClearDerived();
+    if (inline) {
+      return { ok: true, info: 'הציון נשמר.', assignmentId: aid, exerciseId: exId || assignment.exercise_id };
+    }
     return Views_exercise({ sid: p.sid, id: exId || assignment.exercise_id, info: 'הציון נשמר.' });
   }
 
   if (!Roles_hasAdminAccess(u.role)) throw new Error('אין הרשאה לפעולה זו.');
 
-  const newStatus = String(p.status != null ? p.status : '').trim();
+  const newStatus = String(p.status != null ? p.status : '').trim() || 'pending';
   const newScore  = String(p.score  != null ? p.score  : '').trim();
   const newResp   = String(p.responsibility != null ? p.responsibility : '').trim();
   const newTutor  = String(p.tutor != null ? p.tutor : '').trim();
 
-  sh.getRange(row, 4).setValue(newStatus || 'pending');
-  sh.getRange(row, 5).setValue(newScore);
-  sh.getRange(row, 6).setValue(newResp);
+  // batch: cols 4–6 בבת אחת + tutor בנפרד (col 8, אחרי feedback ב-7)
+  sh.getRange(row, 4, 1, 3).setValues([[newStatus, newScore, newResp]]);
   sh.getRange(row, 8).setValue(newTutor);
-  _assignmentsInvalidate();
+  _cachePatchRow('Assignments', row, {
+    4: newStatus,
+    5: newScore,
+    6: newResp,
+    8: newTutor
+  });
+  _assignmentsClearDerived();
 
-  return Views_exercise({ sid: p.sid, id: exId, info: 'פרטי המשתתף עודכנו בהצלחה.' });
+  if (inline) {
+    return {
+      ok: true,
+      info: 'פרטי המשתתף עודכנו בהצלחה.',
+      assignmentId: aid,
+      exerciseId: exId || assignment.exercise_id
+    };
+  }
+
+  return Views_exercise({
+    sid: p.sid,
+    id: exId || assignment.exercise_id,
+    info: 'פרטי המשתתף עודכנו בהצלחה.'
+  });
 }
 
 // Save free-text feedback on trainee performance in an exercise

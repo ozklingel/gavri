@@ -52,14 +52,15 @@ function apiUpdateAssignment(sid, assignmentId, exerciseId, status, score, respo
     status: status == null ? '' : String(status),
     score: score == null ? '' : String(score),
     responsibility: responsibility == null ? '' : String(responsibility),
-    tutor: tutor == null ? '' : String(tutor)
+    tutor: tutor == null ? '' : String(tutor),
+    inline: true
   };
   try {
     const result = _spaEnsureWrap(Assignments_update(p));
     _htmlCacheBump();
     return result;
   } catch (err) {
-    return _spaEnsureWrap(Views_error(err && err.message ? err.message : String(err), p));
+    return { ok: false, error: err && err.message ? err.message : String(err) };
   }
 }
 
@@ -77,10 +78,9 @@ function apiRunAction(sid, action, paramsJson) {
 }
 
 /**
- * לפני הצגת דשבורד:
- * 1) מנקה וטוען מחדש את כל הגיליונות שטאבי הדשבורד צריכים
- * 2) מרנדר את כל הטאבים (search/exercise/team/conflicts)
- * הלקוח מציג דשבורד רק אחרי שהתשובה הזו חוזרת.
+ * לפני הצגת דשבורד — מהיר:
+ * רק גיליונות הדשבורד + טאב search.
+ * שאר הגיליונות/טאבים: apiWarmRestAfterDashboard ברקע.
  */
 function apiReadyDashboard(sid) {
   const s = String(sid || '').trim();
@@ -94,13 +94,55 @@ function apiReadyDashboard(sid) {
   }
   if (!user) return { ok: false, error: 'not logged in' };
 
-  // נתוני DB לטאבים — תמיד fresh מהגיליון
   const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
     ? DB_DASHBOARD_SHEETS
     : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
   _cacheForceReloadSheets(dashSheets);
 
-  // שאר ה-DB גם (לניווט אחרי הדשבורד) — באותה כניסה
+  let dash;
+  try {
+    dash = _spaEnsureWrap(Views_dashboard({ sid: s, tab: 'search' }));
+  } catch (e1) {
+    return { ok: false, error: e1 && e1.message ? e1.message : String(e1) };
+  }
+  if (!dash || dash.body == null) {
+    return { ok: false, error: 'dashboard render failed', pages: [] };
+  }
+
+  const page = {
+    page: 'dashboard',
+    params: { tab: 'search' },
+    body: dash.body,
+    title: dash.title || 'מסך הבית'
+  };
+
+  return {
+    ok: true,
+    sheets: dashSheets.length,
+    pages: [page],
+    dashboard: page
+  };
+}
+
+/**
+ * ברקע אחרי הצגת דשבורד: שאר הגיליונות + שאר טאבי הדשבורד.
+ */
+function apiWarmRestAfterDashboard(sid) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, pages: [] };
+
+  let user;
+  try {
+    user = Auth_current({ sid: s });
+  } catch (e0) {
+    return { ok: false, pages: [] };
+  }
+  if (!user) return { ok: false, pages: [] };
+
+  const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
+    ? DB_DASHBOARD_SHEETS
+    : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
+
   const rest = DB_FULL_CACHE_SHEETS.filter(function(name) {
     return dashSheets.indexOf(name) < 0;
   });
@@ -122,7 +164,6 @@ function apiReadyDashboard(sid) {
     } catch (err) {}
   }
 
-  pushTab('search');
   pushTab('exercise');
   if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
     pushTab('team');
@@ -131,20 +172,7 @@ function apiReadyDashboard(sid) {
     pushTab('conflicts');
   }
 
-  const dash = pages.filter(function(p) {
-    return p.params && p.params.tab === 'search';
-  })[0] || pages[0] || null;
-
-  if (!dash) {
-    return { ok: false, error: 'dashboard render failed', pages: [] };
-  }
-
-  return {
-    ok: true,
-    sheets: dashSheets.length,
-    pages: pages,
-    dashboard: dash
-  };
+  return { ok: true, pages: pages, sheets: rest.length };
 }
 
 /** רשימת דפים/טאבים לטעינה מלאה אחרי התחברות (לפי הרשאות). */

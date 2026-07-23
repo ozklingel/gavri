@@ -824,11 +824,19 @@ function Exercises_updateTimes(p) {
   if (dayErr) throw new Error(dayErr);
 
   const sh = _sheet('Exercises');
-  sh.getRange(row, 5).setValue(String(p.start_date || '').trim());
-  sh.getRange(row, 6).setValue(String(p.end_date || '').trim());
-  sh.getRange(row, 12).setValue(String(p.start_time != null ? p.start_time : '').trim());
-  sh.getRange(row, 13).setValue(String(p.end_time != null ? p.end_time : '').trim());
-  _cacheInvalidate('Exercises');
+  const startDate = String(p.start_date || '').trim();
+  const endDate = String(p.end_date || '').trim();
+  const startTime = String(p.start_time != null ? p.start_time : '').trim();
+  const endTime = String(p.end_time != null ? p.end_time : '').trim();
+  // batch writes — 2 קריאות במקום 4
+  sh.getRange(row, 5, 1, 2).setValues([[startDate, endDate]]);
+  sh.getRange(row, 12, 1, 2).setValues([[startTime, endTime]]);
+  _cachePatchRow('Exercises', row, {
+    5: startDate,
+    6: endDate,
+    12: startTime,
+    13: endTime
+  });
 
   let shiftInfo = '';
   if (_parseBool(p.shift_procedure) && ex) {

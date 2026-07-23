@@ -420,6 +420,34 @@ function _cachePatchAppend(name, rows) {
   _cacheInvalidate(name);
 }
 
+/**
+ * אחרי setValues לכמה תאים בשורה — מעדכן את הקאש בזיכרון בלי קריאת Sheets מחדש.
+ * sheetRow: מספר שורה בגיליון (2 = שורת נתונים ראשונה)
+ * updates: מפה { col1Based: value, ... }
+ */
+function _cachePatchRow(name, sheetRow, updates) {
+  let cur = _rowsCache[name];
+  if (!cur || !cur.data) cur = _getScriptCacheRows(name);
+  if (!cur || !cur.data) {
+    _cacheInvalidate(name);
+    return;
+  }
+  const idx = sheetRow - 2;
+  if (idx < 0 || idx >= cur.data.length) {
+    _cacheInvalidate(name);
+    return;
+  }
+  const row = cur.data[idx].slice();
+  Object.keys(updates || {}).forEach(function(k) {
+    const col = parseInt(k, 10);
+    if (!isNaN(col) && col >= 1) row[col - 1] = updates[k];
+  });
+  cur.data[idx] = row;
+  _rowsCache[name] = cur;
+  _putScriptCacheRows(name, cur);
+  _htmlCacheBump();
+}
+
 function _append(name, row) {
   _sheet(name).appendRow(row);
   _cachePatchAppend(name, [row]);
