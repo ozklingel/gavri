@@ -188,13 +188,23 @@ function _wrapPage(body, title) {
 }
 
 function _spaModuleSlot(moduleId, params, label) {
-  label = label || 'טוען...';
+  label = label || '// LOADING...';
+  const logo = 'https://upload.wikimedia.org/wikipedia/commons/7/72/%D7%A7%D7%95%D7%A8%D7%A1_%D7%9E%22%D7%A4.jpg';
   return '<div class="spa-module" data-spa-module="' + _esc(moduleId) + '"' +
     _spaParamsAttr(params || {}) + '>' +
     '<div class="spa-module-skeleton" aria-busy="true">' +
-    '<span class="spa-module-skeleton-bar"></span>' +
-    '<span class="spa-module-skeleton-text">' + _esc(label) + '</span>' +
-    '</div></div>';
+    '<div class="mapim-brand-loader mapim-brand-loader--compact">' +
+    '<div class="mapim-brand-loader-stage">' +
+    '<div class="mapim-brand-loader-orbit mapim-brand-loader-orbit--outer" aria-hidden="true"></div>' +
+    '<div class="mapim-brand-loader-orbit" aria-hidden="true"></div>' +
+    '<div class="mapim-brand-loader-orbit mapim-brand-loader-orbit--inner" aria-hidden="true"></div>' +
+    '<div class="mapim-brand-loader-glow" aria-hidden="true"></div>' +
+    '<div class="mapim-brand-loader-scan" aria-hidden="true"></div>' +
+    '<img class="mapim-brand-loader-logo" src="' + logo + '" alt="" width="140" height="140" decoding="async">' +
+    '</div>' +
+    '<div class="mapim-brand-loader-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>' +
+    '<div class="mapim-brand-loader-text">' + _esc(label) + '</div>' +
+    '</div></div></div>';
 }
 
 function _parseOpenSections(p) {
