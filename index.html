@@ -3135,7 +3135,6 @@ body {
     var pageCacheEpoch = 0;
     var appPrimed = false;
     var primingInProgress = false;
-    var PREFETCH_BATCH = 3;
 
     function normalizeRoute(page, params) {
       page = String(page || '').trim();
@@ -3219,6 +3218,17 @@ body {
       }
     }
 
+    function storePagesList(list) {
+      (list || []).forEach(function(item) {
+        if (item && item.body != null) {
+          storeClientPage(
+            { page: item.page, params: item.params || {} },
+            { body: item.body, title: item.title || '' }
+          );
+        }
+      });
+    }
+
     function revealDashboardFromCache() {
       var dashRoute = normalizeRoute('dashboard', { tab: 'search' });
       currentRoute = dashRoute;
@@ -3232,166 +3242,183 @@ body {
         afterRender();
         if (dash.title) document.title = dash.title;
         finishPriming({});
-        return;
+        return true;
       }
-      // גיבוי
-      MapimLoader.showPersistent('// LOADING DASHBOARD...');
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result && result.body) {
-            storeClientPage(dashRoute, result);
-            if (app) {
-              app.innerHTML = result.body;
-              runScripts(app);
-              afterRender();
-            }
-            if (result.title) document.title = result.title;
+      return false;
+    }
+
+    // ── Staged load: dashboard → exercises → remaining ──
+    var loadStage = {
+      dashboard: false,
+      exercises: false,
+      remaining: false,
+      running: false
+    };
+    var stageWaiters = { dashboard: [], exercises: [], remaining: [] };
+
+    function gsCall(methodName) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      return new Promise(function(resolve, reject) {
+        try {
+          var runner = google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(function(err) {
+              reject(err || new Error(methodName + ' failed'));
+            });
+          if (typeof runner[methodName] !== 'function') {
+            reject(new Error('Missing server function: ' + methodName));
+            return;
           }
-          finishPriming({});
-        })
-        .withFailureHandler(function(err) {
-          finishPriming({});
-          alert(err && err.message ? err.message : String(err));
-        })
-        .apiRenderPage(getSid(), 'dashboard', JSON.stringify({ tab: 'search' }));
-    }
-
-    function prefetchModulesList(modules, opts) {
-      if (!modules || !modules.length) {
-        finishPriming(opts);
-        return;
-      }
-      if (!opts.background) {
-        MapimLoader.show('// PREPARING MODULES...');
-      }
-      google.script.run
-        .withSuccessHandler(function(res) {
-          var list = (res && res.modules) || [];
-          list.forEach(function(item) {
-            if (item && item.html != null && window.MapimModules && MapimModules.store) {
-              MapimModules.store(item.moduleId, item.params || {}, item.html);
-            }
-          });
-          finishPriming(opts);
-        })
-        .withFailureHandler(function() { finishPriming(opts); })
-        .apiPrefetchModules(getSid(), JSON.stringify(modules));
-    }
-
-    function prefetchPageBatches(pages, modules, offset, opts) {
-      if (!getSid()) {
-        primingInProgress = false;
-        return;
-      }
-      if (offset >= pages.length) {
-        prefetchModulesList(modules, opts);
-        return;
-      }
-      var chunk = pages.slice(offset, offset + PREFETCH_BATCH);
-      var done = Math.min(offset + chunk.length, pages.length);
-      var pct = Math.round((done / Math.max(pages.length, 1)) * 100);
-      if (!opts.background) {
-        MapimLoader.show('// PREPARING APP ' + done + '/' + pages.length + ' (' + pct + '%)');
-      }
-      google.script.run
-        .withSuccessHandler(function(res) {
-          var list = (res && res.pages) || [];
-          list.forEach(function(item) {
-            if (item && item.body != null) {
-              storeClientPage(
-                { page: item.page, params: item.params || {} },
-                { body: item.body, title: item.title || '' }
-              );
-            }
-          });
-          prefetchPageBatches(pages, modules, offset + PREFETCH_BATCH, opts);
-        })
-        .withFailureHandler(function() {
-          prefetchPageBatches(pages, modules, offset + PREFETCH_BATCH, opts);
-        })
-        .apiPrefetchPages(getSid(), JSON.stringify(chunk));
-    }
-
-    function storePagesList(list) {
-      (list || []).forEach(function(item) {
-        if (item && item.body != null) {
-          storeClientPage(
-            { page: item.page, params: item.params || {} },
-            { body: item.body, title: item.title || '' }
-          );
+          runner[methodName].apply(runner, args);
+        } catch (e) {
+          reject(e);
         }
       });
     }
 
-    function warmRestInBackground() {
-      if (!getSid()) return;
-      google.script.run
-        .withSuccessHandler(function(res) {
-          storePagesList(res && res.pages);
-          startAppPriming({ background: true, force: true });
-        })
-        .withFailureHandler(function() {
-          startAppPriming({ background: true, force: true });
-        })
-        .apiWarmRestAfterDashboard(getSid());
+    function notifyStage(stage) {
+      loadStage[stage] = true;
+      var waiters = stageWaiters[stage] || [];
+      stageWaiters[stage] = [];
+      waiters.forEach(function(fn) {
+        try { fn(); } catch (e) {}
+      });
+    }
+
+    function whenStageReady(stage) {
+      if (loadStage[stage]) return Promise.resolve();
+      return new Promise(function(resolve) {
+        if (!stageWaiters[stage]) stageWaiters[stage] = [];
+        stageWaiters[stage].push(resolve);
+      });
+    }
+
+    function stageForPage(page) {
+      page = String(page || '');
+      if (page === 'login') return null;
+      if (page === 'dashboard') return 'dashboard';
+      if (page === 'exercises' || page === 'exercise') return 'exercises';
+      return 'remaining';
+    }
+
+    function showLocalPageLoader(msg) {
+      var app = document.getElementById('app-content');
+      if (!app) return;
+      app.innerHTML =
+        '<div class="page-local-loader" style="padding:48px 24px;text-align:center;color:var(--muted);font-family:var(--mono)">' +
+        '<div class="loader-dots" aria-hidden="true"><span></span><span></span><span></span></div>' +
+        '<div style="margin-top:12px;letter-spacing:.08em">' + (msg || '// LOADING...') + '</div></div>';
+    }
+
+    function storeModulesList(list) {
+      (list || []).forEach(function(item) {
+        if (item && item.html != null && window.MapimModules && MapimModules.store) {
+          MapimModules.store(item.moduleId, item.params || {}, item.html);
+        }
+      });
     }
 
     /**
-     * כניסה: רק נתוני דשבורד (search) — הצגה מהירה.
-     * שאר הטבלאות/טאבים ברקע אחרי ההצגה.
+     * Staged session load:
+     * 1) getDashboardData → paint dashboard, hide full-screen loader
+     * 2) getExercisesData (background, no modal)
+     * 3) getRemainingAppData (background, no modal)
      */
-    function startAppPriming(opts) {
-      opts = opts || {};
+    function startStagedLoad() {
       if (!getSid()) return;
-      if (primingInProgress) return;
-      if (appPrimed && !opts.force) return;
+      if (loadStage.running) return;
 
-      if (opts.background) {
-        primingInProgress = true;
-        google.script.run
-          .withSuccessHandler(function(plan) {
-            var pages = ((plan && plan.pages) || []).filter(function(p) {
-              return p && p.page && p.page !== 'dashboard';
-            });
-            var modules = (plan && plan.modules) || [];
-            if (!pages.length) {
-              prefetchModulesList(modules, { background: true });
-              return;
-            }
-            prefetchPageBatches(pages, modules, 0, { background: true });
-          })
-          .withFailureHandler(function() { primingInProgress = false; })
-          .apiPrefetchPlan(getSid());
-        return;
-      }
-
+      loadStage.running = true;
+      loadStage.dashboard = false;
+      loadStage.exercises = false;
+      loadStage.remaining = false;
       primingInProgress = true;
       appPrimed = false;
+
       MapimLoader.showPersistent('// LOADING DASHBOARD...');
       MapimLoader.showSplashStatus('// LOADING DASHBOARD...');
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (!res || res.ok === false) {
+      gsCall('getDashboardData', getSid())
+        .catch(function() {
+          return gsCall('apiReadyDashboard', getSid());
+        })
+        .then(function(res) {
+          if (res && res.ok !== false) {
+            storePagesList(res.pages);
+            if (res.dashboard && res.dashboard.body) {
+              storeClientPage(
+                normalizeRoute('dashboard', { tab: 'search' }),
+                { body: res.dashboard.body, title: res.dashboard.title || 'מסך הבית' }
+              );
+            }
+          }
+          if (!revealDashboardFromCache()) {
+            // fallback server render
+            return gsCall('apiRenderPage', getSid(), 'dashboard', JSON.stringify({ tab: 'search' }))
+              .then(function(dash) {
+                if (dash && dash.body) {
+                  storeClientPage(normalizeRoute('dashboard', { tab: 'search' }), dash);
+                  revealDashboardFromCache();
+                } else {
+                  finishPriming({});
+                }
+              });
+          }
+        })
+        .then(function() {
+          notifyStage('dashboard');
+          appPrimed = true;
+          primingInProgress = false;
+          // Step 3 — background, no full-screen loader
+          return gsCall('getExercisesData', getSid());
+        })
+        .then(function(res) {
+          storePagesList(res && res.pages);
+          notifyStage('exercises');
+          // Step 4 — remaining
+          return gsCall('getRemainingAppData', getSid());
+        })
+        .then(function(res) {
+          storePagesList(res && res.pages);
+          if (res && res.modules && res.modules.length) {
+            return gsCall('apiPrefetchModules', getSid(), JSON.stringify(res.modules))
+              .then(function(modRes) {
+                storeModulesList(modRes && modRes.modules);
+              })
+              .catch(function() {});
+          }
+        })
+        .then(function() {
+          notifyStage('remaining');
+          loadStage.running = false;
+          appPrimed = true;
+          primingInProgress = false;
+        })
+        .catch(function(err) {
+          loadStage.running = false;
+          primingInProgress = false;
+          appPrimed = true;
+          notifyStage('dashboard');
+          notifyStage('exercises');
+          notifyStage('remaining');
+          if (!document.getElementById('app-content') ||
+              !document.getElementById('app-content').innerHTML) {
             revealDashboardFromCache();
-            setTimeout(warmRestInBackground, 200);
-            return;
+            finishPriming({});
           }
-          storePagesList(res.pages);
-          if (res.dashboard && res.dashboard.body) {
-            storeClientPage(
-              normalizeRoute('dashboard', { tab: 'search' }),
-              { body: res.dashboard.body, title: res.dashboard.title || 'מסך הבית' }
-            );
-          }
-          revealDashboardFromCache();
-          setTimeout(warmRestInBackground, 200);
-        })
-        .withFailureHandler(function() {
-          revealDashboardFromCache();
-          setTimeout(warmRestInBackground, 200);
-        })
-        .apiReadyDashboard(getSid());
+          MapimLoader.hide();
+          finishBootUi();
+        });
+    }
+
+    /** תאימות — קריאות ישנות ל-startAppPriming */
+    function startAppPriming(opts) {
+      opts = opts || {};
+      if (opts.background) {
+        // כבר רץ בתור המדורג / אין צורך ב-reprime מלא
+        return;
+      }
+      startStagedLoad();
     }
 
     function scheduleWarmPageCache(page) {
@@ -3571,7 +3598,7 @@ body {
         !result.mfaToken &&
         !!getSid() &&
         !appPrimed &&
-        !primingInProgress &&
+        !loadStage.running &&
         !opts.fromClientCache &&
         !opts.skipPrime;
 
@@ -3579,8 +3606,8 @@ body {
         loading = false;
         var appHold = document.getElementById('app-content');
         if (appHold) appHold.innerHTML = '';
-        MapimLoader.showPersistent('// LOADING DASHBOARD DATA...');
-        startAppPriming({ background: false });
+        MapimLoader.showPersistent('// LOADING DASHBOARD...');
+        startStagedLoad();
         return;
       }
 
@@ -3613,34 +3640,45 @@ body {
       var prevRoute = currentRoute;
       var nextRoute = normalizeRoute(page, params);
 
-      // בזמן priming — רק מקאש (בלי קריאת שרת)
-      if (primingInProgress && page !== 'login' && !options.force) {
-        var primingHit = getClientPage(nextRoute);
-        if (primingHit) {
-          if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
-            if (routeKey(prevRoute) !== routeKey(nextRoute)) navStack.push(prevRoute);
-          }
-          if (options.replace) navStack = [];
-          currentRoute = nextRoute;
-          applyResult(primingHit, { fromClientCache: true });
-          return;
+      function commitNav(result, fromCache) {
+        if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
+          if (routeKey(prevRoute) !== routeKey(nextRoute)) navStack.push(prevRoute);
         }
-        MapimLoader.show('// STILL PREPARING APP...');
-        return;
+        if (options.replace) navStack = [];
+        currentRoute = nextRoute;
+        applyResult(result, fromCache ? { fromClientCache: true, skipPrime: true } : { skipPrime: true });
       }
 
-      // קאש לקוח — ניווט מיידי בלי קריאת שרת/גיליונות
+      // קאש לקוח — מיידי
       if (!options.force && !options.skipCache && page !== 'login') {
         var cached = getClientPage(nextRoute);
         if (cached) {
-          if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
-            if (routeKey(prevRoute) !== routeKey(nextRoute)) navStack.push(prevRoute);
-          }
-          if (options.replace) navStack = [];
-          currentRoute = nextRoute;
-          applyResult(cached, { fromClientCache: true });
+          commitNav(cached, true);
           return;
         }
+      }
+
+      // שלב רקע עדיין רץ — ממתין עם לוודר מקומי (לא חוסם מסך מלא)
+      var needed = stageForPage(page);
+      if (needed && !loadStage[needed] && loadStage.running && page !== 'login' && !options.force) {
+        showLocalPageLoader('// LOADING ' + page.toUpperCase() + '...');
+        currentRoute = nextRoute;
+        whenStageReady(needed).then(function() {
+          var hit = getClientPage(nextRoute);
+          if (hit) {
+            commitNav(hit, true);
+            return;
+          }
+          // עדיין אין בקאש — קריאה לשרת
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (result && result.body) storeClientPage(nextRoute, result);
+              commitNav(result || {}, false);
+            })
+            .withFailureHandler(function(err) { fail(err); })
+            .apiRenderPage(getSid(), page, JSON.stringify(nextRoute.params || {}));
+        });
+        return;
       }
 
       var myReq = ++reqId;
@@ -3653,14 +3691,7 @@ body {
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
-          if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
-            if (routeKey(prevRoute) !== routeKey(nextRoute)) {
-              navStack.push(prevRoute);
-            }
-          }
-          if (options.replace) navStack = [];
-          currentRoute = nextRoute;
-          applyResult(result);
+          commitNav(result, false);
         })
         .withFailureHandler(function(err) {
           if (myReq !== reqId) return;
@@ -3718,9 +3749,9 @@ body {
     function boot() {
       var sid = getSid();
       if (sid) {
-        MapimLoader.showSplashStatus('// LOADING DASHBOARD DATA...');
-        MapimLoader.showPersistent('// LOADING DASHBOARD DATA...');
-        startAppPriming({ background: false });
+        MapimLoader.showSplashStatus('// LOADING DASHBOARD...');
+        MapimLoader.showPersistent('// LOADING DASHBOARD...');
+        startStagedLoad();
       } else {
         MapimLoader.showSplashStatus('טוען...');
         navigate('login', {});
@@ -3812,7 +3843,16 @@ body {
       invalidatePageCache: invalidateClientPageCache,
       invalidateRoutes: invalidateClientRoutes,
       startAppPriming: startAppPriming,
-      isPriming: function() { return !!primingInProgress; },
+      startStagedLoad: startStagedLoad,
+      isPriming: function() { return !!loadStage.running || !!primingInProgress; },
+      getLoadStage: function() {
+        return {
+          dashboard: !!loadStage.dashboard,
+          exercises: !!loadStage.exercises,
+          remaining: !!loadStage.remaining,
+          running: !!loadStage.running
+        };
+      },
       parseSpaParams: parseSpaParams, runScripts: runScripts, afterRender: afterRender,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };

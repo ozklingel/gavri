@@ -78,11 +78,10 @@ function apiRunAction(sid, action, paramsJson) {
 }
 
 /**
- * לפני הצגת דשבורד — מהיר:
- * רק גיליונות הדשבורד + טאב search.
- * שאר הגיליונות/טאבים: apiWarmRestAfterDashboard ברקע.
+ * Step 1 — מינימום לדשבורד (טאב search).
+ * מחמם רק גיליונות הדשבורד ומחזיר HTML מוכן לקאש לקוח.
  */
-function apiReadyDashboard(sid) {
+function getDashboardData(sid) {
   const s = String(sid || '').trim();
   if (!s) return { ok: false, error: 'missing sid' };
 
@@ -118,16 +117,77 @@ function apiReadyDashboard(sid) {
 
   return {
     ok: true,
+    stage: 'dashboard',
     sheets: dashSheets.length,
     pages: [page],
     dashboard: page
   };
 }
 
+/** תאימות לאחור */
+function apiReadyDashboard(sid) {
+  return getDashboardData(sid);
+}
+
 /**
- * ברקע אחרי הצגת דשבורד: שאר הגיליונות + שאר טאבי הדשבורד.
+ * Step 3 — נתוני עמוד תרגילים (ברקע, אחרי הצגת דשבורד).
  */
-function apiWarmRestAfterDashboard(sid) {
+function getExercisesData(sid) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, pages: [] };
+
+  let user;
+  try {
+    user = Auth_current({ sid: s });
+  } catch (e0) {
+    return { ok: false, pages: [] };
+  }
+  if (!user) return { ok: false, pages: [] };
+
+  // בקשה חדשה — טוענים מ-Script Cache שכבר מולא ב-getDashboardData
+  const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
+    ? DB_DASHBOARD_SHEETS
+    : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
+  _cacheWarmSheetsIfNeeded(dashSheets);
+
+  const pages = [];
+  function pushPage(page, params) {
+    try {
+      const p = Object.assign({}, params || {}, { sid: s });
+      const result = _spaEnsureWrap(_spaDispatchPage(page, p));
+      if (result && result.body != null) {
+        pages.push({
+          page: page,
+          params: params || {},
+          body: result.body,
+          title: result.title || ''
+        });
+      }
+    } catch (err) {}
+  }
+
+  if (Roles_hasAdminAccess(user.role)) {
+    pushPage('exercises', { tab: 'list' });
+    pushPage('exercises', { tab: 'calendar' });
+    pushPage('exercises', { tab: 'new' });
+  }
+
+  // טאבי דשבורד נוספים — שימושיים מיד אחרי הדשבורד הראשי
+  pushPage('dashboard', { tab: 'exercise' });
+  if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
+    pushPage('dashboard', { tab: 'team' });
+  }
+  if (Roles_hasAdminAccess(user.role)) {
+    pushPage('dashboard', { tab: 'conflicts' });
+  }
+
+  return { ok: true, stage: 'exercises', pages: pages };
+}
+
+/**
+ * Step 4 — שאר הגיליונות + שאר דפי האפליקציה (ברקע).
+ */
+function getRemainingAppData(sid) {
   const s = String(sid || '').trim();
   if (!s) return { ok: false, pages: [] };
 
@@ -150,29 +210,59 @@ function apiWarmRestAfterDashboard(sid) {
   _cacheMarkWarmed();
 
   const pages = [];
-  function pushTab(tab) {
+  function pushPage(page, params) {
     try {
-      const result = _spaEnsureWrap(Views_dashboard({ sid: s, tab: tab }));
+      const p = Object.assign({}, params || {}, { sid: s });
+      const result = _spaEnsureWrap(_spaDispatchPage(page, p));
       if (result && result.body != null) {
         pages.push({
-          page: 'dashboard',
-          params: { tab: tab },
+          page: page,
+          params: params || {},
           body: result.body,
-          title: result.title || 'מסך הבית'
+          title: result.title || ''
         });
       }
     } catch (err) {}
   }
 
-  pushTab('exercise');
-  if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
-    pushTab('team');
-  }
+  pushPage('homeConstraints', {});
+  pushPage('fieldForces', {});
+  pushPage('fireZones', {});
+  if (Roles_hasTimelineAccess(user.role)) pushPage('timeline', {});
+
   if (Roles_hasAdminAccess(user.role)) {
-    pushTab('conflicts');
+    pushPage('assign', {});
+    pushPage('users', { tab: 'users' });
+    pushPage('users', { tab: 'teams' });
+    pushPage('statistics', { section: 'kpi' });
+    pushPage('statistics', { section: 'team' });
+    pushPage('statistics', { section: 'compare' });
+    pushPage('statistics', { section: 'trainees' });
+    pushPage('statistics', { section: 'types' });
+    pushPage('seriesArchive', {});
+    pushPage('feedback', {});
+    pushPage('teamMatrix', {});
+    pushPage('exerciseMatrix', {});
   }
 
-  return { ok: true, pages: pages, sheets: rest.length };
+  return {
+    ok: true,
+    stage: 'remaining',
+    sheets: rest.length,
+    pages: pages,
+    modules: ['drawer.panels']
+  };
+}
+
+/** תאימות לאחור — מחזיר טאבי דשבורד נוספים + שאר גיליונות */
+function apiWarmRestAfterDashboard(sid) {
+  const ex = getExercisesData(sid);
+  const rem = getRemainingAppData(sid);
+  return {
+    ok: true,
+    pages: [].concat((ex && ex.pages) || [], (rem && rem.pages) || []),
+    modules: (rem && rem.modules) || []
+  };
 }
 
 /** רשימת דפים/טאבים לטעינה מלאה אחרי התחברות (לפי הרשאות). */

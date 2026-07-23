@@ -149,7 +149,7 @@ function _authUserEmail(user) {
 }
 
 function _authCompleteLogin(user) {
-  // לוגאין מהיר — נתוני דשבורד + כל הטאבים נטענים ב-apiReadyDashboard לפני הצגה
+  // לוגאין מהיר — דשבורד נטען ב-getDashboardData לפני הצגה
   return {
     body: '',
     title: 'טוען מערכת...',
