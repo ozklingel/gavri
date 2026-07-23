@@ -12,9 +12,9 @@ function Views_assign(p) {
     '<div class="page page-assign">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
     '<div class="page-title" style="margin:0">🔀 לוח שיבוץ</div>' +
-    '<span id="assignStatus" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></span>' +
+    '<span id="assignStatus" class="ui-on-bg-chip"></span>' +
     '</div>' +
-    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px">' +
+    '<div class="ui-on-bg-chip assign-page-hint">' +
     '// ימין: חניכים לשיבוץ · שמאל: תרגילים (חסרים למעלה) · גרור לתרגיל · שינויים נשמרים בלחיצה על «שמירה ואישור»' +
     '</div>' +
     _assignMainModuleHtml(user, sid, openSet) +
