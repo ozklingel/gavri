@@ -258,13 +258,27 @@ function _expandablePanel(page, baseParams, sectionId, title, contentHtml, openS
 }
 
 function _htmlShell() {
+  // Bare shell only — no SpreadsheetApp, no background URI, no page HTML.
+  // Background image is fetched lazily via getAppBgDataUri() after first paint.
   const tpl = HtmlService.createTemplateFromFile('index');
   tpl.pageTitle = 'סדרת השטח — מערכת תרגילים';
   tpl.body = '';
-  tpl.appBgDataUri = typeof _appBgDataUri === 'function' ? _appBgDataUri() : '';
   return tpl.evaluate()
     .setTitle('סדרת השטח — מערכת תרגילים')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** Lazy background for client — keeps doGet() instant. */
+function getAppBgDataUri() {
+  if (typeof _appBgDataUri !== 'function') return '';
+  try {
+    console.time('getAppBgDataUri');
+    const uri = _appBgDataUri();
+    console.timeEnd('getAppBgDataUri');
+    return uri || '';
+  } catch (e0) {
+    return '';
+  }
 }
 
 function _userLink(userId, userName, sidQ) {
@@ -675,6 +689,14 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
   }
   const searchUserId = _dashboardResolveSearchUserId(p, user, tab);
   let s = _dashboardUserSearchBar(searchUserId);
+  // light: first paint — search bar only; results load via dashboard.tab.search module
+  if (p && p.light) {
+    const uid = searchUserId || '';
+    const modParams = uid ? { searchUserId: uid } : {};
+    s += '<div data-spa-module="dashboard.tab.search" data-spa-module-loaded="0"' +
+      _spaParamsAttr(modParams) + '></div>';
+    return s;
+  }
   if (searchUserId) {
     s += _dashboardUserExerciseResults(user, searchUserId);
   } else {

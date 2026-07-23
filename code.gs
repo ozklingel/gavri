@@ -8,7 +8,10 @@ function SS() {
 }
 
 function doGet(e) {
-  return _htmlShell();
+  console.time('doGet');
+  const out = _htmlShell();
+  console.timeEnd('doGet');
+  return out;
 }
 
 function doPost(e) {
@@ -181,8 +184,10 @@ function _htmlCachePut(sid, page, params, result) {
   } catch (e1) {}
 }
 
-function _readSheetFromSpreadsheet(name) {
-  const sh = _sheet(name);
+function _readSheetFromSpreadsheet(name, ssOpt) {
+  const ss = ssOpt || SS();
+  const sh = ss.getSheetByName(name);
+  if (!sh) throw new Error('Sheet not found: ' + name);
   const last = sh.getLastRow();
   if (last < 2) {
     return {
@@ -190,8 +195,62 @@ function _readSheetFromSpreadsheet(name) {
       data: []
     };
   }
+  // One getValues() for the whole sheet — never row-by-row / cell-by-cell.
   const values = sh.getDataRange().getValues();
   return { header: values[0], data: values.slice(1) };
+}
+
+/**
+ * Open Spreadsheet once and batch-read many sheets (one getValues each).
+ * Populates request _rowsCache + Script Cache. Returns unified { sheetName: {header,data}, ... }.
+ */
+function _readSheetsBatch(names, options) {
+  options = options || {};
+  const list = names && names.length ? names : [];
+  const force = !!options.force;
+  const profile = {};
+  const tAll = Date.now();
+  console.time('_readSheetsBatch');
+
+  const ss = SS();
+  const out = {};
+  list.forEach(function(name) {
+    const t0 = Date.now();
+    if (!force && _rowsCache[name] && _rowsCache[name].data) {
+      out[name] = {
+        header: _rowsCache[name].header,
+        rows: _rowsCache[name].data.length,
+        source: 'request'
+      };
+      profile[name] = { ms: Date.now() - t0, source: 'request', rows: out[name].rows };
+      return;
+    }
+    if (!force) {
+      const cached = _getScriptCacheRows(name);
+      if (cached && cached.data) {
+        _rowsCache[name] = cached;
+        out[name] = { header: cached.header, rows: cached.data.length, source: 'scriptCache' };
+        profile[name] = { ms: Date.now() - t0, source: 'scriptCache', rows: out[name].rows };
+        return;
+      }
+    }
+    try {
+      console.time('sheet:' + name);
+      const fresh = _readSheetFromSpreadsheet(name, ss);
+      console.timeEnd('sheet:' + name);
+      _putScriptCacheRows(name, fresh);
+      _rowsCache[name] = fresh;
+      out[name] = { header: fresh.header, rows: fresh.data.length, source: 'spreadsheet' };
+      profile[name] = { ms: Date.now() - t0, source: 'spreadsheet', rows: out[name].rows };
+    } catch (e1) {
+      out[name] = { error: e1 && e1.message ? e1.message : String(e1), rows: 0, source: 'error' };
+      profile[name] = { ms: Date.now() - t0, source: 'error' };
+    }
+  });
+
+  console.timeEnd('_readSheetsBatch');
+  profile._totalMs = Date.now() - tAll;
+  return { sheets: out, profile: profile };
 }
 
 function _getScriptCacheRows(name) {
@@ -260,7 +319,9 @@ function _cacheWarmSheet(name) {
 }
 
 function _cacheWarmSheetsIfNeeded(names) {
-  (names || []).forEach(function(name) {
+  const list = names || [];
+  const missing = [];
+  list.forEach(function(name) {
     if (_rowsCache[name]) return;
     if (_scriptCacheHas(name)) {
       const cached = _getScriptCacheRows(name);
@@ -268,10 +329,11 @@ function _cacheWarmSheetsIfNeeded(names) {
         _rowsCache[name] = cached;
         return;
       }
-      _cacheInvalidate(name);
+      _cacheInvalidate(name, { skipRewarm: true });
     }
-    _cacheWarmSheet(name);
+    missing.push(name);
   });
+  if (missing.length) _readSheetsBatch(missing, { force: true });
 }
 
 function _cacheWarmFullIfNeeded() {
@@ -292,7 +354,7 @@ function _cacheWarmAll(force) {
   return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length };
 }
 
-/** מוחק קאש של גיליונות וקורא אותם מחדש מה-Spreadsheet. */
+/** מוחק קאש של גיליונות וקורא אותם מחדש מה-Spreadsheet (batch — SS אחד). */
 function _cacheForceReloadSheets(names) {
   const list = names && names.length ? names : DB_FULL_CACHE_SHEETS;
   _cacheClearWarmFlag();
@@ -305,13 +367,11 @@ function _cacheForceReloadSheets(names) {
       cache.remove(_dbCacheKey(name, 'parts'));
       for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
     } catch (e0) {}
-    try {
-      const fresh = _readSheetFromSpreadsheet(name);
-      _putScriptCacheRows(name, fresh);
-      _rowsCache[name] = fresh;
-    } catch (e1) {}
   });
-  return { ok: true, sheets: list.length, forced: true };
+  console.time('_cacheForceReloadSheets');
+  const batch = _readSheetsBatch(list, { force: true });
+  console.timeEnd('_cacheForceReloadSheets');
+  return { ok: true, sheets: list.length, forced: true, profile: batch.profile };
 }
 
 function apiWarmCache(sid) {

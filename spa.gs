@@ -79,33 +79,74 @@ function apiRunAction(sid, action, paramsJson) {
 
 /**
  * Step 1 — מינימום לדשבורד (טאב search).
- * מחמם רק גיליונות הדשבורד ומחזיר HTML מוכן לקאש לקוח.
+ * Batch-read של גיליונות הדשבורד (SS אחד) → JSON מאוחד + HTML קל לציור ראשון.
  */
 function getDashboardData(sid) {
+  const profile = { marks: {} };
+  const t0 = Date.now();
+  console.time('getDashboardData');
+
   const s = String(sid || '').trim();
   if (!s) return { ok: false, error: 'missing sid' };
 
   let user;
   try {
+    console.time('getDashboardData:auth');
     user = Auth_current({ sid: s });
+    console.timeEnd('getDashboardData:auth');
+    profile.marks.authMs = Date.now() - t0;
   } catch (e0) {
+    console.timeEnd('getDashboardData');
     return { ok: false, error: e0 && e0.message ? e0.message : String(e0) };
   }
-  if (!user) return { ok: false, error: 'not logged in' };
+  if (!user) {
+    console.timeEnd('getDashboardData');
+    return { ok: false, error: 'not logged in' };
+  }
 
   const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
     ? DB_DASHBOARD_SHEETS
     : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
-  _cacheForceReloadSheets(dashSheets);
+
+  // Prefer Script Cache / request cache; only hit Spreadsheet on miss.
+  // One SS.open + one getValues() per missing sheet — never force-reload all every entry.
+  const tBatch = Date.now();
+  console.time('getDashboardData:sheets');
+  const batch = _readSheetsBatch(dashSheets, { force: false });
+  console.timeEnd('getDashboardData:sheets');
+  profile.marks.sheetsMs = Date.now() - tBatch;
+  profile.sheets = batch.profile;
+
+  // Unified JSON for client profiling / future client-side paint (no raw row dumps — sizes only + ids).
+  const data = {
+    userId: user.id,
+    sheets: batch.sheets,
+    counts: {}
+  };
+  dashSheets.forEach(function(name) {
+    const cur = _rowsCache[name];
+    data.counts[name] = cur && cur.data ? cur.data.length : 0;
+  });
 
   let dash;
+  const tRender = Date.now();
   try {
-    dash = _spaEnsureWrap(Views_dashboard({ sid: s, tab: 'search' }));
+    console.time('getDashboardData:render');
+    // light: shell + search bar; heavy results hydrate via module after paint
+    dash = _spaEnsureWrap(Views_dashboard({ sid: s, tab: 'search', light: true }));
+    console.timeEnd('getDashboardData:render');
+    profile.marks.renderMs = Date.now() - tRender;
   } catch (e1) {
-    return { ok: false, error: e1 && e1.message ? e1.message : String(e1) };
+    console.timeEnd('getDashboardData');
+    return {
+      ok: false,
+      error: e1 && e1.message ? e1.message : String(e1),
+      profile: profile
+    };
   }
   if (!dash || dash.body == null) {
-    return { ok: false, error: 'dashboard render failed', pages: [] };
+    console.timeEnd('getDashboardData');
+    return { ok: false, error: 'dashboard render failed', pages: [], profile: profile };
   }
 
   const page = {
@@ -115,12 +156,18 @@ function getDashboardData(sid) {
     title: dash.title || 'מסך הבית'
   };
 
+  profile.marks.totalMs = Date.now() - t0;
+  console.timeEnd('getDashboardData');
+  Logger.log('getDashboardData profile: ' + JSON.stringify(profile));
+
   return {
     ok: true,
     stage: 'dashboard',
     sheets: dashSheets.length,
     pages: [page],
-    dashboard: page
+    dashboard: page,
+    data: data,
+    profile: profile
   };
 }
 
@@ -206,7 +253,12 @@ function getRemainingAppData(sid) {
   const rest = DB_FULL_CACHE_SHEETS.filter(function(name) {
     return dashSheets.indexOf(name) < 0;
   });
-  if (rest.length) _cacheForceReloadSheets(rest);
+  // Warm remaining sheets (batch) — do not force-reload if Script Cache already has them
+  if (rest.length) {
+    console.time('getRemainingAppData:sheets');
+    _readSheetsBatch(rest, { force: false });
+    console.timeEnd('getRemainingAppData:sheets');
+  }
   _cacheMarkWarmed();
 
   const pages = [];
