@@ -11,13 +11,13 @@
 
     :root {
       --bg:        transparent;
-      --bg2:       rgba(248, 252, 249, 0.82);
-      --bg3:       rgba(240, 247, 243, 0.88);
-      --bg4:       rgba(230, 242, 235, 0.94);
-      --glass:     rgba(255, 255, 255, 0.72);
-      --glass-strong: rgba(245, 250, 247, 0.88);
-      --glass-heavy: rgba(236, 245, 239, 0.92);
-      --overlay-dim: rgba(255, 255, 255, 0.28);
+      --bg2:       rgba(248, 252, 249, 0.92);
+      --bg3:       rgba(240, 247, 243, 0.95);
+      --bg4:       rgba(230, 242, 235, 0.97);
+      --glass:     rgba(255, 255, 255, 0.9);
+      --glass-strong: rgba(245, 250, 247, 0.95);
+      --glass-heavy: rgba(255, 255, 255, 0.97);
+      --overlay-dim: rgba(255, 255, 255, 0.38);
       --scrim:     rgba(20, 45, 30, 0.32);
       --border:    #c5dcc8;
       --border2:   #7cb896;
@@ -28,7 +28,7 @@
       --text:      #1a2e22;
       --text2:     #166534;
       --text3:     #15803d;
-      --muted:     #5a7d68;
+      --muted:     #3f5f4c;
       --danger:    #dc2626;
       --danger-bg: #fef2f2;
       --warn:      #d97706;
@@ -190,7 +190,7 @@ body {
       min-height: 44px;
       border-radius: 999px;
       border: 1px solid var(--border2);
-      background: var(--glass-heavy);
+      background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       color: var(--green3);
@@ -296,11 +296,14 @@ body {
     }
     .app-drawer-brand .star { font-size: 18px; flex-shrink: 0; }
     .app-drawer-brand .sub {
-      color: var(--muted);
+      color: var(--text2);
       font-size: 10px;
-      display: block;
+      display: inline-block;
       line-height: 1.2;
       font-weight: normal;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 3px;
+      padding: 1px 6px;
     }
     .app-drawer-close {
       flex-shrink: 0;
@@ -572,15 +575,17 @@ body {
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 8px;
-      background: rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.92);
     }
     .user-cal-dow {
       text-align: center;
       font-family: var(--mono);
       font-size: 10px;
       font-weight: 700;
-      color: var(--muted);
+      color: var(--heading-on-bg);
       padding: 4px 0;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 3px;
     }
     .user-cal-day {
       min-height: 84px;
@@ -640,9 +645,12 @@ body {
     .user-cal-event.type-muted { background: rgba(148, 163, 184, 0.3); border-color: #94a3b8; color: #334155; }
     .user-cal-more {
       font-size: 9px;
-      color: var(--muted);
+      color: var(--text2);
       font-family: var(--mono);
-      padding: 0 2px;
+      padding: 1px 4px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 3px;
+      display: inline-block;
     }
     .proc-add-panel {
       border-bottom: 1px solid var(--border);
@@ -1022,8 +1030,11 @@ body {
       content: '// גרור חניך לכאן';
       font-family: var(--mono);
       font-size: 11px;
-      color: var(--muted);
-      padding: 8px 2px;
+      color: var(--text2);
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px dashed var(--border2);
+      border-radius: 4px;
     }
     .page-assign .assign-ex-row-zone.drag-over {
       background: rgba(74, 222, 128, 0.07);
@@ -1997,12 +2008,16 @@ body {
     }
     .ex-drop-body:empty::after {
       content: 'גרור חייל לכאן...';
-      color: var(--muted);
+      color: var(--text2);
       font-family: var(--mono);
       font-size: 11px;
-      padding: 6px;
+      padding: 6px 10px;
       width: 100%;
       text-align: center;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px dashed var(--border2);
+      border-radius: 4px;
+      box-sizing: border-box;
     }
     .assigned-chip {
       background: var(--bg2);
@@ -2510,8 +2525,11 @@ body {
       content: '// גרור לכאן';
       font-family: var(--mono);
       font-size: 11px;
-      color: var(--muted);
-      padding: 8px;
+      color: var(--text2);
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px dashed var(--border2);
+      border-radius: 4px;
     }
 
     .assigned-chip {
@@ -2792,12 +2810,23 @@ body {
       cursor: pointer;
     }
     .stats-chip.active { background: #166534; border-color: #166534; color: #fff !important; }
-    .stats-chip-clear { background: transparent; }
+    .stats-chip-clear {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border2);
+    }
     .stats-filters {
       display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
       margin-bottom: 12px;
     }
-    .stats-filter-label { font-size: 11px; color: var(--muted); }
+    .stats-filter-label {
+      font-size: 11px;
+      color: var(--heading-on-bg);
+      background: var(--heading-chip-bg);
+      border: 1px solid var(--heading-chip-border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      box-shadow: var(--ui-chip-shadow);
+    }
     .stats-team-select { width: auto; min-width: 120px; font-size: 12px; }
     .stats-rank-badge {
       display: inline-block; background: #dbeafe; color: #1d4ed8;
@@ -2882,7 +2911,7 @@ body {
     }
     .stats-tbl th,
     .stats-tbl td {
-      background-color: rgba(255, 255, 255, 0.55) !important;
+      background-color: rgba(255, 255, 255, 0.94) !important;
     }
     /* טאבים — לא לדרוס ברקע זכוכית שקוף */
     .spa-tabs-bar.tabs,
@@ -2899,23 +2928,36 @@ body {
       background-color: var(--bg4) !important;
     }
     .stats-tbl tr:hover td {
-      background-color: rgba(255, 255, 255, 0.72) !important;
+      background-color: rgba(255, 255, 255, 0.98) !important;
     }
     .app-drawer-overlay {
       background: var(--scrim) !important;
     }
-    /* כותרות / תוויות / לחצנים — רקע אטום מעל תמונת הרקע */
+    /* כותרות / תוויות / לחצנים / טקסט חופשי — רקע אטום מעל תמונת הרקע */
     .ui-on-bg-chip,
     .page-assign .assign-panel-head,
     .page-assign .assign-page-hint,
     .page-assign #assignStatus,
+    .page-assign .assign-users-empty,
+    .page-assign .assign-changes-count,
     .page h1:not(.page-title),
     .page h2,
-    .page > .section-header,
+    .page h3,
+    .page > p,
+    .page > .rules-muted,
+    .page > ul.rules-muted,
     .user-cal-month-label,
     .drawer-section-title,
     .assign-changes-title,
-    .dashboard-search-label {
+    .dashboard-search-label,
+    .stats-hint,
+    .stats-chart-caption,
+    .stats-avg-line,
+    .stats-legend,
+    .timeline-tools-expand-label,
+    #timelineEditHint,
+    .login-sub,
+    .demo-role {
       background: var(--heading-chip-bg) !important;
       border: 1px solid var(--heading-chip-border);
       border-radius: var(--radius);
@@ -2924,6 +2966,41 @@ body {
       text-shadow: none;
       box-shadow: var(--ui-chip-shadow);
       display: inline-block;
+    }
+    .page > .section-header,
+    .section-header {
+      background: rgba(255, 255, 255, 0.94) !important;
+      border: 1px solid var(--heading-chip-border);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      box-shadow: var(--ui-chip-shadow);
+      display: flex;
+      width: 100%;
+      box-sizing: border-box;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    /* טקסט עזר / מושתק מחוץ לכרטיסים — תמיד עם שבב רקע */
+    .page .rules-muted,
+    .page p[style*="color:var(--muted)"],
+    .page span.rules-muted,
+    .page ul.rules-muted,
+    .app-drawer .rules-muted,
+    .app-drawer p[style*="color:var(--muted)"],
+    .spa-tab-panel > p,
+    .spa-tab-panel > .rules-muted {
+      background: var(--heading-chip-bg);
+      border: 1px solid var(--heading-chip-border);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      color: var(--text2) !important;
+      box-shadow: var(--ui-chip-shadow);
+    }
+    .page ul.rules-muted,
+    .expandable-panel-body ul.rules-muted {
+      display: block;
+      padding: 8px 10px 8px 22px;
     }
     .page-assign .assign-panel-head {
       display: flex;
@@ -2961,15 +3038,29 @@ body {
       margin-bottom: 0;
       font-size: 12px;
     }
-    .page-assign .assign-exercises-col,
-    .page-assign .assign-users-col {
-      background: rgba(255, 255, 255, 0.95) !important;
-    }
-    .page > .section-header {
-      display: flex;
+    .page-assign .assign-users-empty {
+      display: block;
       width: 100%;
       box-sizing: border-box;
-      background: rgba(255, 255, 255, 0.9);
+      text-align: center;
+      margin: 8px 0;
+    }
+    .page-assign .assign-exercises-col,
+    .page-assign .assign-users-col {
+      background: rgba(255, 255, 255, 0.96) !important;
+    }
+    .page-assign .assign-changes-bar {
+      background: rgba(255, 248, 230, 0.96) !important;
+    }
+    .card {
+      background: var(--glass-strong) !important;
+    }
+    .card-body,
+    .card-header {
+      background-color: rgba(255, 255, 255, 0.55) !important;
+    }
+    .card-header {
+      background-color: var(--bg3) !important;
     }
     .btn-primary {
       box-shadow: var(--ui-chip-shadow);
@@ -2978,7 +3069,57 @@ body {
     button.btn-ghost,
     a.btn-secondary,
     button.btn-secondary {
+      background: rgba(255, 255, 255, 0.96) !important;
+    }
+    .stats-hint,
+    .stats-chart-caption,
+    .stats-avg-line,
+    .stats-legend {
+      display: block;
+      width: fit-content;
+      max-width: 100%;
+      margin-bottom: 10px;
+      color: var(--text2) !important;
+    }
+    .stats-legend {
+      display: flex;
+    }
+    #timelineEditHint {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 8px 0;
+      color: var(--text2) !important;
+    }
+    .timeline-row-label,
+    .timeline-slot-time-label,
+    .timeline-day-head {
       background: rgba(255, 255, 255, 0.94) !important;
+      color: var(--heading-on-bg) !important;
+    }
+    .team-matrix-stat-label,
+    .stat-label,
+    .ex-meta,
+    .ex-matrix-person-phone,
+    .team-matrix-user-sub {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: var(--text2) !important;
+      display: inline-block;
+    }
+    .topbar-brand .sub {
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 3px;
+      padding: 1px 6px;
+      color: var(--text2) !important;
+    }
+    .login-box {
+      background: rgba(255, 255, 255, 0.96) !important;
+    }
+    .login-sub,
+    .demo-role {
+      color: var(--text2) !important;
     }
 
     ::-webkit-scrollbar-track {
@@ -2999,17 +3140,83 @@ body {
       color: var(--green3) !important;
     }
     .expandable-panel-body .tbl td {
-      background: rgba(255, 255, 255, 0.92) !important;
+      background: rgba(255, 255, 255, 0.96) !important;
       color: var(--text) !important;
     }
     .expandable-panel-body .rules-muted,
     .expandable-panel-body p,
     .expandable-panel-body li {
       color: var(--text) !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0;
+    }
+    .expandable-panel-body ul.rules-muted {
+      padding: 0 0 0 18px !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
     }
     .expandable-panel-body .rules-warn {
       color: #92400e !important;
-      background: rgba(254, 243, 199, 0.85) !important;
+      background: rgba(254, 243, 199, 0.92) !important;
+      border: 1px solid #fbbf24 !important;
+      border-radius: var(--radius);
+      padding: 6px 10px !important;
+      box-shadow: none !important;
+    }
+    /* בתוך כרטיס/טבלה/מודל — כבר יש רקע; בלי שבב כפול */
+    .card .rules-muted,
+    .card p[style*="color:var(--muted)"],
+    .card span[style*="color:var(--muted)"],
+    .card ul.rules-muted,
+    .card h1,
+    .card h2,
+    .card h3,
+    .card #timelineEditHint,
+    .tbl .rules-muted,
+    .tbl td[style*="color:var(--muted)"],
+    .tbl span[style*="color:var(--muted)"],
+    .login-box .login-sub,
+    .login-box .demo-role,
+    .timeline-tools-body p[style*="color:var(--muted)"],
+    .timeline-tools-body .rules-muted,
+    .dp-popup .dp-month-label,
+    .dp-popup .dp-dow,
+    .stat-box .stat-label,
+    .team-matrix-stats .team-matrix-stat-label {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      color: var(--text2) !important;
+    }
+    .card ul.rules-muted {
+      padding: 0 0 0 18px !important;
+    }
+    .card #timelineEditHint {
+      padding: 8px 14px !important;
+      color: var(--text2) !important;
+      background: rgba(255, 248, 220, 0.95) !important;
+      border-top: 1px solid var(--border) !important;
+    }
+    /* טבלאות / פאנלי ציר זמן — רקע אטום יותר לקריאות */
+    .tbl th {
+      background: rgba(230, 242, 235, 0.98) !important;
+      color: var(--green3) !important;
+    }
+    .tbl td {
+      background: rgba(255, 255, 255, 0.94) !important;
+      color: var(--text) !important;
+    }
+    .timeline-tools-body,
+    .timeline-tools-panel,
+    .timeline-scroll {
+      background: rgba(255, 255, 255, 0.94) !important;
+    }
+    .app-drawer {
+      background: rgba(255, 255, 255, 0.96) !important;
     }
 </style>
 </head>
