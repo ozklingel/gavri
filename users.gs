@@ -34,6 +34,28 @@ function Users_get(id) {
   return Users_byIdMap()[String(id)] || null;
 }
 
+/** מזהה משתמש הבא — U001, U002… (או המשך ממקסימום קיים) */
+function Users_nextIds(count) {
+  count = Math.max(1, parseInt(count, 10) || 1);
+  const data = _rows('Users').data;
+  let max = 0;
+  data.forEach(function(r) {
+    const id = String(r[0] || '').trim();
+    const m = id.match(/^U(\d+)$/i);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+    else {
+      const n = parseInt(id, 10);
+      if (!isNaN(n) && String(n) === id) max = Math.max(max, n);
+    }
+  });
+  const out = [];
+  for (let i = 1; i <= count; i++) {
+    const n = max + i;
+    out.push('U' + String(n).padStart(Math.max(3, String(n).length), '0'));
+  }
+  return out;
+}
+
 function Users_byTeam(teamId) {
   return Users_all().filter(u => u.team_id === String(teamId));
 }
@@ -390,8 +412,9 @@ function Users_updateProfile(p) {
 }
 
 // ═══════════════════════════════════════
-//  Users_importBulk — ייבוא משתמשים מאקסל
-//  p.usersJson = JSON array of {id, name, role, password, team_id?}
+//  Users_importBulk — ייבוא משתמשים מאקסל/CSV
+//  p.usersJson = JSON array of {name, password, role?, team_id?, ...}
+//  מזהה (id) נוצר אוטומטית — אין צורך בעמודה בקובץ
 // ═══════════════════════════════════════
 function Users_importBulk(p) {
   Auth_requireRole(p, ['admin']);
@@ -399,51 +422,59 @@ function Users_importBulk(p) {
   let rows;
   try {
     rows = JSON.parse(p.usersJson || '[]');
-  } catch(e) {
+  } catch (e) {
     throw new Error('JSON לא תקין: ' + e.message);
   }
 
   if (!Array.isArray(rows) || !rows.length) throw new Error('לא נמצאו שורות לייבוא.');
 
-  const usersSh = _sheet('Users');
-  const credsSh = _sheet('Credentials');
+  const existing = new Set(_rows('Users').data.map(function(r) { return String(r[0]).trim(); }));
+  const ids = Users_nextIds(rows.length);
 
-  // Build lookup of existing IDs to avoid duplicates
-  const existing = new Set(_rows('Users').data.map(r => String(r[0]).trim()));
-
-  let added = 0, skipped = 0, errors = [];
-
-  // PERF: collect all new rows; batch-append at the end
-  const newUserRows  = [];
-  const newCredRows  = [];
+  let added = 0;
+  let errors = [];
+  const newUserRows = [];
+  const newCredRows = [];
 
   rows.forEach(function(row, i) {
-    const id       = String(row.id       || '').trim();
-    const name     = String(row.name     || '').trim();
-    const role     = String(row.role     || 'trainee').trim().toLowerCase();
+    const name = String(row.name || '').trim();
     const password = String(row.password || '').trim();
-    const teamId   = String(row.team_id  || '').trim();
+    if (!name) { errors.push('שורה ' + (i + 1) + ': חסר שם'); return; }
+    if (!password) { errors.push('שורה ' + (i + 1) + ': חסרה סיסמה ל־' + name); return; }
 
-    if (!id || !name) { errors.push('שורה ' + (i+1) + ': חסר id או שם'); return; }
-    if (!password)    { errors.push('שורה ' + (i+1) + ': חסרה סיסמה ל-' + id); return; }
+    const id = ids[i] || ('U' + Date.now() + '_' + i);
+    if (existing.has(id)) {
+      errors.push('שורה ' + (i + 1) + ': מזהה פנימי כפול — נסה שוב');
+      return;
+    }
 
-    const validRoles = Roles_allValid();
-    const finalRole  = validRoles.includes(role) ? Roles_normalize(role) : 'trainee';
+    const finalRole = typeof Roles_fromImport === 'function'
+      ? Roles_fromImport(row.role)
+      : 'trainee';
 
-    if (existing.has(id)) { skipped++; return; }
-
-    newUserRows.push([id, name, finalRole, teamId, '', '', '', '', '', '', String(row.email || '').trim()]);
+    newUserRows.push([
+      id,
+      name,
+      finalRole,
+      String(row.team_id || '').trim(),
+      String(row.unit_affiliation || '').trim(),
+      String(row.service_type || '').trim(),
+      String(row.military_affiliation || '').trim(),
+      String(row.unit_classification || '').trim(),
+      String(row.target_role || '').trim(),
+      String(row.phone || '').trim(),
+      String(row.email || '').trim()
+    ]);
     newCredRows.push([id, password]);
     existing.add(id);
     added++;
   });
 
-  if (newUserRows.length) _appendBatch('Users',       newUserRows);
+  if (newUserRows.length) _appendBatch('Users', newUserRows);
   if (newCredRows.length) _appendBatch('Credentials', newCredRows);
 
-  let info = 'ייבוא הושלם: ' + added + ' משתמשים נוספו.';
-  if (skipped) info += ' ' + skipped + ' דולגו (קיימים כבר).';
-  if (errors.length) info += ' שגיאות: ' + errors.slice(0,3).join(' | ');
+  let info = 'ייבוא הושלם: ' + added + ' משתמשים נוספו (מזהים נוצרו אוטומטית).';
+  if (errors.length) info += ' שגיאות: ' + errors.slice(0, 3).join(' | ');
 
   return Views_users({ sid: p.sid, tab: 'users', info: info });
 }

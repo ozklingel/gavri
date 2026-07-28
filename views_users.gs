@@ -47,7 +47,15 @@ function _usersNewUserForm(sid, teams) {
 
 function _usersImportCsvPanel() {
   return '<div class="card"><div class="card-body">' +
-    '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">עמודות: id, name, password, role, team_id</p>' +
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+    '<b>עמודות חובה:</b> name, password<br>' +
+    '<b>אופציונלי:</b> role, team_id, military_affiliation, service_type, unit_affiliation, unit_classification, target_role, phone, email<br>' +
+    '<b>מזהה (id):</b> נוצר אוטומטית — אין צורך בעמודה בקובץ.<br>' +
+    '<b>תפקיד (role):</b> חניך / חונך / ממ / מפקצ / מגד / אגמ מלפק (או באנגלית: trainee, tutor, …)' +
+    '</p>' +
+    '<div style="margin-bottom:10px">' +
+    '<button type="button" id="xlsxExampleDownload" class="btn btn-secondary btn-sm">📄 הורד קובץ דוגמה</button>' +
+    '</div>' +
     '<input type="file" id="xlsxFile" accept=".csv,.tsv,.txt" class="form-input">' +
     '<div id="xlsxError" class="flash flash-error" style="display:none;margin-top:8px"></div>' +
     '<div id="xlsxPreview" style="display:none;margin-top:10px"><table class="tbl" id="xlsxPreviewTable"></table></div>' +

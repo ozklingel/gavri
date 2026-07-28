@@ -1,0 +1,11 @@
+name,password,role,team_id,military_affiliation,service_type,unit_affiliation,unit_classification,target_role,phone,email
+ישראל ישראלי,Pass1234,חניך,T1,חיר,מילואים,גדוד 401,מתמרן,מפ חיר א,0501234567,israel@example.com
+דנה כהן,Pass1234,trainee,T1,חשן,סדיר,גדוד 401,,מפ חשן,0529876543,
+אבי לוי,Abc!2345,חניך,,חהן,מילואים,,,מפ חהן,,
+נועה מזרחי,Abc!2345,trainee,T2,מסייעת,סדיר,גדוד 52,,מפ מסייעת,0541112233,noa@example.com
+רון אברהם,Trainee1,חניך,T2,מנהלי,מילואים,,,,0556667788,
+יוסי מפקד,CmdPass1,מפקצ,T1,,,,,מפקד צוות,0509998877,yossi@example.com
+מיכל חונכת,Tutor99,חונך,,,,,,חונך מפ א,0532223344,
+עמית מגד,Magad77,מגד,,,,,,,0514445566,amit@example.com
+ליאור ממ,MmPass88,ממ,,,,,,,,
+שרה אגמ,Admin123,admin,,,,,,,0500000001,admin@example.com

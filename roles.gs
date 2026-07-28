@@ -19,6 +19,36 @@ function Roles_label(role) {
   return map[r] || 'משתמש';
 }
 
+/** המרה מתפקיד בעברית / באנגלית לקוד מערכת */
+function Roles_fromImport(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return 'trainee';
+  const lower = s.toLowerCase();
+  const byCode = {
+    admin: 'admin',
+    unitcommander: 'unitCommander',
+    companycommander: 'companyCommander',
+    departmentcommander: 'departmentCommander',
+    tutor: 'tutor',
+    trainee: 'trainee',
+    commander: 'companyCommander'
+  };
+  if (byCode[lower]) return byCode[lower];
+  const byHe = {
+    'אגמ מלפק': 'admin',
+    'אג״מ מלפק': 'admin',
+    'מגד': 'unitCommander',
+    'מפקצ': 'companyCommander',
+    'מפקד צוות': 'companyCommander',
+    'ממ': 'departmentCommander',
+    'חונך': 'tutor',
+    'חניך': 'trainee',
+    'מפ': 'trainee'
+  };
+  if (byHe[s]) return byHe[s];
+  return Roles_isValid(s) ? Roles_normalize(s) : 'trainee';
+}
+
 function Roles_allValid() {
   return ['admin', 'unitCommander', 'companyCommander', 'departmentCommander', 'tutor', 'trainee', 'commander'];
 }

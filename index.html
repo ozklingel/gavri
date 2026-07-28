@@ -5061,6 +5061,7 @@ body {
       assignDiscardBtn: 'ביטול שינויים שלא נשמרו',
       assignUndoBar: 'יומן שמירות ידניות שניתן לבטל',
       xlsxImportBtn: 'ייבוא משתמשים מהקובץ שנבחר',
+      xlsxExampleDownload: 'הורדת קובץ CSV לדוגמה לייבוא משתמשים',
       timelineProcedureToggle: 'הצגה/הסתרה של נוהל קרב על ציר הזמן',
       timelineEditToggle: 'הפעלת מצב עריכה — גרירת תרגילים לשינוי זמנים',
       timelineToolsExpand: 'פתיחת לוח כלים בציר הזמן',
@@ -5746,16 +5747,16 @@ body {
         return h.trim().toLowerCase().replace(/^"|"$/g,'').replace(/^\uFEFF/,'');
       });
 
-      var req = ['id','name','password'];
+      var req = ['name','password'];
       var miss = req.filter(function(r){return headers.indexOf(r) < 0;});
-      if (miss.length) throw new Error('חסרות עמודות: ' + miss.join(', ') + '\nעמודות שנמצאו: ' + headers.join(', '));
+      if (miss.length) throw new Error('חסרות עמודות: ' + miss.join(', ') + '\nעמודות שנמצאו: ' + headers.join(', ') + '\n(מזהה id נוצר אוטומטית — אין צורך בעמודה)');
 
       return lines.slice(1).map(function(line) {
         var vals = splitLine(line, delim);
         var obj  = {};
         headers.forEach(function(h,i){ obj[h] = (vals[i]||'').trim().replace(/^"|"$/g,''); });
         return obj;
-      }).filter(function(r){ return r.id; });
+      }).filter(function(r){ return r.name; });
     }
 
     function splitLine(line, delim) {
@@ -5773,19 +5774,20 @@ body {
 
     function showPreview(rows, previewTbl, preview, importBtn, errDiv) {
       if (!rows.length) { showErr(errDiv,'לא נמצאו שורות תקינות.'); return; }
-      var cols=['id','name','password','role','team_id'];
+      var cols=['name','password','role','team_id','military_affiliation','service_type','phone','email'];
       var tbl='<table class="tbl" style="font-size:11px"><thead><tr>'+
+        '<th>id (אוטומטי)</th>'+
         cols.map(function(c){return '<th>'+c+'</th>';}).join('')+
         '</tr></thead><tbody>';
       rows.slice(0,8).forEach(function(row){
-        tbl+='<tr>'+cols.map(function(col){
+        tbl+='<tr><td class="mono" style="color:var(--muted)">יווצר</td>'+cols.map(function(col){
           var val=row[col]||'';
           return '<td>'+(col==='password'?'••••':val)+'</td>';
         }).join('')+'</tr>';
       });
-      if(rows.length>8) tbl+='<tr><td colspan="'+cols.length+'" style="color:var(--muted);text-align:center;font-family:var(--mono);font-size:11px">… ועוד '+(rows.length-8)+' שורות</td></tr>';
+      if(rows.length>8) tbl+='<tr><td colspan="'+(cols.length+1)+'" style="color:var(--muted);text-align:center;font-family:var(--mono);font-size:11px">… ועוד '+(rows.length-8)+' שורות</td></tr>';
       tbl+='</tbody></table>';
-      tbl+='<div style="font-family:var(--mono);font-size:11px;color:var(--green);margin-top:8px">✓ '+rows.length+' משתמשים לייבוא</div>';
+      tbl+='<div style="font-family:var(--mono);font-size:11px;color:var(--green);margin-top:8px">✓ '+rows.length+' משתמשים לייבוא · מזהים ייווצרו אוטומטית</div>';
       previewTbl.innerHTML = tbl;
       preview.style.display   = 'block';
       importBtn.style.display = 'inline-block';
@@ -5828,14 +5830,54 @@ body {
       btn.disabled    = true;
       MapimLoader.show('// IMPORTING...');
       var payload = rows.map(function(r){
-        return {id:r.id||'',name:r.name||'',password:r.password||'',
-                role:r.role||'trainee',team_id:r.team_id||''};
+        return {
+          name: r.name || '',
+          password: r.password || '',
+          role: r.role || 'trainee',
+          team_id: r.team_id || '',
+          military_affiliation: r.military_affiliation || '',
+          service_type: r.service_type || '',
+          unit_affiliation: r.unit_affiliation || '',
+          unit_classification: r.unit_classification || '',
+          target_role: r.target_role || '',
+          phone: r.phone || '',
+          email: r.email || ''
+        };
       });
       MapimSpa.runAction('importUsers', { usersJson: JSON.stringify(payload) });
     };
 
+    var EXAMPLE_CSV =
+      'name,password,role,team_id,military_affiliation,service_type,unit_affiliation,unit_classification,target_role,phone,email\n' +
+      'ישראל ישראלי,Pass1234,חניך,T1,חיר,מילואים,גדוד 401,מתמרן,מפ חיר א,0501234567,israel@example.com\n' +
+      'דנה כהן,Pass1234,trainee,T1,חשן,סדיר,גדוד 401,,מפ חשן,0529876543,\n' +
+      'אבי לוי,Abc!2345,חניך,,חהן,מילואים,,,מפ חהן,,\n' +
+      'נועה מזרחי,Abc!2345,trainee,T2,מסייעת,סדיר,גדוד 52,,מפ מסייעת,0541112233,noa@example.com\n' +
+      'רון אברהם,Trainee1,חניך,T2,מנהלי,מילואים,,,,0556667788,\n' +
+      'יוסי מפקד,CmdPass1,מפקצ,T1,,,,,מפקד צוות,0509998877,yossi@example.com\n' +
+      'מיכל חונכת,Tutor99,חונך,,,,,,חונך מפ א,0532223344,\n' +
+      'עמית מגד,Magad77,מגד,,,,,,,0514445566,amit@example.com\n' +
+      'ליאור ממ,MmPass88,ממ,,,,,,,,\n' +
+      'שרה אגמ,Admin123,admin,,,,,,,0500000001,admin@example.com\n';
+
+    function downloadExampleCsv() {
+      var blob = new Blob(['\ufeff' + EXAMPLE_CSV], { type: 'text/csv;charset=utf-8;' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'users-import-example.csv';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+    }
+
     document.addEventListener('change', function(e){
       if (e.target && e.target.id === 'xlsxFile') onFileChange(e.target);
+    });
+    document.addEventListener('click', function(e){
+      if (e.target && e.target.id === 'xlsxExampleDownload') {
+        e.preventDefault();
+        downloadExampleCsv();
+      }
     });
   })();
 
