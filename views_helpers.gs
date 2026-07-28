@@ -258,27 +258,13 @@ function _expandablePanel(page, baseParams, sectionId, title, contentHtml, openS
 }
 
 function _htmlShell() {
-  // Bare shell only — no SpreadsheetApp, no background URI, no page HTML.
-  // Background image is fetched lazily via getAppBgDataUri() after first paint.
   const tpl = HtmlService.createTemplateFromFile('index');
   tpl.pageTitle = 'סדרת השטח — מערכת תרגילים';
   tpl.body = '';
+  tpl.appBgDataUri = typeof _appBgDataUri === 'function' ? _appBgDataUri() : '';
   return tpl.evaluate()
     .setTitle('סדרת השטח — מערכת תרגילים')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
-
-/** Lazy background for client — keeps doGet() instant. */
-function getAppBgDataUri() {
-  if (typeof _appBgDataUri !== 'function') return '';
-  try {
-    console.time('getAppBgDataUri');
-    const uri = _appBgDataUri();
-    console.timeEnd('getAppBgDataUri');
-    return uri || '';
-  } catch (e0) {
-    return '';
-  }
 }
 
 function _userLink(userId, userName, sidQ) {
@@ -395,20 +381,12 @@ function _dashboardUserSearchBar(selectedUserId) {
     return { id: u.id, name: u.name, role: Roles_label(u.role) };
   });
   const json = JSON.stringify(users).replace(/</g, '\\u003c');
-  let prefill = '';
-  const uid = String(selectedUserId || '').trim();
-  if (uid) {
-    const u = Users_get(uid);
-    if (u) prefill = u.name + ' (' + u.id + ')';
-  }
   return '<div class="dashboard-search-panel">' +
     '<label class="form-label dashboard-search-label">🔍 חיפוש משתמש</label>' +
     '<div class="dashboard-search-row">' +
     '<div class="user-search-wrap">' +
     '<input type="text" id="dashboardUserSearch" class="form-input dashboard-search-input" ' +
     'placeholder="הקלד שם או מספר אישי..." autocomplete="off" ' +
-    'value="' + _esc(prefill) + '" ' +
-    'data-selected-id="' + _esc(uid) + '" ' +
     'data-users="' + json.replace(/"/g, '&quot;') + '">' +
     '</div>' +
     '<button type="button" id="dashboardUserSearchBtn" class="btn btn-primary dashboard-search-btn">חפש</button>' +
@@ -557,8 +535,8 @@ function Views_login(p) {
     '<hr class="divider">' +
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">// משתמשי דמו</div>' +
     '<div class="demo-grid">' +
-    '<div class="demo-item"><div class="demo-role">רגמ מלפק</div><div class="demo-cred">1<br>111</div></div>' +
-    '<div class="demo-item"><div class="demo-role">סגל</div><div class="demo-cred">222<br>222</div></div>' +
+    '<div class="demo-item"><div class="demo-role">סגל</div><div class="demo-cred">1<br>111</div></div>' +
+    '<div class="demo-item"><div class="demo-role">מפקצ</div><div class="demo-cred">222<br>222</div></div>' +
     '<div class="demo-item"><div class="demo-role">חניך</div><div class="demo-cred">3332<br>3332</div></div>' +
     '<div class="demo-item"><div class="demo-role">חונך</div><div class="demo-cred">333<br>333</div></div>' +
     '<div class="demo-item"><div class="demo-role">מגד</div><div class="demo-cred">1010<br>1010</div></div>' +
@@ -689,14 +667,6 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
   }
   const searchUserId = _dashboardResolveSearchUserId(p, user, tab);
   let s = _dashboardUserSearchBar(searchUserId);
-  // light: first paint — search bar only; results load via dashboard.tab.search module
-  if (p && p.light) {
-    const uid = searchUserId || '';
-    const modParams = uid ? { searchUserId: uid } : {};
-    s += '<div data-spa-module="dashboard.tab.search" data-spa-module-loaded="0"' +
-      _spaParamsAttr(modParams) + '></div>';
-    return s;
-  }
   if (searchUserId) {
     s += _dashboardUserExerciseResults(user, searchUserId);
   } else {

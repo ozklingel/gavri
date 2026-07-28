@@ -383,6 +383,7 @@ function Exercises_generateTimeline(p) {
     return ['D' + baseTs + '_' + idx, exId, r.time, r.location, r.description];
   });
   _appendBatch('ExerciseDetails', detailRows);
+  if (typeof _exercisesClearDerived === 'function') _exercisesClearDerived();
 
   const rangeLabel = _fmtDate(win.dayBefore) + ' — ' + _fmtDate(win.dayAfter);
   return Views_exercise({

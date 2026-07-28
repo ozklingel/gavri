@@ -106,12 +106,24 @@ function _assignMainModuleHtml(user, sid, openSet) {
     '<div class="assign-layout">' +
     '<aside class="assign-users-col" id="assignUsersCol">' +
     '<div class="assign-users-block">' +
-    '<div class="assign-panel-head">👤 חניכים לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
+    '<div class="assign-panel-head">👤 מפ לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
     '<div id="assignTraineesList" class="assign-users-list"></div>' +
     '</div>' +
-    '<div class="assign-users-block assign-mm-block">' +
-    '<div class="assign-panel-head">🎖 ממ לשיבוץ <span class="assign-panel-sub">הכי משובץ למעלה</span></div>' +
+    '<div class="assign-users-block assign-role-block" data-assign-role="companyCommander">' +
+    '<div class="assign-panel-head">🪖 סגל לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
+    '<div id="assignMpList" class="assign-users-list"></div>' +
+    '</div>' +
+    '<div class="assign-users-block assign-role-block" data-assign-role="unitCommander">' +
+    '<div class="assign-panel-head">⭐ מגד לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
+    '<div id="assignMagadList" class="assign-users-list"></div>' +
+    '</div>' +
+    '<div class="assign-users-block assign-role-block assign-mm-block" data-assign-role="departmentCommander">' +
+    '<div class="assign-panel-head">🎖 ממ לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
     '<div id="assignMmList" class="assign-users-list"></div>' +
+    '</div>' +
+    '<div class="assign-users-block assign-role-block" data-assign-role="tutor">' +
+    '<div class="assign-panel-head">📘 חונך לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
+    '<div id="assignTutorList" class="assign-users-list"></div>' +
     '</div>' +
     '</aside>' +
     '<div class="assign-exercises-col">' +
@@ -180,7 +192,10 @@ function _assignBoardJs() {
   var data = JSON.parse(document.getElementById('assignData').textContent);
   var sid = document.getElementById('assignSid').value;
   var traineesList = document.getElementById('assignTraineesList');
+  var mpList = document.getElementById('assignMpList');
+  var magadList = document.getElementById('assignMagadList');
   var mmList = document.getElementById('assignMmList');
+  var tutorList = document.getElementById('assignTutorList');
   var exercisesList = document.getElementById('assignExercisesList');
   var status = document.getElementById('assignStatus');
   var leastPanel = document.getElementById('assignLeastPanel');
@@ -489,31 +504,29 @@ function _assignBoardJs() {
   }
 
   function getTraineePool() {
+    return getRolePool('trainee', true);
+  }
+
+  function getRolePool(role, leastFirst) {
+    var want = String(role || '');
     var list = [];
     Object.keys(data.userMap).forEach(function(uid) {
       var u = data.userMap[uid];
-      if (!u || u.role !== 'trainee') return;
+      if (!u) return;
+      var r = String(u.role || '');
+      if (r === 'commander') r = 'companyCommander';
+      if (r !== want) return;
       list.push({ id: uid, name: u.name, count: countAssignments(uid) });
     });
     list.sort(function(a, b) {
-      if (a.count !== b.count) return a.count - b.count;
+      if (a.count !== b.count) return leastFirst ? (a.count - b.count) : (b.count - a.count);
       return String(a.name || '').localeCompare(String(b.name || ''), 'he');
     });
     return list;
   }
 
   function getDepartmentCommanderPool() {
-    var list = [];
-    Object.keys(data.userMap).forEach(function(uid) {
-      var u = data.userMap[uid];
-      if (!u || u.role !== 'departmentCommander') return;
-      list.push({ id: uid, name: u.name, count: countAssignments(uid) });
-    });
-    list.sort(function(a, b) {
-      if (a.count !== b.count) return b.count - a.count;
-      return String(a.name || '').localeCompare(String(b.name || ''), 'he');
-    });
-    return list;
+    return getRolePool('departmentCommander', true);
   }
 
   function renderUserPool(listEl, pool, emptyLabel) {
@@ -930,8 +943,11 @@ function _assignBoardJs() {
       });
     }
 
-    renderUserPool(traineesList, getTraineePool(), 'אין חניכים במערכת');
-    renderUserPool(mmList, getDepartmentCommanderPool(), 'אין ממ במערכת');
+    renderUserPool(traineesList, getRolePool('trainee', true), 'אין חניכים במערכת');
+    renderUserPool(mpList, getRolePool('companyCommander', true), 'אין מפ במערכת');
+    renderUserPool(magadList, getRolePool('unitCommander', true), 'אין מגד במערכת');
+    renderUserPool(mmList, getRolePool('departmentCommander', true), 'אין ממ במערכת');
+    renderUserPool(tutorList, getRolePool('tutor', true), 'אין חונכים במערכת');
 
     renderChangesBar();
     renderLeastAssigned();

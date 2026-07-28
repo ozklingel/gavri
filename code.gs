@@ -432,6 +432,12 @@ function _rows(name) {
   return result;
 }
 
+function _cacheNotifyDerived(name) {
+  if (name === 'Exercises' || name === 'ExerciseDetails') {
+    if (typeof _exercisesClearDerived === 'function') _exercisesClearDerived();
+  }
+}
+
 /**
  * ביטול קאש אחרי כתיבה.
  * כברירת מחדל: write-through — קורא את הגיליון פעם אחת ומחזיר לקאש,
@@ -440,6 +446,7 @@ function _rows(name) {
 function _cacheInvalidate(name, options) {
   options = options || {};
   delete _rowsCache[name];
+  _cacheNotifyDerived(name);
   const cache = CacheService.getScriptCache();
   cache.remove(_dbCacheKey(name));
   cache.remove(_dbCacheKey(name, 'parts'));
@@ -474,6 +481,7 @@ function _cachePatchAppend(name, rows) {
     for (let i = 0; i < rows.length; i++) cur.data.push(rows[i]);
     _rowsCache[name] = cur;
     _putScriptCacheRows(name, cur);
+    _cacheNotifyDerived(name);
     _htmlCacheBump();
     return;
   }
@@ -505,6 +513,7 @@ function _cachePatchRow(name, sheetRow, updates) {
   cur.data[idx] = row;
   _rowsCache[name] = cur;
   _putScriptCacheRows(name, cur);
+  _cacheNotifyDerived(name);
   _htmlCacheBump();
 }
 

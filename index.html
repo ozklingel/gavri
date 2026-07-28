@@ -922,8 +922,15 @@ body {
       padding-top: 14px;
       border-top: 1px solid var(--border);
     }
-    .page-assign .assign-mm-block .assign-panel-head {
-      color: var(--blue, #60a5fa);
+    .page-assign .assign-mm-block .assign-panel-head,
+    .page-assign .assign-role-block[data-assign-role="companyCommander"] .assign-panel-head {
+      color: var(--blue, #1d4ed8);
+    }
+    .page-assign .assign-role-block[data-assign-role="unitCommander"] .assign-panel-head {
+      color: var(--green3);
+    }
+    .page-assign .assign-role-block[data-assign-role="tutor"] .assign-panel-head {
+      color: #a16207;
     }
     .page-assign .assign-users-list {
       display: flex;
@@ -3990,11 +3997,18 @@ body {
             return;
           }
           // לא מוחקים את כל הקאש — רק דפים שמושפעים + הדף הנוכחי יוחלף מ-result.body
-          invalidateClientRoutes(['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix']);
+          invalidateClientRoutes(['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix', 'exercises']);
           if (currentRoute && currentRoute.page) {
             invalidateClientRoutes([currentRoute.page]);
           }
           applyResult(result, { skipPrime: true });
+          // אחרי יצירת נוה״ק — גלול לכרטיס הנוהל אם קיים
+          if (action === 'generateTimeline' || action === 'addDetail' || action === 'updateDetail' || action === 'deleteDetail') {
+            setTimeout(function() {
+              var card = document.getElementById('exercise-procedure-card');
+              if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 50);
+          }
           // בלי reprime מלא אחרי כל כתיבה (זה גרם ל-3–4ש׳ לקליק הבא)
         })
         .withFailureHandler(function(err) {
