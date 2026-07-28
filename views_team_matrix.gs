@@ -50,7 +50,8 @@ function _teamMatrixExerciseMeta(ex) {
 
 function _teamMatrixAllowedTeams(user) {
   const all = Teams_all();
-  if (Roles_hasAdminAccess(user.role) || Roles_isUnitCommander(user.role)) {
+  // צפייה בכל הצוותים — כמו צפייה בכל התרגילים/שיבוצים (לכל ישות מחוברת)
+  if (Roles_canSeeAllExercises(user.role)) {
     return all;
   }
   if (Roles_isCompanyCommander(user.role)) {
@@ -136,7 +137,14 @@ function _teamMatrixEmbedHtml(user, p) {
   }
 
   const payload = _teamMatrixBuildPayload(user);
-  const initialTeam = String((p && p.teamId) || teams[0].id).trim();
+  let initialTeam = String((p && p.teamId) || '').trim();
+  if (!initialTeam || !teams.some(function(t) { return t.id === initialTeam; })) {
+    if (user.team_id && teams.some(function(t) { return t.id === String(user.team_id); })) {
+      initialTeam = String(user.team_id);
+    } else {
+      initialTeam = teams[0].id;
+    }
+  }
   const highlightUserId = _dashboardHighlightUserId(p, user);
   payload.highlightUserId = highlightUserId;
   const highlightUser = highlightUserId ? Users_get(highlightUserId) : null;

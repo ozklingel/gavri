@@ -327,6 +327,43 @@ function _respDatalistHtml(listId) {
     '</datalist>';
 }
 
+/** כפתורי ייצוא CSV + סקריפט הורדה (דף תרגילים / שיבוץ) */
+function _exercisesExportJs(sid) {
+  return '<script>(function(){' +
+    'var sid=' + JSON.stringify(String(sid || '')) + ';' +
+    'function downloadExport(res){' +
+      'if(!res||!res.csv){alert("אין נתונים לייצוא");return;}' +
+      'var blob=new Blob([res.csv],{type:"text/csv;charset=utf-8;"});' +
+      'var a=document.createElement("a");' +
+      'a.href=URL.createObjectURL(blob);' +
+      'a.download=res.filename||"export.csv";' +
+      'document.body.appendChild(a);a.click();' +
+      'setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);' +
+    '}' +
+    'function runExport(apiName,btn){' +
+      'if(!btn||btn.disabled)return;' +
+      'var prev=btn.textContent;' +
+      'btn.disabled=true;btn.textContent="⏳ מייצא...";' +
+      'if(window.MapimSpaShowLoader)MapimSpaShowLoader("// EXPORT...");' +
+      'google.script.run' +
+        '.withSuccessHandler(function(res){' +
+          'if(window.MapimSpaHideLoader)MapimSpaHideLoader();' +
+          'btn.disabled=false;btn.textContent=prev;' +
+          'downloadExport(res);' +
+        '})' +
+        '.withFailureHandler(function(err){' +
+          'if(window.MapimSpaHideLoader)MapimSpaHideLoader();' +
+          'btn.disabled=false;btn.textContent=prev;' +
+          'alert(err&&err.message?err.message:String(err));' +
+        '})[apiName](sid);' +
+    '}' +
+    'var b1=document.getElementById("exportExAssignmentsBtn");' +
+    'var b2=document.getElementById("exportExProceduresBtn");' +
+    'if(b1)b1.addEventListener("click",function(){runExport("exportExercisesAssignmentsCsv",b1);});' +
+    'if(b2)b2.addEventListener("click",function(){runExport("exportExercisesProceduresCsv",b2);});' +
+  '})();</script>';
+}
+
 function _fireZoneSelectOptions(selected) {
   const opts = FireZones_names().map(function(name) { return [name, name]; });
   if (selected && !opts.some(function(o) { return o[0] === selected; })) {

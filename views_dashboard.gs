@@ -43,12 +43,17 @@ function Views_exercises(p) {
     '<div class="page">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
       '<h1 class="page-title" style="margin:0">🎯 ' + (isAdmin ? 'ניהול תרגילים' : 'תרגילים') + '</h1>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+      '<button type="button" id="exportExAssignmentsBtn" class="btn btn-secondary btn-sm" title="טבלת תרגילים + שיבוצים לפי תפקיד (ללא נוה״ק)">📊 ייצוא שיבוצים</button>' +
+      '<button type="button" id="exportExProceduresBtn" class="btn btn-secondary btn-sm" title="טבלת תרגילים + זמני נוהל קרב">⏱ ייצוא נוה״ק</button>' +
       (isAdmin && exs.length
         ? '<button type="button" class="btn btn-secondary btn-sm" onclick="toggleCollapsible(\'ex-duplicate-panel\')">⎘ שכפל תרגיל</button>'
         : '') +
+      '</div>' +
     '</div>' +
     (isAdmin && exs.length ? _exercisesDuplicatePanelHtml(exs) : '') +
     s +
+    _exercisesExportJs(sid) +
     '</div>';
 
   return _wrapPage(body, isAdmin ? 'ניהול תרגילים' : 'תרגילים');

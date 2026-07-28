@@ -14,7 +14,11 @@ function Views_assign(p) {
     '<div class="page-title" style="margin:0">🔀 לוח שיבוץ' +
     (canEdit ? '' : ' <span class="badge badge-muted" style="margin-right:8px;font-size:11px">צפייה בלבד</span>') +
     '</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+    '<button type="button" id="exportExAssignmentsBtn" class="btn btn-secondary btn-sm" title="טבלת תרגילים + שיבוצים לפי תפקיד (ללא נוה״ק)">📊 ייצוא שיבוצים</button>' +
+    '<button type="button" id="exportExProceduresBtn" class="btn btn-secondary btn-sm" title="טבלת תרגילים + זמני נוהל קרב">⏱ ייצוא נוה״ק</button>' +
     '<span id="assignStatus" class="ui-on-bg-chip"></span>' +
+    '</div>' +
     '</div>' +
     '<div class="ui-on-bg-chip assign-page-hint">' +
     (canEdit
@@ -22,6 +26,7 @@ function Views_assign(p) {
       : '// צפייה בכל התרגילים והשיבוצים · עריכה זמינה לסגל בלבד') +
     '</div>' +
     _assignMainModuleHtml(user, sid, openSet, canEdit) +
+    _exercisesExportJs(sid) +
     '</div>';
 
   return _wrapPage(body, 'לוח שיבוץ');
