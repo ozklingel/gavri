@@ -551,8 +551,8 @@ function Views_login(p) {
   const form =
     _formOpen() +
     '<input type="hidden" name="action" value="login">' +
-    '<div class="form-row"><label class="form-label">מספר אישי</label>' +
-    _input('userId', 'U001', '', 'text', 'required autofocus') + '</div>' +
+    '<div class="form-row"><label class="form-label">שם משתמש</label>' +
+    _input('userId', 'רונן שלוש', '', 'text', 'required autofocus') + '</div>' +
     '<div class="form-row"><label class="form-label">סיסמה</label>' +
     _input('password', '••••••••', '', 'password', 'required') + '</div>' +
     _submitBtn('כניסה למערכת', 'btn btn-primary btn-full btn-lg') +

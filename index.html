@@ -2457,34 +2457,23 @@ body {
     .timeline-track .tl-slot-bar {
       pointer-events: none;
     }
-    .timeline-track:not(.show-procedures) .tl-procedure-bar {
+    .timeline-track .tl-bar.tl-bar-with-procedure {
+      /* גוש אחד מורחב — אותו מראה כמו פס התרגיל */
+      box-shadow: 0 1px 6px rgba(30, 60, 40, 0.18);
+    }
+    .timeline-track:not(.show-procedures) .tl-procedure-bar,
+    .timeline-track:not(.show-procedures) .tl-procedure-span {
       display: none;
     }
-    .timeline-track .tl-procedure-bar {
-      background: rgba(245, 158, 11, 0.55);
-      border: 1px solid #d97706;
-      border-radius: 4px;
-      overflow: hidden;
-      pointer-events: auto;
-      cursor: help;
-      box-shadow: 0 1px 3px rgba(120, 53, 15, 0.2);
-    }
-    .timeline-track .tl-procedure-label {
-      display: block;
-      font-size: 8px;
-      font-weight: 700;
-      line-height: 1.1;
-      padding: 0 3px;
-      color: #78350f;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+    /* מקטעי נוה״ק נפרדים הוסרו — הכל בפס התרגיל */
+    .timeline-track .tl-procedure-bar,
+    .timeline-track .tl-procedure-span {
+      display: none !important;
     }
     #timelineProcedureToggle.active {
-      border-color: #d97706;
-      color: #b45309;
-      background: rgba(245, 158, 11, 0.12);
+      border-color: var(--border2);
+      color: var(--green3);
+      background: rgba(74, 222, 128, 0.12);
     }
     @media (max-width: 900px) {
       .timeline-page-row {
@@ -2924,7 +2913,8 @@ body {
     }
     .timeline-track .tl-bar,
     .timeline-track .tl-slot-bar,
-    .timeline-track .tl-procedure-bar {
+    .timeline-track .tl-procedure-bar,
+    .timeline-track .tl-procedure-span {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
@@ -5889,10 +5879,46 @@ body {
     btn._bound = true;
     var KEY = 'mapim_timeline_show_procedures';
 
+    function viewSpan() {
+      var vs = +track.dataset.viewStart;
+      var ve = +track.dataset.viewEnd;
+      if (!isNaN(vs) && !isNaN(ve) && ve > vs) return { start: vs, span: ve - vs };
+      var ws = +track.dataset.weekStart;
+      var we = +track.dataset.weekEnd;
+      return { start: ws, span: we - ws };
+    }
+
+    function setBarVisual(bar, startMs, endMs) {
+      var v = viewSpan();
+      if (!v.span) return;
+      var rightPct = ((startMs - v.start) / v.span) * 100;
+      var widthPct = ((endMs - startMs) / v.span) * 100;
+      bar.style.right = rightPct + '%';
+      bar.style.width = Math.max(widthPct, 1.5) + '%';
+    }
+
+    function layoutBarsForProcedures(on) {
+      var editing = track.classList.contains('edit-mode');
+      track.querySelectorAll('.tl-bar').forEach(function(bar) {
+        var us = bar.getAttribute('data-united-start-ms');
+        var ue = bar.getAttribute('data-united-end-ms');
+        var s = +bar.getAttribute('data-start-ms');
+        var e = +bar.getAttribute('data-end-ms');
+        if (on && !editing && us && ue) {
+          setBarVisual(bar, +us, +ue);
+          bar.classList.add('tl-bar-with-procedure');
+        } else if (!isNaN(s) && !isNaN(e)) {
+          setBarVisual(bar, s, e);
+          bar.classList.remove('tl-bar-with-procedure');
+        }
+      });
+    }
+
     function apply(on) {
       track.classList.toggle('show-procedures', on);
       btn.classList.toggle('active', on);
       btn.textContent = on ? '📋 הסתר נוה"ק' : '📋 הצג נוה"ק';
+      layoutBarsForProcedures(on);
     }
 
     var on = false;
@@ -5904,6 +5930,9 @@ body {
       apply(on);
       try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) { /* ignore */ }
     });
+
+    // חשיפה ל-edit mode: בחזרה מתרגיל בלבד בזמן עריכה, ואז הרחבה מחדש
+    track._layoutBarsForProcedures = layoutBarsForProcedures;
   }
 
   function initTimelineWeek() {
@@ -6218,6 +6247,9 @@ body {
         editBtn.textContent = on ? '✓ יציאה מעריכה' : '✏ מצב עריכה';
         if (hint) hint.style.display = on ? 'block' : 'none';
         syncTimelineEditHandles(on);
+        if (typeof track._layoutBarsForProcedures === 'function') {
+          track._layoutBarsForProcedures(track.classList.contains('show-procedures'));
+        }
         if (!on) refreshTimelineWeekTable();
       });
       if (track.classList.contains('edit-mode')) syncTimelineEditHandles(true);

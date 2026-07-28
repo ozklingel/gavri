@@ -535,34 +535,23 @@ function _timelineProcedureEventsForWeek(weekItems, weekStartMs, weekEndMs, deta
   return events;
 }
 
-function _timelineRenderProcedureBar(ev, viewStartMs, viewSpanMs, rowTopPx) {
-  const DAY_MS = 86400000;
-  const item = ev.item;
-  const band = item.band;
-  if (!band) return '';
+function _timelineProcedureSpanForItem(item, events) {
+  let spanStart = item.startMs;
+  let spanEnd = item.endMs;
+  (events || []).forEach(function(ev) {
+    if (ev.startMs < spanStart) spanStart = ev.startMs;
+    if (ev.endMs > spanEnd) spanEnd = ev.endMs;
+  });
+  return { startMs: spanStart, endMs: spanEnd };
+}
 
-  const viewEndMs = viewStartMs + viewSpanMs;
-  const visStart = Math.max(ev.startMs, viewStartMs);
-  const visEnd = Math.min(ev.endMs, viewEndMs);
-  const startPct = ((visStart - viewStartMs) / viewSpanMs) * 100;
-  const widthPct = Math.max(((visEnd - visStart) / viewSpanMs) * 100, 0.35);
-
-  const barH = band.subBarH - 8;
-  const procH = Math.min(12, Math.max(8, barH - 6));
-  const topPx = rowTopPx + band.top + (item.subLane || 0) * band.subBarH + 4 + barH - procH - 2;
-  const tip = ev.label +
-    (ev.location ? ' · ' + ev.location : '') +
-    (ev.description ? ' — ' + ev.description : '');
-
-  const style =
-    'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;width:' + widthPct + '%;' +
-    'height:' + procH + 'px;min-width:4px;box-sizing:border-box;' +
-    'z-index:' + (22 + (item.baseLane || 0) * 3 + (item.subLane || 0)) + ';';
-
-  return '<div class="tl-procedure-bar" data-exercise-id="' + _timelineAttrEsc(ev.exerciseId) + '" ' +
-    'title="' + _timelineAttrEsc(tip) + '" style="' + style + '">' +
-    (widthPct > 2.5 ? '<span class="tl-procedure-label">' + _esc(ev.label) + '</span>' : '') +
-    '</div>';
+function _timelineProcedureTip(events) {
+  if (!events || !events.length) return '';
+  return events.map(function(ev) {
+    return ev.label +
+      (ev.location ? ' · ' + ev.location : '') +
+      (ev.description ? ' — ' + ev.description : '');
+  }).join('\n');
 }
 
 function _timelineParseExercise(ex) {
@@ -1104,16 +1093,36 @@ function Views_timeline(p) {
     procCountByEx[exId] = (detailsIndex[exId] || []).length;
   });
 
+  const colorByEx = {};
   viewItems.forEach(function(item, idx) {
-    const startPct = ((item.startMs - viewStartMs) / viewSpanMs) * 100;
-    const widthPct = ((item.endMs - item.startMs) / viewSpanMs) * 100;
+    colorByEx[String(item.ex.id)] =
+      TIMELINE_TYPE_COLORS[item.displayType || item.typeKey] || COLORS[idx % COLORS.length];
+  });
+
+  const procsByEx = {};
+  procedureEvents.forEach(function(ev) {
+    const id = String(ev.exerciseId);
+    if (!procsByEx[id]) procsByEx[id] = [];
+    procsByEx[id].push(ev);
+  });
+
+  // גוש אחד: פס התרגיל מורחב לטווח נוה״ק+תרגיל (בלי מקטעים נפרדים)
+  viewItems.forEach(function(item, idx) {
     const band = item.band;
     const barH = band.subBarH - 8;
     const topPx = rowTopPx + band.top + (item.subLane || 0) * band.subBarH + 4;
-    const color = TIMELINE_TYPE_COLORS[item.displayType || item.typeKey] || COLORS[idx % COLORS.length];
+    const color = colorByEx[String(item.ex.id)] ||
+      TIMELINE_TYPE_COLORS[item.displayType || item.typeKey] || COLORS[idx % COLORS.length];
     const isPast = item.endMs < nowMs;
     const exId = String(item.ex.id);
     const barDomId = 'tl-bar-' + exId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const evs = procsByEx[exId] || [];
+    const united = _timelineProcedureSpanForItem(item, evs);
+    const hasProc = evs.length > 0;
+
+    // תצוגה ראשונית = זמן התרגיל בלבד; הרחבה לנוה״ק בלחיצת «הצג נוה״ק»
+    const startPct = ((item.startMs - viewStartMs) / viewSpanMs) * 100;
+    const widthPct = ((item.endMs - item.startMs) / viewSpanMs) * 100;
 
     const barStyle =
       'position:absolute;top:' + topPx + 'px;right:' + startPct + '%;' +
@@ -1123,6 +1132,14 @@ function Views_timeline(p) {
       'padding:4px 6px;overflow:hidden;color:#1a2e22;font-weight:600;opacity:' + (isPast ? '0.72' : '1') + ';' +
       'z-index:' + (10 + (item.baseLane || 0) * 3 + (item.subLane || 0)) + ';display:flex;align-items:stretch;box-sizing:border-box';
 
+    const procTip = hasProc ? _timelineProcedureTip(evs) : '';
+    const exWeekLabel = item.ex.rawStartDate
+      ? _isoWeekLabel(item.ex.rawStartDate)
+      : _isoWeekLabel(_timelineMsToYmdLocal(item.startMs));
+    const barTitle = item.ex.title +
+      (exWeekLabel ? ' · ' + exWeekLabel : '') +
+      (procTip ? '\n— נוה״ק —\n' + procTip : '');
+
     const dataAttrs =
       ' id="' + _timelineAttrEsc(barDomId) + '"' +
       ' data-tl-bar="1" data-exercise-id="' + _timelineAttrEsc(exId) + '"' +
@@ -1130,12 +1147,10 @@ function Views_timeline(p) {
       ' data-procedure-count="' + (procCountByEx[exId] || 0) + '"' +
       ' data-lane="' + (item.baseLane || 0) + '"' +
       ' data-sub-lane="' + (item.subLane || 0) + '"' +
-      ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"';
-
-    const exWeekLabel = item.ex.rawStartDate
-      ? _isoWeekLabel(item.ex.rawStartDate)
-      : _isoWeekLabel(_timelineMsToYmdLocal(item.startMs));
-    const barTitle = item.ex.title + (exWeekLabel ? ' · ' + exWeekLabel : '');
+      ' data-start-ms="' + item.startMs + '" data-end-ms="' + item.endMs + '"' +
+      (hasProc
+        ? ' data-united-start-ms="' + united.startMs + '" data-united-end-ms="' + united.endMs + '"'
+        : '');
 
     if (canEdit) {
       s += '<div class="tl-bar"' + dataAttrs + ' style="' + barStyle + '">' +
@@ -1147,10 +1162,6 @@ function Views_timeline(p) {
         '<span class="tl-bar-label" title="' + _timelineAttrEsc(barTitle) + '">' +
         _esc(item.ex.title) + '</span></a>';
     }
-  });
-
-  procedureEvents.forEach(function(ev) {
-    s += _timelineRenderProcedureBar(ev, viewStartMs, viewSpanMs, rowTopPx);
   });
 
   s += '</div></div>';
