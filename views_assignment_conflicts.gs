@@ -10,12 +10,14 @@ function _assignmentConflictsListHtml(items, emptyText) {
       _userLink(item.user_id, item.user_name, '') + ' — ' +
       _exerciseLink(item.exercise_a_id, item.exercise_a_title) + ' ↔ ' +
       _exerciseLink(item.exercise_b_id, item.exercise_b_title);
-    if (item.type === 'procedure') {
-      s += ' <span class="badge badge-yellow" style="font-size:10px">' +
-        item.gap_hours + ' שע׳</span>';
+    if (item.type === 'procedure' && item.procedure_label) {
+      s += ' <span class="badge badge-yellow" style="font-size:10px">נוה״ק: ' +
+        _esc(item.procedure_label) + '</span>';
+    } else if (item.type === 'time') {
+      s += ' <span class="badge" style="font-size:10px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5">חמורה</span>';
     }
     s += '<div style="font-size:11px;color:var(--muted);margin-top:2px">' +
-      _esc(item.exercise_a_label) + '<br>' + _esc(item.exercise_b_label) +
+      _esc(AssignmentConflicts_message(item)) +
       '</div></li>';
   });
   return s + '</ul>';
@@ -34,16 +36,18 @@ function _assignmentConflictsPanel(conflicts, opts) {
   s += '<div class="card-body" style="font-size:13px">';
 
   if (timeItems.length) {
-    s += '<div style="margin-bottom:12px">' +
-      '<div style="font-weight:600;color:#f87171;margin-bottom:6px">⏱ התנגשות תרגיל — חפיפה בזמן (' +
+    s += '<div style="margin-bottom:12px;padding:10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.35)">' +
+      '<div style="font-weight:700;color:#b91c1c;margin-bottom:6px">🚨 אזהרה חמורה — שיבוץ בשני תרגילים חופפים (' +
       timeItems.length + ')</div>' +
+      '<p style="font-size:11px;color:var(--muted);margin:0 0 8px">אדם משובץ לשני תרגילים שזמניהם חופפים.</p>' +
       _assignmentConflictsListHtml(timeItems, '') + '</div>';
   }
 
   if (procItems.length) {
-    s += '<div>' +
-      '<div style="font-weight:600;color:var(--yellow);margin-bottom:6px">⚔ התנגשות נוהל קרב — פחות מ-5 שעות (' +
+    s += '<div style="padding:10px;border-radius:6px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35)">' +
+      '<div style="font-weight:700;color:#a16207;margin-bottom:6px">⚠ אזהרה — נוה״ק מול תרגיל (' +
       procItems.length + ')</div>' +
+      '<p style="font-size:11px;color:var(--muted);margin:0 0 8px">משובץ לתרגיל בזמן שמתקיים נוהל קרב של תרגיל אחר שהוא משובץ אליו.</p>' +
       _assignmentConflictsListHtml(procItems, '') + '</div>';
   }
 
@@ -66,12 +70,12 @@ function _assignmentConflictsDashboardWidget() {
     _a('page=assign', 'לוח שיבוץ', 'btn btn-secondary btn-sm') +
     '</div><div class="card-body" style="font-size:13px;line-height:1.6">';
   if (conflicts.timeOverlaps.length) {
-    s += '<p style="margin:0 0 6px"><b style="color:#f87171">' + conflicts.timeOverlaps.length +
-      '</b> חפיפות זמן בין תרגילים</p>';
+    s += '<p style="margin:0 0 6px"><b style="color:#b91c1c">' + conflicts.timeOverlaps.length +
+      '</b> אזהרות חמורות — שיבוץ בשני תרגילים חופפים</p>';
   }
   if (conflicts.procedureGaps.length) {
-    s += '<p style="margin:0"><b style="color:var(--yellow)">' + conflicts.procedureGaps.length +
-      '</b> מרווחי נוהל קרב קצרים מ-5 שעות</p>';
+    s += '<p style="margin:0"><b style="color:#a16207">' + conflicts.procedureGaps.length +
+      '</b> אזהרות — נוה״ק מול תרגיל</p>';
   }
   s += '</div></div>';
   return s;

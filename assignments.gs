@@ -153,14 +153,14 @@ function Assignments_assign(p) {
 
   const conflictWarnings = AssignmentConflicts_checkNewAssignment(userId, exId);
   conflictWarnings.forEach(function(w) {
-    if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+    if (w.type === 'time') throw new Error('אזהרה חמורה — שיבוץ בשני תרגילים חופפים: ' + w.message);
   });
 
   const id = 'A' + new Date().getTime();
   _append('Assignments', _assignmentRow(id, exId, userId, 'pending', '', resp, '', ''));
   let info = 'החייל הוקצה בהצלחה בתפקיד ' + resp + '.';
   const procWarn = conflictWarnings.filter(function(w) { return w.type === 'procedure'; });
-  if (procWarn.length) info += ' ⚠ ' + procWarn[0].message;
+  if (procWarn.length) info += ' ⚠ אזהרה (נוה״ק): ' + procWarn[0].message;
   return Views_exercise({ sid: p.sid, id: exId, info: info });
 }
 
@@ -954,7 +954,7 @@ function assignFromBoard(sid, exId, userId, resp) {
 
   const conflictWarnings = AssignmentConflicts_checkNewAssignment(userId, exId);
   conflictWarnings.forEach(function(w) {
-    if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+    if (w.type === 'time') throw new Error('אזהרה חמורה — שיבוץ בשני תרגילים חופפים: ' + w.message);
   });
 
   var id = 'A' + new Date().getTime();
@@ -989,7 +989,7 @@ function moveAssignmentById(sid, assignId, toExId) {
   HomeConstraints_assertCanAssign(userId, toExId);
   var conflictWarnings = AssignmentConflicts_checkNewAssignment(userId, toExId);
   conflictWarnings.forEach(function(w) {
-    if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+    if (w.type === 'time') throw new Error('אזהרה חמורה — שיבוץ בשני תרגילים חופפים: ' + w.message);
   });
   sh.getRange(row, 2).setValue(toExId);
   _assignmentsInvalidate();
@@ -1093,7 +1093,7 @@ function assignExerciseMatrixCell(sid, exId, role, userId) {
 
   if (!userRows.length) {
     AssignmentConflicts_checkNewAssignment(userId, exId).forEach(function(w) {
-      if (w.type === 'time') throw new Error('התנגשות תרגיל: ' + w.message);
+      if (w.type === 'time') throw new Error('אזהרה חמורה — שיבוץ בשני תרגילים חופפים: ' + w.message);
     });
   }
 

@@ -1,6 +1,8 @@
-// assignment_conflicts.gs — התנגשויות שיבוץ (זמן / נוהל קרב)
+// assignment_conflicts.gs — התנגשויות שיבוץ
+// 1) time (חמורה): אדם משובץ בשני תרגילים חופפים בזמן
+// 2) procedure (אזהרה): משובץ לתרגיל בזמן שנוה״ק של תרגיל אחר שהוא משובץ אליו מתקיים
 
-var ASSIGNMENT_MIN_PROCEDURE_GAP_MS = 5 * 3600000;
+var ASSIGNMENT_PROCEDURE_DEFAULT_MS = 3600000; // שעה אם אין סוף מפורש לאירוע נוה״ק
 
 function AssignmentConflicts_gapMs(r1, r2) {
   if (!r1 || !r2) return Infinity;
@@ -15,12 +17,13 @@ function AssignmentConflicts_exerciseLabel(ex) {
   return ex.title + (when ? ' · ' + when : '');
 }
 
-function AssignmentConflicts_buildItem(userId, exIdA, exIdB, exById, type, gapMs) {
+function AssignmentConflicts_buildItem(userId, exIdA, exIdB, exById, type, extra) {
   const u = Users_get(userId);
   const exA = exById[exIdA];
   const exB = exById[exIdB];
   const item = {
     type: type,
+    severity: type === 'time' ? 'severe' : 'warning',
     user_id: userId,
     user_name: u ? u.name : userId,
     exercise_a_id: exIdA,
@@ -30,9 +33,8 @@ function AssignmentConflicts_buildItem(userId, exIdA, exIdB, exById, type, gapMs
     exercise_a_label: AssignmentConflicts_exerciseLabel(exA),
     exercise_b_label: AssignmentConflicts_exerciseLabel(exB)
   };
-  if (type === 'procedure' && gapMs != null) {
-    item.gap_hours = Math.round(gapMs / 360000) / 10;
-  }
+  if (extra && extra.procedure_label) item.procedure_label = extra.procedure_label;
+  if (extra && extra.gap_hours != null) item.gap_hours = extra.gap_hours;
   return item;
 }
 
@@ -46,28 +48,105 @@ function AssignmentConflicts_userExerciseIds(userId, extraExId) {
   return ids;
 }
 
-function AssignmentConflicts_compareUserExercises(userId, exIds, exRanges, exById) {
+/** טווחי אירועי נוה״ק לתרגיל */
+function AssignmentConflicts_procedureRanges(exId, detailsIndex) {
+  const details = (detailsIndex && detailsIndex[String(exId)]) ||
+    (typeof Exercises_details === 'function' ? Exercises_details(exId) : []) || [];
+  const ranges = [];
+  details.forEach(function(d) {
+    const startMs = _exerciseDetailSortMs(d.rawTime);
+    if (!isFinite(startMs) || startMs >= Number.MAX_SAFE_INTEGER - 2) return;
+
+    let endMs = startMs + ASSIGNMENT_PROCEDURE_DEFAULT_MS;
+    const raw = String(d.rawTime || '');
+    // טווח מפורש: "2026-01-01 08:00 — 2026-01-01 10:00" או "08:00-10:00"
+    const full = raw.match(
+      /(\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2})\s*[—\-–]\s*(\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2})/
+    );
+    if (full) {
+      const e = _exerciseDetailSortMs(full[2]);
+      if (isFinite(e) && e > startMs) endMs = e;
+    } else {
+      const hm = raw.match(/(\d{1,2}:\d{2})\s*[—\-–]\s*(\d{1,2}:\d{2})/);
+      if (hm) {
+        const day = Exercise_msToYmd ? Exercise_msToYmd(startMs) : '';
+        if (day && typeof Exercise_msFromYmdHm === 'function') {
+          const e = Exercise_msFromYmdHm(day, hm[2]);
+          if (!isNaN(e) && e > startMs) endMs = e;
+          else if (!isNaN(e) && e <= startMs) {
+            endMs = Exercise_msFromYmdHm(_ymdPlusDays(day, 1), hm[2]);
+          }
+        }
+      }
+    }
+
+    ranges.push({
+      startMs: startMs,
+      endMs: endMs,
+      label: String(d.description || d.time || 'נוה״ק').substring(0, 80)
+    });
+  });
+  return ranges;
+}
+
+/**
+ * משווה תרגילים של אותו משתמש:
+ * - time: חפיפת זמני תרגיל ↔ תרגיל (חמורה)
+ * - procedure: נוה״ק של תרגיל א׳ חופף לזמן תרגיל ב׳ (אזהרה בלבד)
+ */
+function AssignmentConflicts_compareUserExercises(userId, exIds, exRanges, exById, detailsIndex) {
   const timeOverlaps = [];
   const procedureGaps = [];
   if (!exIds || exIds.length < 2) return { timeOverlaps: timeOverlaps, procedureGaps: procedureGaps };
 
+  const detailsIdx = detailsIndex ||
+    (typeof Exercises_detailsIndex === 'function' ? Exercises_detailsIndex() : {});
+
   for (let i = 0; i < exIds.length; i++) {
     for (let j = i + 1; j < exIds.length; j++) {
-      const r1 = exRanges[exIds[i]];
-      const r2 = exRanges[exIds[j]];
-      if (!r1 || !r2) continue;
+      const idA = exIds[i];
+      const idB = exIds[j];
+      const rA = exRanges[idA];
+      const rB = exRanges[idB];
+      if (!rA || !rB) continue;
 
-      if (_timesOverlap(r1, r2)) {
+      // התנגשות חמורה — משובץ בשני תרגילים חופפים
+      if (_timesOverlap(rA, rB)) {
         timeOverlaps.push(AssignmentConflicts_buildItem(
-          userId, exIds[i], exIds[j], exById, 'time', null
+          userId, idA, idB, exById, 'time', null
         ));
-      } else {
-        const gap = AssignmentConflicts_gapMs(r1, r2);
-        if (gap < ASSIGNMENT_MIN_PROCEDURE_GAP_MS) {
-          procedureGaps.push(AssignmentConflicts_buildItem(
-            userId, exIds[i], exIds[j], exById, 'procedure', gap
-          ));
+        continue; // לא כפולים גם כאזהרת נוה״ק
+      }
+
+      // אזהרה — נוה״ק של אחד חופף לזמן התרגיל של השני
+      const procsA = AssignmentConflicts_procedureRanges(idA, detailsIdx);
+      const procsB = AssignmentConflicts_procedureRanges(idB, detailsIdx);
+      let hit = null;
+
+      for (let p = 0; p < procsA.length && !hit; p++) {
+        if (_timesOverlap(procsA[p], rB)) {
+          hit = {
+            procedure_label: procsA[p].label,
+            hostExId: idA,
+            drillExId: idB
+          };
         }
+      }
+      for (let q = 0; q < procsB.length && !hit; q++) {
+        if (_timesOverlap(procsB[q], rA)) {
+          hit = {
+            procedure_label: procsB[q].label,
+            hostExId: idB,
+            drillExId: idA
+          };
+        }
+      }
+      if (hit) {
+        procedureGaps.push(AssignmentConflicts_buildItem(
+          userId, hit.drillExId, hit.hostExId, exById, 'procedure', {
+            procedure_label: hit.procedure_label
+          }
+        ));
       }
     }
   }
@@ -82,6 +161,7 @@ function AssignmentConflicts_scan() {
     exById[ex.id] = ex;
     exRanges[ex.id] = _exerciseTimeRange(ex);
   });
+  const detailsIndex = typeof Exercises_detailsIndex === 'function' ? Exercises_detailsIndex() : {};
 
   const userExercises = {};
   Assignments_all().forEach(function(a) {
@@ -96,7 +176,7 @@ function AssignmentConflicts_scan() {
 
   Object.keys(userExercises).forEach(function(userId) {
     const part = AssignmentConflicts_compareUserExercises(
-      userId, userExercises[userId], exRanges, exById
+      userId, userExercises[userId], exRanges, exById, detailsIndex
     );
     timeOverlaps.push.apply(timeOverlaps, part.timeOverlaps);
     procedureGaps.push.apply(procedureGaps, part.procedureGaps);
@@ -116,6 +196,7 @@ function AssignmentConflicts_forExercise(exerciseId) {
     exById[ex.id] = ex;
     exRanges[ex.id] = _exerciseTimeRange(ex);
   });
+  const detailsIndex = typeof Exercises_detailsIndex === 'function' ? Exercises_detailsIndex() : {};
 
   const userIds = {};
   Assignments_byExercise(exId).forEach(function(a) {
@@ -127,7 +208,9 @@ function AssignmentConflicts_forExercise(exerciseId) {
 
   Object.keys(userIds).forEach(function(userId) {
     const exIds = AssignmentConflicts_userExerciseIds(userId);
-    const part = AssignmentConflicts_compareUserExercises(userId, exIds, exRanges, exById);
+    const part = AssignmentConflicts_compareUserExercises(
+      userId, exIds, exRanges, exById, detailsIndex
+    );
     part.timeOverlaps.forEach(function(c) {
       if (c.exercise_a_id === exId || c.exercise_b_id === exId) timeOverlaps.push(c);
     });
@@ -148,16 +231,22 @@ function AssignmentConflicts_wouldCreate(userId, exerciseId) {
     exById[ex.id] = ex;
     exRanges[ex.id] = _exerciseTimeRange(ex);
   });
-  return AssignmentConflicts_compareUserExercises(userId, exIds, exRanges, exById);
+  const detailsIndex = typeof Exercises_detailsIndex === 'function' ? Exercises_detailsIndex() : {};
+  return AssignmentConflicts_compareUserExercises(
+    userId, exIds, exRanges, exById, detailsIndex
+  );
 }
 
 function AssignmentConflicts_message(item) {
   if (!item) return '';
   if (item.type === 'time') {
-    return item.user_name + ' — חפיפה בזמן בין "' + item.exercise_a_title + '" ל"' + item.exercise_b_title + '"';
+    return item.user_name + ' משובץ בשני תרגילים חופפים: "' +
+      item.exercise_a_title + '" ו-"' + item.exercise_b_title + '"';
   }
-  return item.user_name + ' — מרווח ' + item.gap_hours + ' שעות בין "' +
-    item.exercise_a_title + '" ל"' + item.exercise_b_title + '" (נדרשות לפחות 5 שעות)';
+  // procedure — אזהרה: נוה״ק מול תרגיל
+  const proc = item.procedure_label ? (' («' + item.procedure_label + '»)') : '';
+  return item.user_name + ' משובץ לתרגיל "' + item.exercise_a_title +
+    '" בזמן שמתקיים נוה״ק' + proc + ' של "' + item.exercise_b_title + '"';
 }
 
 function AssignmentConflicts_checkNewAssignment(userId, exerciseId) {
@@ -165,12 +254,20 @@ function AssignmentConflicts_checkNewAssignment(userId, exerciseId) {
   const warnings = [];
   result.timeOverlaps.forEach(function(c) {
     if (c.exercise_a_id === exerciseId || c.exercise_b_id === exerciseId) {
-      warnings.push({ type: 'time', message: AssignmentConflicts_message(c) });
+      warnings.push({
+        type: 'time',
+        severity: 'severe',
+        message: AssignmentConflicts_message(c)
+      });
     }
   });
   result.procedureGaps.forEach(function(c) {
     if (c.exercise_a_id === exerciseId || c.exercise_b_id === exerciseId) {
-      warnings.push({ type: 'procedure', message: AssignmentConflicts_message(c) });
+      warnings.push({
+        type: 'procedure',
+        severity: 'warning',
+        message: AssignmentConflicts_message(c)
+      });
     }
   });
   return warnings;

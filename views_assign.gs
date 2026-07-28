@@ -161,6 +161,10 @@ function _assignMainModuleHtml(user, sid, openSet, canEdit) {
   return html;
 }
 
+function _assignConflictsSectionHtml(sid) {
+  return _assignmentConflictsPanel(AssignmentConflicts_scan(), { alwaysShow: true });
+}
+
 function _assignGroupActionsHtml(sidQ, groupKey, label) {
   return '<div class="assign-group-actions">' +
     _confirmAction(
@@ -491,18 +495,24 @@ function _assignBoardJs() {
     return '';
   }
 
+  function assertCanAssignOrError(userId, exId, actionLabel) {
+    var block = homeBlockMsg(userId, exId);
+    if (!block) return true;
+    var msg = 'לא ניתן ' + (actionLabel || 'לשבץ') + ': ' + block;
+    setStatus('✗ ' + msg, '#f87171');
+    alert(msg);
+    return false;
+  }
+
   function userAlreadyInExercise(userId, exId) {
     return (data.exMap[exId] || []).some(function(a) { return a.userId === userId; });
   }
 
   function stageAdd(exId, userId, resp) {
-    var block = homeBlockMsg(userId, exId);
-    if (block) {
-      setStatus('✗ לא ניתן לשבץ: ' + block, '#f87171');
-      return false;
-    }
+    if (!assertCanAssignOrError(userId, exId, 'לשבץ')) return false;
     if (userAlreadyInExercise(userId, exId)) {
       setStatus('✗ החניך כבר משובץ לתרגיל זה', '#f87171');
+      alert('החניך כבר משובץ לתרגיל זה');
       return false;
     }
     if (!data.exMap[exId]) data.exMap[exId] = [];
@@ -525,13 +535,10 @@ function _assignBoardJs() {
   }
 
   function stageMove(assignId, toExId, userId, resp, fromExId) {
-    var block = homeBlockMsg(userId, toExId);
-    if (block) {
-      setStatus('✗ לא ניתן להעביר: ' + block, '#f87171');
-      return false;
-    }
+    if (!assertCanAssignOrError(userId, toExId, 'להעביר')) return false;
     if (userAlreadyInExercise(userId, toExId)) {
       setStatus('✗ החניך כבר משובץ לתרגיל יעד', '#f87171');
+      alert('החניך כבר משובץ לתרגיל יעד');
       return false;
     }
     var list = data.exMap[fromExId] || [];
