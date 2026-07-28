@@ -319,13 +319,163 @@ function Assignments_slotConfig() {
   ];
 }
 
+/** קבוצות לוח השיבוץ — תואם לכותרות בעמוד */
+function Assignments_boardGroups() {
+  return [
+    { key: 'trainee', role: 'trainee', label: 'מפ', defaultResp: 'מפ' },
+    { key: 'companyCommander', role: 'companyCommander', label: 'סגל', defaultResp: 'מפקד צוות' },
+    { key: 'unitCommander', role: 'unitCommander', label: 'מגד', defaultResp: 'מגד' },
+    { key: 'departmentCommander', role: 'departmentCommander', label: 'ממ', defaultResp: 'ממ' },
+    { key: 'tutor', role: 'tutor', label: 'חונך', defaultResp: 'חונך' }
+  ];
+}
+
+function Assignments_boardGroup(key) {
+  const want = Roles_normalize(String(key || '').trim());
+  const list = Assignments_boardGroups();
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].key === want) return list[i];
+  }
+  return null;
+}
+
+function Assignments_autoAssignByUserRole(p, groupMeta) {
+  Auth_requireRole(p, ['admin']);
+  const role = groupMeta.role;
+  const resp = groupMeta.defaultResp || groupMeta.label;
+  const exercises = Exercises_all();
+  const allUsers = Users_all();
+  const allAssigns = Assignments_all();
+  const pool = allUsers.filter(function(u) {
+    return Roles_normalize(u.role) === role;
+  });
+  if (!pool.length) {
+    return Views_assign({
+      sid: p.sid,
+      info: '⚠ אין משתמשים בקבוצת «' + groupMeta.label + '» לשיבוץ.'
+    });
+  }
+
+  const exRanges = {};
+  exercises.forEach(function(ex) {
+    exRanges[ex.id] = _exerciseTimeRange(ex);
+  });
+  const userExMap = _buildUserExerciseMap(allAssigns);
+  const userById = {};
+  allUsers.forEach(function(u) { userById[u.id] = u; });
+
+  function assignCount(userId, pendingRows) {
+    let n = allAssigns.filter(function(a) { return a.user_id === userId; }).length;
+    pendingRows.forEach(function(r) {
+      if (r[2] === userId) n++;
+    });
+    return n;
+  }
+
+  function exerciseHasRole(exId, pendingRows) {
+    function hit(userId) {
+      const u = userById[userId];
+      return u && Roles_normalize(u.role) === role;
+    }
+    for (let i = 0; i < allAssigns.length; i++) {
+      if (String(allAssigns[i].exercise_id) !== String(exId)) continue;
+      if (hit(allAssigns[i].user_id)) return true;
+    }
+    for (let j = 0; j < pendingRows.length; j++) {
+      if (String(pendingRows[j][1]) !== String(exId)) continue;
+      if (hit(pendingRows[j][2])) return true;
+    }
+    return false;
+  }
+
+  function onExercise(exId, pendingRows) {
+    const ids = {};
+    allAssigns.forEach(function(a) {
+      if (String(a.exercise_id) === String(exId)) ids[a.user_id] = true;
+    });
+    pendingRows.forEach(function(r) {
+      if (String(r[1]) === String(exId)) ids[r[2]] = true;
+    });
+    return ids;
+  }
+
+  const sortedExercises = exercises.slice().sort(function(a, b) {
+    const ra = exRanges[a.id];
+    const rb = exRanges[b.id];
+    if (ra && rb) return ra.startMs - rb.startMs;
+    if (ra) return -1;
+    if (rb) return 1;
+    return a.id.localeCompare(b.id);
+  });
+
+  const allRows = [];
+  let added = 0;
+  let skipped = 0;
+
+  sortedExercises.forEach(function(ex, exIdx) {
+    if (exerciseHasRole(ex.id, allRows)) {
+      skipped++;
+      return;
+    }
+    const onEx = onExercise(ex.id, allRows);
+    const candidates = pool.filter(function(u) {
+      if (onEx[u.id]) return false;
+      if (_userTimeConflict(u.id, ex.id, exRanges, userExMap)) return false;
+      if (HomeConstraints_checkAssignment(u.id, ex.id)) return false;
+      return true;
+    });
+    candidates.sort(function(a, b) {
+      const ca = assignCount(a.id, allRows);
+      const cb = assignCount(b.id, allRows);
+      if (ca !== cb) return ca - cb;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+    });
+    const user = candidates[0];
+    if (!user) return;
+    allRows.push(_assignmentRow(
+      'A' + Date.now() + '_' + exIdx + '_g' + added,
+      ex.id, user.id, 'pending', '', resp, '', ''
+    ));
+    _addUserToExerciseMap(userExMap, user.id, ex.id);
+    added++;
+  });
+
+  if (allRows.length) _appendBatch('Assignments', allRows);
+  let info = '✅ שיבוץ «' + groupMeta.label + '»: ' + added + ' הקצאות חדשות';
+  if (skipped) info += ' · ' + skipped + ' תרגילים כבר עם משתמש מהקבוצה';
+  return Views_assign({ sid: p.sid, info: info });
+}
+
 function Assignments_autoAssignAll(p) {
   Auth_requireRole(p, ['admin']);
+
+  const groupKey = Roles_normalize(String(p.group || '').trim());
+  const groupMeta = groupKey ? Assignments_boardGroup(groupKey) : null;
+  if (groupKey && !groupMeta) throw new Error('קבוצת שיבוץ לא מוכרת: ' + groupKey);
+
+  // מגד / ממ / חונך — שיבוץ לפי תפקיד מערכת (אחד לכל תרגיל אם חסר)
+  if (groupMeta && (groupMeta.role === 'unitCommander' ||
+      groupMeta.role === 'departmentCommander' ||
+      groupMeta.role === 'tutor')) {
+    return Assignments_autoAssignByUserRole(p, groupMeta);
+  }
+
+  const onlyCommander = groupMeta && groupMeta.role === 'companyCommander';
+  if (groupMeta && groupMeta.role !== 'trainee' && !onlyCommander) {
+    throw new Error('קבוצה לא נתמכת לשיבוץ אוטומטי');
+  }
 
   const exercises  = Exercises_all();
   const allUsers   = Users_all();
   const allAssigns = Assignments_all();
-  const SLOTS = Assignments_slotConfig();
+  const SLOTS = Assignments_slotConfig().filter(function(slot) {
+    if (onlyCommander) return slot.kind === 'commander';
+    if (groupMeta && groupMeta.role === 'trainee') return slot.kind === 'corps';
+    return true;
+  });
+  if (!SLOTS.length) {
+    return Views_assign({ sid: p.sid, info: '⚠ אין תפקידים מתאימים לקבוצה זו.' });
+  }
 
   function normalize(v) {
     return String(v || '').replace(/״/g, '').trim();
@@ -643,7 +793,8 @@ function Assignments_autoAssignAll(p) {
 
   if (allRows.length) _appendBatch('Assignments', allRows);
 
-  let info = '✅ שיבוץ הושלם: ' + stats.added + ' הקצאות חדשות. ' +
+  const groupLabel = groupMeta ? ('«' + groupMeta.label + '» ') : '';
+  let info = '✅ שיבוץ ' + groupLabel + 'הושלם: ' + stats.added + ' הקצאות חדשות. ' +
     stats.full + ' תרגילים מלאים';
   if (stats.partial) info += ', ' + stats.partial + ' חלקיים';
   if (stats.empty) info += ', ' + stats.empty + ' ללא שיבוץ';
@@ -654,27 +805,47 @@ function Assignments_autoAssignAll(p) {
 
   return Views_assign({ sid: p.sid, info: info });
 }
-// פעולה: ניקוי כל השיבוצים (לפני הרצה מחדש של שיבוץ אוטומטי)
+// פעולה: ניקוי שיבוצים (הכל / לפי קבוצה)
 function Assignments_clearAll(p) {
   const u = Auth_requireRole(p, ['admin']);
+  const groupKey = Roles_normalize(String(p.group || '').trim());
+  const groupMeta = groupKey ? Assignments_boardGroup(groupKey) : null;
+  if (groupKey && !groupMeta) throw new Error('קבוצת שיבוץ לא מוכרת: ' + groupKey);
+
   const activeEx = Exercises_activeIdSet();
   const sh = _sheet('Assignments');
   const data = _rows('Assignments').data;
+  const userById = {};
+  if (groupMeta) {
+    Users_all().forEach(function(usr) { userById[String(usr.id)] = usr; });
+  }
   let removed = 0;
   for (let i = data.length - 1; i >= 0; i--) {
     if (!activeEx[String(data[i][1])]) continue;
+    if (groupMeta) {
+      const assigned = userById[String(data[i][2])];
+      if (!assigned || Roles_normalize(assigned.role) !== groupMeta.role) continue;
+    }
     sh.deleteRow(i + 2);
     removed++;
   }
   _assignmentsInvalidate();
   SystemLog_write({
     user_id: u.id,
-    action: 'assignments.clearAll',
+    action: groupMeta ? 'assignments.clearGroup' : 'assignments.clearAll',
     entity_type: 'assignments',
-    entity_id: '',
-    details: { removed: removed, scope: 'active_series_only' }
+    entity_id: groupMeta ? groupMeta.key : '',
+    details: {
+      removed: removed,
+      scope: 'active_series_only',
+      group: groupMeta ? groupMeta.key : 'all'
+    }
   });
-  return Views_assign({ sid: p.sid, info: '🗑 שיבוצי הסדרה הפעילה נוקו (' + removed + ').' });
+  const label = groupMeta ? ('קבוצת «' + groupMeta.label + '»') : 'הסדרה הפעילה';
+  return Views_assign({
+    sid: p.sid,
+    info: '🗑 שיבוצי ' + label + ' נוקו (' + removed + ').'
+  });
 }
 
 // Update assignment fields — admin: all; tutor: score only for assigned tutee

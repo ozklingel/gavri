@@ -527,7 +527,9 @@ function _spaDispatchAction(action, p) {
     case 'updateAssignment':   return Assignments_update(p);
     case 'complete':           return Assignments_complete(p);
     case 'autoAssignAll':      return Assignments_autoAssignAll(p);
+    case 'autoAssignGroup':    return Assignments_autoAssignAll(p);
     case 'clearAllAssignments':return Assignments_clearAll(p);
+    case 'clearAssignGroup':   return Assignments_clearAll(p);
     case 'createUser':         return Users_create(p);
     case 'importUsers':        return Users_importBulk(p);
     case 'deleteUser':         return Users_delete(p);

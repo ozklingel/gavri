@@ -897,6 +897,15 @@ body {
       border-radius: var(--radius);
       background: var(--heading-chip-bg);
       box-shadow: var(--ui-chip-shadow);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .page-assign .assign-panel-head-main {
+      flex: 1;
+      min-width: 120px;
     }
     .page-assign .assign-panel-sub {
       display: block;
@@ -905,6 +914,18 @@ body {
       color: var(--text2);
       margin-top: 3px;
       opacity: 0.9;
+    }
+    .page-assign .assign-group-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .page-assign .assign-group-actions .btn {
+      white-space: nowrap;
+    }
+    .page-assign .assign-exercises-col > .assign-panel-head {
+      display: block;
     }
     .page-assign .assign-users-col {
       position: sticky;
@@ -2905,7 +2926,7 @@ body {
       display: inline-block;
     }
     .page-assign .assign-panel-head {
-      display: block;
+      display: flex;
       width: 100%;
       box-sizing: border-box;
       margin-bottom: 10px;
@@ -2913,6 +2934,13 @@ body {
       font-family: var(--mono);
       font-size: 12px;
       font-weight: 700;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .page-assign .assign-exercises-col > .assign-panel-head {
+      display: block;
     }
     .page-assign .assign-panel-sub {
       color: var(--text2) !important;
@@ -3080,7 +3108,9 @@ body {
       'action=remove': '// REMOVING...',
       'action=complete': '// UPDATING...',
       'action=autoAssignAll': '// AUTO-ASSIGNING...',
+      'action=autoAssignGroup': '// AUTO-ASSIGN GROUP...',
       'action=clearAllAssignments': '// CLEARING...',
+      'action=clearAssignGroup': '// CLEARING GROUP...',
       'action=deleteArchivedSeries': '// DELETING SERIES...',
       'action=importUsers': '// IMPORTING...',
       'page=dashboard': '// LOADING DASHBOARD...',
@@ -4729,7 +4759,9 @@ body {
       updateAssignment: 'שמירת שינוי בשיבוץ משתתף',
       complete: 'סימון שיבוץ כהושלם',
       autoAssignAll: 'שיבוץ אוטומטי לכל התרגילים (נדרש אישור)',
+      autoAssignGroup: 'שיבוץ אוטומטי לקבוצה נבחרת (נדרש אישור)',
       clearAllAssignments: 'מחיקת כל השיבוצים במערכת (נדרש אישור)',
+      clearAssignGroup: 'מחיקת שיבוצי קבוצה נבחרת (נדרש אישור)',
       deleteArchivedSeries: 'מחיקת סדרה מארכיון לצמיתות (נדרש אישור)',
       createUser: 'יצירת משתמש חדש',
       importUsers: 'ייבוא משתמשים מקובץ',

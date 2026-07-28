@@ -80,11 +80,11 @@ function _assignMainModuleHtml(user, sid, openSet) {
     })
   });
 
-  return '<div style="display:flex;gap:8px;margin-bottom:14px">' +
-    _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי',
-      'לבצע שיבוץ אוטומטי? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
-    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס שיבוצים',
-      'לאפס את כל השיבוצים? פעולה בלתי הפיכה.', 'btn btn-danger btn-sm') +
+    return '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+    _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי — הכל',
+      'לבצע שיבוץ אוטומטי לכל הקבוצות? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
+    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס — הכל',
+      'לאפס את כל השיבוצים בסדרה הפעילה? פעולה בלתי הפיכה.', 'btn btn-danger btn-sm') +
     '</div>' +
     '<script id="assignData" type="application/json">' + jsonData + '</script>' +
     '<input type="hidden" id="assignSid" value="' + _esc(sid) + '">' +
@@ -105,26 +105,25 @@ function _assignMainModuleHtml(user, sid, openSet) {
     '</div></div>' +
     '<div class="assign-layout">' +
     '<aside class="assign-users-col" id="assignUsersCol">' +
-    '<div class="assign-users-block">' +
-    '<div class="assign-panel-head">👤 מפ לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
-    '<div id="assignTraineesList" class="assign-users-list"></div>' +
-    '</div>' +
-    '<div class="assign-users-block assign-role-block" data-assign-role="companyCommander">' +
-    '<div class="assign-panel-head">🪖 סגל לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
-    '<div id="assignMpList" class="assign-users-list"></div>' +
-    '</div>' +
-    '<div class="assign-users-block assign-role-block" data-assign-role="unitCommander">' +
-    '<div class="assign-panel-head">⭐ מגד לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
-    '<div id="assignMagadList" class="assign-users-list"></div>' +
-    '</div>' +
-    '<div class="assign-users-block assign-role-block assign-mm-block" data-assign-role="departmentCommander">' +
-    '<div class="assign-panel-head">🎖 ממ לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
-    '<div id="assignMmList" class="assign-users-list"></div>' +
-    '</div>' +
-    '<div class="assign-users-block assign-role-block" data-assign-role="tutor">' +
-    '<div class="assign-panel-head">📘 חונך לשיבוץ <span class="assign-panel-sub">פחות שיבוצים למעלה</span></div>' +
-    '<div id="assignTutorList" class="assign-users-list"></div>' +
-    '</div>' +
+    _assignUsersBlockHtml(sidQ, {
+      role: 'trainee', label: 'מפ', listId: 'assignTraineesList', icon: '👤'
+    }) +
+    _assignUsersBlockHtml(sidQ, {
+      role: 'companyCommander', label: 'סגל', listId: 'assignMpList',
+      icon: '🪖', extraClass: 'assign-role-block'
+    }) +
+    _assignUsersBlockHtml(sidQ, {
+      role: 'unitCommander', label: 'מגד', listId: 'assignMagadList',
+      icon: '⭐', extraClass: 'assign-role-block'
+    }) +
+    _assignUsersBlockHtml(sidQ, {
+      role: 'departmentCommander', label: 'ממ', listId: 'assignMmList',
+      icon: '🎖', extraClass: 'assign-role-block assign-mm-block'
+    }) +
+    _assignUsersBlockHtml(sidQ, {
+      role: 'tutor', label: 'חונך', listId: 'assignTutorList',
+      icon: '📘', extraClass: 'assign-role-block'
+    }) +
     '</aside>' +
     '<div class="assign-exercises-col">' +
     '<div class="assign-panel-head">🎯 תרגילים <span class="assign-panel-sub">חסרים למעלה</span></div>' +
@@ -142,8 +141,42 @@ function _assignMainModuleHtml(user, sid, openSet) {
     '<script>' + _assignBoardJs() + '</script>';
 }
 
-function _assignConflictsSectionHtml(sid) {
-  return _assignmentConflictsPanel(AssignmentConflicts_scan(), { alwaysShow: true });
+function _assignGroupActionsHtml(sidQ, groupKey, label) {
+  return '<div class="assign-group-actions">' +
+    _confirmAction(
+      'action=autoAssignGroup&group=' + encodeURIComponent(groupKey) + '&sid=' + sidQ,
+      '⚡ שיבוץ',
+      'לבצע שיבוץ אוטומטי לקבוצת «' + label + '»? ימולאו תרגילים חסרים לפי הקבוצה בלבד.',
+      'btn btn-primary btn-sm'
+    ) +
+    _confirmAction(
+      'action=clearAssignGroup&group=' + encodeURIComponent(groupKey) + '&sid=' + sidQ,
+      '🗑 איפוס',
+      'לאפס את כל שיבוצי קבוצת «' + label + '» בסדרה הפעילה? פעולה בלתי הפיכה.',
+      'btn btn-danger btn-sm'
+    ) +
+    '</div>';
+}
+
+function _assignUsersBlockHtml(sidQ, opts) {
+  opts = opts || {};
+  const role = opts.role || '';
+  const label = opts.label || '';
+  const listId = opts.listId || '';
+  const sub = opts.sub || 'פחות שיבוצים למעלה';
+  const icon = opts.icon || '';
+  const extraClass = opts.extraClass || '';
+  return '<div class="assign-users-block' + (extraClass ? ' ' + extraClass : '') + '"' +
+    (role ? ' data-assign-role="' + _esc(role) + '"' : '') + '>' +
+    '<div class="assign-panel-head">' +
+    '<div class="assign-panel-head-main">' +
+    icon + ' ' + _esc(label) + ' לשיבוץ' +
+    '<span class="assign-panel-sub">' + _esc(sub) + '</span>' +
+    '</div>' +
+    _assignGroupActionsHtml(sidQ, role, label) +
+    '</div>' +
+    '<div id="' + _esc(listId) + '" class="assign-users-list"></div>' +
+    '</div>';
 }
 
 function _autoAssignRulesExplainHtml() {
@@ -151,6 +184,7 @@ function _autoAssignRulesExplainHtml() {
   let s = '<div style="font-size:12px;line-height:1.65">';
   s += '<p class="rules-muted" style="margin:0 0 10px">' +
     'שיבוץ אוטומטי ממלא <b>תפקידים חסרים</b> בלבד — שיבוצים קיימים נשארים ללא שינוי. ' +
+    'ניתן להריץ שיבוץ/איפוס <b>לכל קבוצה בנפרד</b> (מפ, סגל, מגד, ממ, חונך) או לכולן יחד. ' +
     'משתתף יכול להיות במספר תרגילים, אך לא בשני תרגילים שחופפים בזמן.</p>';
   s += '<ul class="rules-muted" style="font-size:11px;margin:0 0 12px 18px;line-height:1.6">';
   s += '<li>תרגילים מעובדים לפי סדר זמן התחלה</li>';
@@ -943,8 +977,8 @@ function _assignBoardJs() {
       });
     }
 
-    renderUserPool(traineesList, getRolePool('trainee', true), 'אין חניכים במערכת');
-    renderUserPool(mpList, getRolePool('companyCommander', true), 'אין מפ במערכת');
+    renderUserPool(traineesList, getRolePool('trainee', true), 'אין מפ במערכת');
+    renderUserPool(mpList, getRolePool('companyCommander', true), 'אין סגל במערכת');
     renderUserPool(magadList, getRolePool('unitCommander', true), 'אין מגד במערכת');
     renderUserPool(mmList, getRolePool('departmentCommander', true), 'אין ממ במערכת');
     renderUserPool(tutorList, getRolePool('tutor', true), 'אין חונכים במערכת');
