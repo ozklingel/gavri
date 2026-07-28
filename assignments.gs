@@ -267,14 +267,35 @@ function Assignments_assignTeamAction(p) {
 // ═══════════════════════════════════════
 function _matchesCorps(value, corps) {
   if (!value) return false;
-  const v = String(value).toLowerCase().trim();
-  if (corps === 'חיר') {
-    return v.indexOf('חיר') !== -1 || v.indexOf('רגל') !== -1 || v === 'infantry';
+  const v = String(value).toLowerCase().replace(/״/g, '').replace(/"/g, '').trim();
+  const c = String(corps || '').toLowerCase().replace(/״/g, '').replace(/"/g, '').trim();
+  if (c === 'חיר') {
+    return v.indexOf('חיר') !== -1 || v.indexOf('רגל') !== -1 || v === 'infantry' || v === 'חי';
   }
-  if (corps === 'חשן') {
-    return v.indexOf('חשן') !== -1 || v === 'armor' || v === 'armour';
+  if (c === 'חשן') {
+    return v.indexOf('חשן') !== -1 || v.indexOf('שריון') !== -1 || v === 'armor' || v === 'armour';
   }
-  return false;
+  if (c === 'חהן' || c === 'חה״ן') {
+    return v.indexOf('חהן') !== -1 || v.indexOf('הנדס') !== -1 || v === 'engineering';
+  }
+  if (c === 'מסייעת') {
+    return v.indexOf('מסייע') !== -1 || v === 'support';
+  }
+  if (c === 'מנהלי') {
+    return v.indexOf('מנהל') !== -1 || v === 'admin' || v === 'administrative';
+  }
+  return v === c;
+}
+
+/** מפתח חיל למשתמש — ריק אם לא זוהה */
+function _userCorpsKey(u) {
+  const raw = u && u.military_affiliation;
+  if (_matchesCorps(raw, 'חיר')) return 'חיר';
+  if (_matchesCorps(raw, 'חשן')) return 'חשן';
+  if (_matchesCorps(raw, 'חהן')) return 'חהן';
+  if (_matchesCorps(raw, 'מסייעת')) return 'מסייעת';
+  if (_matchesCorps(raw, 'מנהלי')) return 'מנהלי';
+  return '';
 }
 
 function _timesOverlap(r1, r2) {
@@ -478,11 +499,7 @@ function Assignments_autoAssignAll(p) {
   }
 
   function normalize(v) {
-    return String(v || '').replace(/״/g, '').trim();
-  }
-
-  function corps(u) {
-    return normalize(u.military_affiliation);
+    return String(v || '').replace(/״/g, '').replace(/"/g, '').trim();
   }
 
   const CORPS = {
@@ -495,7 +512,7 @@ function Assignments_autoAssignAll(p) {
 
   function priority(u) {
     let s = 0;
-    if (u.service_type === 'מילואים') s += 100;
+    if (normalize(u.service_type) === 'מילואים') s += 100;
     if (u.target_role === 'מתמרן') s += 50;
     return s;
   }
@@ -528,13 +545,18 @@ function Assignments_autoAssignAll(p) {
     .filter(function(u) { return Roles_isTrainee(u.role); })
     .sort(function(a, b) { return priority(b) - priority(a); });
 
+  // מאגרי חיל — לפי זיהוי גמיש; בלי חיל → לא במאגר ספציפי (ייכנסו ב-fallback)
   const corpsPools = {
-    [CORPS.INF]: trainees.filter(function(u) { return corps(u) === CORPS.INF; }),
-    [CORPS.ARM]: trainees.filter(function(u) { return corps(u) === CORPS.ARM; }),
-    [CORPS.ENG]: trainees.filter(function(u) { return corps(u) === CORPS.ENG; }),
-    [CORPS.SUP]: trainees.filter(function(u) { return corps(u) === CORPS.SUP; }),
-    [CORPS.ADM]: trainees.filter(function(u) { return corps(u) === CORPS.ADM; })
+    חיר: [],
+    חשן: [],
+    חהן: [],
+    מסייעת: [],
+    מנהלי: []
   };
+  trainees.forEach(function(u) {
+    const key = _userCorpsKey(u);
+    if (key && corpsPools[key]) corpsPools[key].push(u);
+  });
 
   const commanders = shuffle(allUsers.filter(function(u) { return Roles_isCompanyCommander(u.role); }));
 
@@ -610,6 +632,8 @@ function Assignments_autoAssignAll(p) {
     function ok(u) {
       if (onEx[u.id]) return false;
       if (_userTimeConflict(u.id, exId, exRanges, userExMap)) return false;
+      if (typeof HomeConstraints_checkAssignment === 'function' &&
+          HomeConstraints_checkAssignment(u.id, exId)) return false;
       return true;
     }
 
@@ -700,7 +724,8 @@ function Assignments_autoAssignAll(p) {
 
   function preferredTeamForEx(exId, onEx) {
     const teamCount = {};
-    corpsPools[CORPS.INF].forEach(function(u) {
+    const infPool = corpsPools['חיר'] || [];
+    infPool.forEach(function(u) {
       if (onEx[u.id]) return;
       if (_userTimeConflict(u.id, exId, exRanges, userExMap)) return;
       if (!u.team_id) return;
@@ -732,14 +757,12 @@ function Assignments_autoAssignAll(p) {
       const need = slot.count - respCount(ex.id, slot.resp, allRows);
       for (let n = 0; n < need; n++) {
         const onEx = onExercise(ex.id, allRows);
-        const pool = corpsPools[slot.corpsKey] || [];
-        const user = pickTrainee(pool, ex.id, preferredTeam, onEx);
+        const corpsPool = corpsPools[slot.corpsKey] || [];
+        // קודם לפי חיל; אם אין — כל חניך פנוי (שיבוץ מה שאפשר)
+        let user = pickTrainee(corpsPool, ex.id, preferredTeam, onEx);
+        if (!user) user = pickTrainee(trainees, ex.id, preferredTeam, onEx);
 
         if (!user) {
-          stats.slotsMissing++;
-          continue;
-        }
-        if (HomeConstraints_checkAssignment(user.id, ex.id)) {
           stats.slotsMissing++;
           continue;
         }
@@ -766,7 +789,8 @@ function Assignments_autoAssignAll(p) {
           stats.slotsMissing++;
           continue;
         }
-        if (HomeConstraints_checkAssignment(user.id, ex.id)) {
+        if (typeof HomeConstraints_checkAssignment === 'function' &&
+            HomeConstraints_checkAssignment(user.id, ex.id)) {
           stats.slotsMissing++;
           continue;
         }
@@ -799,7 +823,7 @@ function Assignments_autoAssignAll(p) {
   if (stats.partial) info += ', ' + stats.partial + ' חלקיים';
   if (stats.empty) info += ', ' + stats.empty + ' ללא שיבוץ';
   if (stats.slotsMissing) {
-    info += '. חסרים ' + stats.slotsMissing + ' משתתפים (חפיפה בזמן או מחסור בכוח אדם)';
+    info += '. לא מולאו ' + stats.slotsMissing + ' מקומות (חפיפה בזמן / אילוץ בית / מחסור בכוח אדם) — שובץ מה שאפשר';
   }
   info += '. משתתפים יכולים להופיע בכמה תרגילים — למעט תרגילים חופפים בזמן.';
 
