@@ -1001,8 +1001,9 @@ function updateAssignmentRespFromBoard(sid, assignId, exerciseId, responsibility
   var p = { sid: sid };
   Auth_requireRole(p, ['admin']);
   if (!assignId) throw new Error('חסר מזהה הקצאה.');
-  var resp = String(responsibility || '').trim();
-  if (!resp) throw new Error('יש לציין תפקיד.');
+  // ריק מותר בביטול / איפוס תפקיד
+  var resp = String(responsibility == null ? '' : responsibility).trim();
+  if (resp === '—') resp = '';
 
   var row = _findRowIndex('Assignments', assignId);
   if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
@@ -1018,10 +1019,55 @@ function updateAssignmentRespFromBoard(sid, assignId, exerciseId, responsibility
   return { ok: true, responsibility: resp };
 }
 
+function _boardChangeLabel(ch) {
+  var u = Users_get(ch.userId);
+  var name = u ? u.name : (ch.userId || '');
+  var exTitle = function(exId) {
+    var ex = Exercises_get(exId);
+    return ex ? ex.title : (exId || '');
+  };
+  if (ch.type === 'add') {
+    return '+ שיבוץ ' + name + ' → ' + exTitle(ch.exId) + (ch.resp ? ' (' + ch.resp + ')' : '');
+  }
+  if (ch.type === 'remove') {
+    return '− הסרת ' + name + ' מ־' + exTitle(ch.exId);
+  }
+  if (ch.type === 'move') {
+    return '↔ העברת ' + name + ': ' + exTitle(ch.fromExId) + ' → ' + exTitle(ch.toExId);
+  }
+  if (ch.type === 'resp') {
+    return '✎ תפקיד ' + name + ': ' + (ch.oldResp || '—') + ' → ' + (ch.resp || '');
+  }
+  return ch.type || '';
+}
+
+/** לוגים אחרונים של שמירה ידנית מלוח השיבוץ שניתן לבטל */
+function Assignments_boardUndoLogs(limit) {
+  limit = limit == null ? 12 : parseInt(limit, 10);
+  if (isNaN(limit) || limit < 1) limit = 12;
+  const rows = SystemLog_all(80);
+  const out = [];
+  for (let i = 0; i < rows.length && out.length < limit; i++) {
+    const row = rows[i];
+    if (row.action !== 'assignments.boardSave') continue;
+    if (row.details && row.details.undone) continue;
+    if (!row.details || !row.details.undo || !row.details.undo.length) continue;
+    out.push({
+      id: row.id,
+      timestamp: row.timestamp,
+      user_id: row.user_id,
+      label: row.details.label || ('שמירת ' + (row.details.applied || row.details.undo.length) + ' שינויים'),
+      count: row.details.applied || (row.details.undo ? row.details.undo.length : 0),
+      lines: row.details.lines || []
+    });
+  }
+  return out;
+}
+
 // Apply staged board changes (batch save from assignment UI)
 function applyBoardChanges(sid, changesJson) {
   var p = { sid: sid };
-  Auth_requireRole(p, ['admin']);
+  var actor = Auth_requireRole(p, ['admin']);
   var changes = [];
   try {
     changes = JSON.parse(changesJson || '[]');
@@ -1032,21 +1078,110 @@ function applyBoardChanges(sid, changesJson) {
 
   var applied = 0;
   var errors = [];
+  var undo = [];
+  var lines = [];
+  var appliedForward = [];
 
   changes.forEach(function(ch, idx) {
     try {
       if (ch.type === 'add') {
-        assignFromBoard(sid, ch.exId, ch.userId, ch.resp || '');
+        var created = assignFromBoard(sid, ch.exId, ch.userId, ch.resp || '');
         applied++;
+        appliedForward.push({
+          type: 'add',
+          assignId: created.id,
+          userId: ch.userId,
+          exId: ch.exId,
+          resp: ch.resp || ''
+        });
+        undo.unshift({
+          type: 'remove',
+          assignId: created.id,
+          userId: ch.userId,
+          exId: ch.exId,
+          resp: ch.resp || ''
+        });
+        lines.push(_boardChangeLabel(ch));
       } else if (ch.type === 'remove') {
+        var before = Assignments_get(ch.assignId);
+        if (!before) throw new Error('ההקצאה לא נמצאה: ' + ch.assignId);
         removeAssignmentById(sid, ch.assignId);
         applied++;
+        appliedForward.push({
+          type: 'remove',
+          assignId: ch.assignId,
+          userId: before.user_id,
+          exId: before.exercise_id,
+          resp: before.responsibility || ''
+        });
+        undo.unshift({
+          type: 'add',
+          userId: before.user_id,
+          exId: before.exercise_id,
+          resp: before.responsibility || '',
+          restoreStatus: before.status || 'pending'
+        });
+        lines.push(_boardChangeLabel({
+          type: 'remove',
+          userId: before.user_id,
+          exId: before.exercise_id
+        }));
       } else if (ch.type === 'move') {
+        var moved = Assignments_get(ch.assignId);
+        if (!moved) throw new Error('ההקצאה לא נמצאה: ' + ch.assignId);
+        var fromExId = ch.fromExId || moved.exercise_id;
         moveAssignmentById(sid, ch.assignId, ch.toExId);
         applied++;
+        appliedForward.push({
+          type: 'move',
+          assignId: ch.assignId,
+          userId: moved.user_id,
+          fromExId: fromExId,
+          toExId: ch.toExId,
+          resp: moved.responsibility || ''
+        });
+        undo.unshift({
+          type: 'move',
+          assignId: ch.assignId,
+          userId: moved.user_id,
+          fromExId: ch.toExId,
+          toExId: fromExId,
+          resp: moved.responsibility || ''
+        });
+        lines.push(_boardChangeLabel({
+          type: 'move',
+          userId: moved.user_id,
+          fromExId: fromExId,
+          toExId: ch.toExId
+        }));
       } else if (ch.type === 'resp') {
+        var cur = Assignments_get(ch.assignId);
+        if (!cur) throw new Error('ההקצאה לא נמצאה: ' + ch.assignId);
+        var oldResp = ch.oldResp != null ? ch.oldResp : (cur.responsibility || '');
         updateAssignmentRespFromBoard(sid, ch.assignId, ch.exId, ch.resp);
         applied++;
+        appliedForward.push({
+          type: 'resp',
+          assignId: ch.assignId,
+          userId: cur.user_id,
+          exId: ch.exId || cur.exercise_id,
+          resp: ch.resp,
+          oldResp: oldResp
+        });
+        undo.unshift({
+          type: 'resp',
+          assignId: ch.assignId,
+          userId: cur.user_id,
+          exId: ch.exId || cur.exercise_id,
+          resp: oldResp,
+          oldResp: ch.resp
+        });
+        lines.push(_boardChangeLabel({
+          type: 'resp',
+          userId: cur.user_id,
+          oldResp: oldResp,
+          resp: ch.resp
+        }));
       }
     } catch (err) {
       errors.push((idx + 1) + '. ' + (err.message || String(err)));
@@ -1056,7 +1191,97 @@ function applyBoardChanges(sid, changesJson) {
   if (errors.length) {
     throw new Error('חלק מהשינויים נכשלו:\n' + errors.join('\n'));
   }
-  return { ok: true, applied: applied };
+
+  var label = 'שמירה ידנית — ' + applied + ' שינויים';
+  SystemLog_write({
+    user_id: actor.id,
+    action: 'assignments.boardSave',
+    entity_type: 'assignments',
+    entity_id: 'board',
+    details: {
+      label: label,
+      applied: applied,
+      lines: lines,
+      forward: appliedForward,
+      undo: undo,
+      undone: false
+    }
+  });
+
+  return { ok: true, applied: applied, label: label };
+}
+
+/** ביטול שמירה ידנית אחרונה לפי מזהה לוג */
+function undoBoardChanges(sid, logId) {
+  var p = { sid: sid };
+  var actor = Auth_requireRole(p, ['admin']);
+  logId = String(logId || '').trim();
+  if (!logId) throw new Error('חסר מזהה לוג.');
+
+  var log = SystemLog_get(logId);
+  if (!log) throw new Error('הרשומה לא נמצאה ביומן.');
+  if (log.action !== 'assignments.boardSave') {
+    throw new Error('ניתן לבטל רק שמירות ידניות מלוח השיבוץ.');
+  }
+  var details = log.details || {};
+  if (details.undone) throw new Error('הפעולה כבר בוטלה.');
+  var undoOps = details.undo || [];
+  if (!undoOps.length) throw new Error('אין פעולות לביטול ברשומה זו.');
+
+  var applied = 0;
+  var errors = [];
+  undoOps.forEach(function(ch, idx) {
+    try {
+      if (ch.type === 'add') {
+        assignFromBoard(sid, ch.exId, ch.userId, ch.resp || '');
+        applied++;
+      } else if (ch.type === 'remove') {
+        if (ch.assignId && Assignments_get(ch.assignId)) {
+          removeAssignmentById(sid, ch.assignId);
+        } else if (ch.userId && ch.exId) {
+          var matches = Assignments_byExercise(ch.exId).filter(function(a) {
+            return String(a.user_id) === String(ch.userId);
+          });
+          if (matches.length) removeAssignmentById(sid, matches[0].id);
+          else throw new Error('לא נמצא שיבוץ לביטול עבור ' + ch.userId);
+        } else {
+          throw new Error('חסר מזהה להסרת שיבוץ בביטול.');
+        }
+        applied++;
+      } else if (ch.type === 'move') {
+        moveAssignmentById(sid, ch.assignId, ch.toExId);
+        applied++;
+      } else if (ch.type === 'resp') {
+        updateAssignmentRespFromBoard(sid, ch.assignId, ch.exId, ch.resp || '');
+        applied++;
+      }
+    } catch (err) {
+      errors.push((idx + 1) + '. ' + (err.message || String(err)));
+    }
+  });
+
+  if (errors.length) {
+    throw new Error('הביטול נכשל חלקית:\n' + errors.join('\n'));
+  }
+
+  details.undone = true;
+  details.undone_at = new Date().toISOString();
+  details.undone_by = actor.id;
+  SystemLog_updateDetails(logId, details);
+
+  SystemLog_write({
+    user_id: actor.id,
+    action: 'assignments.boardUndo',
+    entity_type: 'assignments',
+    entity_id: logId,
+    details: {
+      label: 'ביטול: ' + (details.label || logId),
+      undone_log_id: logId,
+      applied: applied
+    }
+  });
+
+  return { ok: true, applied: applied, undoneLogId: logId };
 }
 
 function _assignmentMatrixCellPayload(assignment) {

@@ -888,6 +888,38 @@ body {
       gap: 8px;
       flex-wrap: wrap;
     }
+    .page-assign .assign-undo-bar {
+      margin-bottom: 14px;
+      padding: 12px 14px;
+      background: rgba(220, 252, 231, 0.92);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      border-radius: var(--radius);
+    }
+    .page-assign .assign-undo-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .page-assign .assign-undo-main { flex: 1; min-width: 180px; }
+    .page-assign .assign-undo-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--heading-on-bg);
+    }
+    .page-assign .assign-undo-meta,
+    .page-assign .assign-undo-line {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+    .page-assign .assign-undo-item {
+      border-right-color: #22c55e;
+      background: rgba(255, 255, 255, 0.85);
+    }
     .page-assign .assign-layout {
       display: grid;
       grid-template-columns: 280px minmax(0, 1fr);
@@ -5035,6 +5067,7 @@ body {
       dashboardUserSearchBtn: 'חיפוש תרגילים של המשתמש',
       assignSaveBtn: 'שמירת כל השינויים בלוח השיבוץ',
       assignDiscardBtn: 'ביטול שינויים שלא נשמרו',
+      assignUndoBar: 'יומן שמירות ידניות שניתן לבטל',
       xlsxImportBtn: 'ייבוא משתמשים מהקובץ שנבחר',
       timelineProcedureToggle: 'הצגה/הסתרה של נוהל קרב על ציר הזמן',
       timelineEditToggle: 'הפעלת מצב עריכה — גרירת תרגילים לשינוי זמנים',

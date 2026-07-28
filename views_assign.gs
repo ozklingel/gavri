@@ -18,7 +18,7 @@ function Views_assign(p) {
     '</div>' +
     '<div class="ui-on-bg-chip assign-page-hint">' +
     (canEdit
-      ? '// ימין: קבוצות לשיבוץ · שמאל: תרגילים (חסרים למעלה) · גרור לתרגיל · שינויים נשמרים בלחיצה על «שמירה ואישור»'
+      ? '// ימין: קבוצות לשיבוץ · שמאל: תרגילים (חסרים למעלה) · גרור לתרגיל · שינויים נשמרים בלחיצה על «שמירה ואישור» · אחרי שמירה אפשר לבטל מהיומן'
       : '// צפייה בכל התרגילים והשיבוצים · עריכה זמינה לסגל בלבד') +
     '</div>' +
     _assignMainModuleHtml(user, sid, openSet, canEdit) +
@@ -73,6 +73,7 @@ function _assignMainModuleHtml(user, sid, openSet, canEdit) {
     userMap:   userMap,
     exMap:     exMap,
     homeBlocked: homeBlocked,
+    boardUndoLogs: canEdit ? Assignments_boardUndoLogs(12) : [],
     corpsList: [
       { key: 'חיר', label: 'חי״ר' },
       { key: 'חשן', label: 'חשן' },
@@ -112,7 +113,14 @@ function _assignMainModuleHtml(user, sid, openSet, canEdit) {
       '<div class="assign-changes-actions">' +
       '<button type="button" id="assignDiscardBtn" class="btn btn-secondary btn-sm">↺ בטל שינויים</button>' +
       '<button type="button" id="assignSaveBtn" class="btn btn-primary">💾 שמירה ואישור</button>' +
-      '</div></div>';
+      '</div></div>' +
+      '<div id="assignUndoBar" class="assign-undo-bar" hidden>' +
+      '<div class="assign-changes-head">' +
+      '<span class="assign-changes-title">↩ יומן שינויים ידניים — ניתן לביטול</span>' +
+      '<span id="assignUndoCount" class="assign-changes-count"></span>' +
+      '</div>' +
+      '<ul id="assignUndoList" class="assign-changes-list"></ul>' +
+      '</div>';
   }
   html += '<div class="assign-layout">' +
     '<aside class="assign-users-col" id="assignUsersCol">' +
@@ -264,6 +272,10 @@ function _assignBoardJs() {
   var changesCount = document.getElementById('assignChangesCount');
   var saveBtn = document.getElementById('assignSaveBtn');
   var discardBtn = document.getElementById('assignDiscardBtn');
+  var undoBar = document.getElementById('assignUndoBar');
+  var undoList = document.getElementById('assignUndoList');
+  var undoCount = document.getElementById('assignUndoCount');
+  var boardUndoLogs = (data.boardUndoLogs || []).slice();
 
   var baseline = JSON.parse(JSON.stringify({ exMap: data.exMap }));
   var nextTempId = 1;
@@ -485,6 +497,82 @@ function _assignBoardJs() {
       changesList.appendChild(li);
     });
     setStatus('● ' + changes.length + ' שינויים ממתינים לשמירה', '#fbbf24');
+  }
+
+  function formatLogTime(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString('he-IL', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch (e) { return String(iso); }
+  }
+
+  function renderUndoBar() {
+    if (!undoBar || !undoList) return;
+    if (!boardUndoLogs.length) {
+      undoBar.hidden = true;
+      undoList.innerHTML = '';
+      if (undoCount) undoCount.textContent = '';
+      return;
+    }
+    undoBar.hidden = false;
+    if (undoCount) undoCount.textContent = boardUndoLogs.length + ' פעולות';
+    undoList.innerHTML = '';
+    boardUndoLogs.forEach(function(log) {
+      var li = document.createElement('li');
+      li.className = 'assign-change-item assign-undo-item';
+      var lines = (log.lines || []).slice(0, 4).map(function(line) {
+        return '<div class="assign-undo-line">' + escHtml(line) + '</div>';
+      }).join('');
+      if ((log.lines || []).length > 4) {
+        lines += '<div class="assign-undo-line">… ועוד ' + ((log.lines || []).length - 4) + '</div>';
+      }
+      li.innerHTML =
+        '<div class="assign-undo-row">' +
+          '<div class="assign-undo-main">' +
+            '<div class="assign-undo-title">' + escHtml(log.label || 'שמירה ידנית') + '</div>' +
+            '<div class="assign-undo-meta">' + escHtml(formatLogTime(log.timestamp)) +
+              (log.count ? ' · ' + log.count + ' שינויים' : '') + '</div>' +
+            lines +
+          '</div>' +
+          '<button type="button" class="btn btn-secondary btn-sm assign-undo-btn" data-log-id="' +
+            escHtml(log.id) + '">↺ בטל</button>' +
+        '</div>';
+      undoList.appendChild(li);
+    });
+    undoList.querySelectorAll('.assign-undo-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        undoSavedLog(btn.getAttribute('data-log-id'));
+      });
+    });
+  }
+
+  function undoSavedLog(logId) {
+    if (!canEdit || !logId) return;
+    if (!confirm('לבטל את השמירה הידנית הזו? השיבוצים יחזרו למצב שלפני אותה שמירה.')) return;
+    setStatus('⏳ מבטל פעולה...', '#fbbf24');
+    showPageLoader('// UNDOING...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hidePageLoader();
+        var n = (res && res.applied) || 0;
+        if (window.MapimSpa && MapimSpa.navigate) {
+          MapimSpa.navigate('assign', { info: 'בוטלו ' + n + ' שינויים מהיומן' });
+        } else {
+          setStatus('✓ בוטלו ' + n + ' שינויים', '#4ade80');
+          location.reload();
+        }
+      })
+      .withFailureHandler(function(err) {
+        hidePageLoader();
+        setStatus('✗ ' + (err.message || String(err)), '#f87171');
+        alert(err.message || String(err));
+      })
+      .undoBoardChanges(sid, logId);
   }
 
   function homeBlockMsg(userId, exId) {
@@ -1022,6 +1110,7 @@ function _assignBoardJs() {
     renderUserPool(tutorList, getRolePool('tutor', true), 'אין חונכים במערכת');
 
     renderChangesBar();
+    renderUndoBar();
     renderLeastAssigned();
   }
 

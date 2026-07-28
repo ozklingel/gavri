@@ -35,3 +35,34 @@ function SystemLog_all(limit) {
   }
   return out;
 }
+
+function SystemLog_get(id) {
+  id = String(id || '').trim();
+  if (!id) return null;
+  const rows = _rows('SystemLog').data;
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]) !== id) continue;
+    let details = {};
+    try { details = JSON.parse(String(rows[i][6] || '{}')); } catch (e1) { details = {}; }
+    return {
+      id: String(rows[i][0]),
+      timestamp: String(rows[i][1] || ''),
+      user_id: String(rows[i][2] || ''),
+      action: String(rows[i][3] || ''),
+      entity_type: String(rows[i][4] || ''),
+      entity_id: String(rows[i][5] || ''),
+      details: details,
+      _row: i + 2
+    };
+  }
+  return null;
+}
+
+function SystemLog_updateDetails(id, details) {
+  const row = SystemLog_get(id);
+  if (!row || !row._row) return false;
+  const json = JSON.stringify(details || {});
+  _sheet('SystemLog').getRange(row._row, 7).setValue(json);
+  _cachePatchRow('SystemLog', row._row, { 7: json });
+  return true;
+}
