@@ -9,7 +9,7 @@ function Roles_normalize(role) {
 function Roles_label(role) {
   const r = Roles_normalize(role);
   const map = {
-    admin: 'סגל',
+    admin: 'אגמ מלפק',
     unitCommander: 'מגד',
     companyCommander: 'מפקצ',
     departmentCommander: 'ממ',

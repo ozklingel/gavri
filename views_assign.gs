@@ -195,7 +195,7 @@ function _assignBoardJs() {
   var editingChip = null;
 
   var ROLE_LABELS = {
-    admin: 'סגל', unitCommander: 'מגד', companyCommander: 'מפקצ',
+    admin: 'אגמ מלפק', unitCommander: 'מגד', companyCommander: 'מפקצ',
     departmentCommander: 'ממ', tutor: 'חונך', trainee: 'חניך', commander: 'מפקצ'
   };
   var ROLE_COLORS = {
