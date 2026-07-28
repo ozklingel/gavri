@@ -2,29 +2,34 @@
 function Views_assign(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
-  if (!Roles_hasAdminAccess(user.role)) return Views_error('גישה לסגל בלבד.', p);
 
   const sid  = user.id;
   const sidQ = encodeURIComponent(sid);
+  const canEdit = Roles_hasAdminAccess(user.role);
   const openSet = _parseOpenSections(p);
 
   const body = _topbar(user, sid) +
-    '<div class="page page-assign">' + _flash(p) +
+    '<div class="page page-assign' + (canEdit ? '' : ' page-assign-readonly') + '">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0">🔀 לוח שיבוץ</div>' +
+    '<div class="page-title" style="margin:0">🔀 לוח שיבוץ' +
+    (canEdit ? '' : ' <span class="badge badge-muted" style="margin-right:8px;font-size:11px">צפייה בלבד</span>') +
+    '</div>' +
     '<span id="assignStatus" class="ui-on-bg-chip"></span>' +
     '</div>' +
     '<div class="ui-on-bg-chip assign-page-hint">' +
-    '// ימין: חניכים לשיבוץ · שמאל: תרגילים (חסרים למעלה) · גרור לתרגיל · שינויים נשמרים בלחיצה על «שמירה ואישור»' +
+    (canEdit
+      ? '// ימין: קבוצות לשיבוץ · שמאל: תרגילים (חסרים למעלה) · גרור לתרגיל · שינויים נשמרים בלחיצה על «שמירה ואישור»'
+      : '// צפייה בכל התרגילים והשיבוצים · עריכה זמינה לסגל בלבד') +
     '</div>' +
-    _assignMainModuleHtml(user, sid, openSet) +
+    _assignMainModuleHtml(user, sid, openSet, canEdit) +
     '</div>';
 
   return _wrapPage(body, 'לוח שיבוץ');
 }
 
-function _assignMainModuleHtml(user, sid, openSet) {
+function _assignMainModuleHtml(user, sid, openSet, canEdit) {
   openSet = openSet || {};
+  canEdit = canEdit !== false && Roles_hasAdminAccess(user.role);
   const sidQ = encodeURIComponent(sid);
 
   const exercises = Exercises_all();
@@ -63,6 +68,7 @@ function _assignMainModuleHtml(user, sid, openSet) {
   const homeBlocked = HomeConstraints_blockedPairsForAssign();
 
   const jsonData = JSON.stringify({
+    canEdit: !!canEdit,
     exercises: exData,
     userMap:   userMap,
     exMap:     exMap,
@@ -80,65 +86,79 @@ function _assignMainModuleHtml(user, sid, openSet) {
     })
   });
 
-    return '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
-    _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי — הכל',
-      'לבצע שיבוץ אוטומטי לכל הקבוצות? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
-    _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס — הכל',
-      'לאפס את כל השיבוצים בסדרה הפעילה? פעולה בלתי הפיכה.', 'btn btn-danger btn-sm') +
-    '</div>' +
-    '<script id="assignData" type="application/json">' + jsonData + '</script>' +
+  let html = '';
+  if (canEdit) {
+    html += '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+      _confirmAction('action=autoAssignAll&sid=' + sidQ, '⚡ שיבוץ אוטומטי — הכל',
+        'לבצע שיבוץ אוטומטי לכל הקבוצות? ימולאו תרגילים חסרים. משתתף יכול להיות בכמה תרגילים — למעט תרגילים חופפים בזמן.', 'btn btn-primary') +
+      _confirmAction('action=clearAllAssignments&sid=' + sidQ, '🗑 איפוס — הכל',
+        'לאפס את כל השיבוצים בסדרה הפעילה? פעולה בלתי הפיכה.', 'btn btn-danger btn-sm') +
+      '</div>';
+  }
+  html += '<script id="assignData" type="application/json">' + jsonData + '</script>' +
     '<input type="hidden" id="assignSid" value="' + _esc(sid) + '">' +
-    _respDatalistHtml('assignRespList') +
+    (canEdit ? _respDatalistHtml('assignRespList') : '') +
     '<div id="assignUserPopover" role="tooltip" style="display:none;position:fixed;z-index:10000;' +
     'max-width:280px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border2);' +
     'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-family:var(--mono);font-size:11px;' +
-    'color:var(--text1);pointer-events:none;line-height:1.45"></div>' +
-    '<div id="assignChangesBar" class="assign-changes-bar" hidden>' +
-    '<div class="assign-changes-head">' +
-    '<span class="assign-changes-title">📝 שינויים ממתינים לאישור</span>' +
-    '<span id="assignChangesCount" class="assign-changes-count"></span>' +
-    '</div>' +
-    '<ul id="assignChangesList" class="assign-changes-list"></ul>' +
-    '<div class="assign-changes-actions">' +
-    '<button type="button" id="assignDiscardBtn" class="btn btn-secondary btn-sm">↺ בטל שינויים</button>' +
-    '<button type="button" id="assignSaveBtn" class="btn btn-primary">💾 שמירה ואישור</button>' +
-    '</div></div>' +
-    '<div class="assign-layout">' +
+    'color:var(--text1);pointer-events:none;line-height:1.45"></div>';
+  if (canEdit) {
+    html += '<div id="assignChangesBar" class="assign-changes-bar" hidden>' +
+      '<div class="assign-changes-head">' +
+      '<span class="assign-changes-title">📝 שינויים ממתינים לאישור</span>' +
+      '<span id="assignChangesCount" class="assign-changes-count"></span>' +
+      '</div>' +
+      '<ul id="assignChangesList" class="assign-changes-list"></ul>' +
+      '<div class="assign-changes-actions">' +
+      '<button type="button" id="assignDiscardBtn" class="btn btn-secondary btn-sm">↺ בטל שינויים</button>' +
+      '<button type="button" id="assignSaveBtn" class="btn btn-primary">💾 שמירה ואישור</button>' +
+      '</div></div>';
+  }
+  html += '<div class="assign-layout">' +
     '<aside class="assign-users-col" id="assignUsersCol">' +
     _assignUsersBlockHtml(sidQ, {
-      role: 'trainee', label: 'מפ', listId: 'assignTraineesList', icon: '👤'
+      role: 'trainee', label: 'מפ', listId: 'assignTraineesList', icon: '👤', canEdit: canEdit
     }) +
     _assignUsersBlockHtml(sidQ, {
       role: 'companyCommander', label: 'סגל', listId: 'assignMpList',
-      icon: '🪖', extraClass: 'assign-role-block'
+      icon: '🪖', extraClass: 'assign-role-block', canEdit: canEdit
     }) +
     _assignUsersBlockHtml(sidQ, {
       role: 'unitCommander', label: 'מגד', listId: 'assignMagadList',
-      icon: '⭐', extraClass: 'assign-role-block'
+      icon: '⭐', extraClass: 'assign-role-block', canEdit: canEdit
     }) +
     _assignUsersBlockHtml(sidQ, {
       role: 'departmentCommander', label: 'ממ', listId: 'assignMmList',
-      icon: '🎖', extraClass: 'assign-role-block assign-mm-block'
+      icon: '🎖', extraClass: 'assign-role-block assign-mm-block', canEdit: canEdit
     }) +
     _assignUsersBlockHtml(sidQ, {
       role: 'tutor', label: 'חונך', listId: 'assignTutorList',
-      icon: '📘', extraClass: 'assign-role-block'
+      icon: '📘', extraClass: 'assign-role-block', canEdit: canEdit
     }) +
     '</aside>' +
     '<div class="assign-exercises-col">' +
-    '<div class="assign-panel-head">🎯 תרגילים <span class="assign-panel-sub">חסרים למעלה</span></div>' +
+    '<div class="assign-panel-head">🎯 תרגילים <span class="assign-panel-sub">' +
+    (canEdit ? 'חסרים למעלה' : 'כל השיבוצים') + '</span></div>' +
     '<div id="assignExercisesList" class="assign-exercises-list"></div>' +
     '</div>' +
-    '</div>' +
-    '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">' +
-    _expandablePanel('assign', {}, 'autoAssign', '⚡ הסבר — שיבוץ אוטומטי',
-      _autoAssignRulesExplainHtml(), openSet) +
-    _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
-      _assignConflictsSectionHtml(sid), openSet) +
-    _expandablePanel('assign', {}, 'least', '📊 חניך מועדף לשיבוץ',
-      _assignLeastSectionHtml(), openSet) +
-    '</div>' +
-    '<script>' + _assignBoardJs() + '</script>';
+    '</div>';
+  if (canEdit) {
+    html += '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">' +
+      _expandablePanel('assign', {}, 'autoAssign', '⚡ הסבר — שיבוץ אוטומטי',
+        _autoAssignRulesExplainHtml(), openSet) +
+      _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
+        _assignConflictsSectionHtml(sid), openSet) +
+      _expandablePanel('assign', {}, 'least', '📊 חניך מועדף לשיבוץ',
+        _assignLeastSectionHtml(), openSet) +
+      '</div>';
+  } else {
+    html += '<div class="expandable-stack" style="margin-top:12px">' +
+      _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
+        _assignConflictsSectionHtml(sid), openSet) +
+      '</div>';
+  }
+  html += '<script>' + _assignBoardJs() + '</script>';
+  return html;
 }
 
 function _assignGroupActionsHtml(sidQ, groupKey, label) {
@@ -166,6 +186,7 @@ function _assignUsersBlockHtml(sidQ, opts) {
   const sub = opts.sub || 'פחות שיבוצים למעלה';
   const icon = opts.icon || '';
   const extraClass = opts.extraClass || '';
+  const canEdit = opts.canEdit !== false;
   return '<div class="assign-users-block' + (extraClass ? ' ' + extraClass : '') + '"' +
     (role ? ' data-assign-role="' + _esc(role) + '"' : '') + '>' +
     '<div class="assign-panel-head">' +
@@ -173,7 +194,7 @@ function _assignUsersBlockHtml(sidQ, opts) {
     icon + ' ' + _esc(label) + ' לשיבוץ' +
     '<span class="assign-panel-sub">' + _esc(sub) + '</span>' +
     '</div>' +
-    _assignGroupActionsHtml(sidQ, role, label) +
+    (canEdit ? _assignGroupActionsHtml(sidQ, role, label) : '') +
     '</div>' +
     '<div id="' + _esc(listId) + '" class="assign-users-list"></div>' +
     '</div>';
@@ -224,6 +245,7 @@ function _assignBoardJs() {
   return `
 (function() {
   var data = JSON.parse(document.getElementById('assignData').textContent);
+  var canEdit = data.canEdit !== false;
   var sid = document.getElementById('assignSid').value;
   var traineesList = document.getElementById('assignTraineesList');
   var mpList = document.getElementById('assignMpList');
@@ -679,7 +701,7 @@ function _assignBoardJs() {
     var u = data.userMap[userId] || { name: userId, role: 'trainee' };
     var div = document.createElement('div');
     div.className = 'assign-chip assign-chip-pool';
-    div.draggable = true;
+    div.draggable = canEdit;
     div.dataset.userId = userId;
     div.dataset.assignId = '';
     div.dataset.exId = '__pool__';
@@ -701,13 +723,15 @@ function _assignBoardJs() {
     div.appendChild(txt);
     div.appendChild(badge);
 
-    div.addEventListener('dragstart', function(e) {
-      e.dataTransfer.setData('text/plain', JSON.stringify({
-        userId: userId, assignId: '', fromExId: '__pool__', resp: ''
-      }));
-      div.style.opacity = '0.4';
-    });
-    div.addEventListener('dragend', function() { div.style.opacity = '1'; });
+    if (canEdit) {
+      div.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+          userId: userId, assignId: '', fromExId: '__pool__', resp: ''
+        }));
+        div.style.opacity = '0.4';
+      });
+      div.addEventListener('dragend', function() { div.style.opacity = '1'; });
+    }
     attachProfileHints(div, userId);
     return div;
   }
@@ -716,7 +740,7 @@ function _assignBoardJs() {
     var u = data.userMap[userId] || { name: userId, role: 'trainee' };
     var div = document.createElement('div');
     div.className = 'assign-chip';
-    div.draggable = true;
+    div.draggable = canEdit;
     div.dataset.userId = userId;
     div.dataset.assignId = assignId || '';
     div.dataset.exId = exId || '';
@@ -741,7 +765,7 @@ function _assignBoardJs() {
       txt.appendChild(sep);
       var respEl = document.createElement('span');
       respEl.textContent = resp;
-      if (assignId && exId && exId !== '__pool__') {
+      if (canEdit && assignId && exId && exId !== '__pool__') {
         respEl.style.cursor = 'pointer';
         respEl.title = 'לחץ לשינוי תפקיד';
         respEl.onclick = function(e) {
@@ -752,32 +776,36 @@ function _assignBoardJs() {
       txt.appendChild(respEl);
     }
 
-    var del = document.createElement('span');
-    del.className = 'assign-chip-del';
-    del.textContent = '✕';
-    del.title = 'הסר מתרגיל';
-    del.style.cssText = 'color:var(--muted);cursor:pointer;padding:0 2px;flex-shrink:0';
-    del.onclick = function(e) {
-      e.stopPropagation();
-      if (assignId) stageRemove(assignId, exId);
-    };
-
     div.appendChild(dot);
     div.appendChild(txt);
-    if (assignId) div.appendChild(del);
+    if (canEdit && assignId) {
+      var del = document.createElement('span');
+      del.className = 'assign-chip-del';
+      del.textContent = '✕';
+      del.title = 'הסר מתרגיל';
+      del.style.cssText = 'color:var(--muted);cursor:pointer;padding:0 2px;flex-shrink:0';
+      del.onclick = function(e) {
+        e.stopPropagation();
+        if (assignId) stageRemove(assignId, exId);
+      };
+      div.appendChild(del);
+    }
 
-    div.addEventListener('dragstart', function(e) {
-      e.dataTransfer.setData('text/plain', JSON.stringify({
-        userId: userId, assignId: assignId || '', fromExId: exId || '', resp: resp || ''
-      }));
-      div.style.opacity = '0.4';
-    });
-    div.addEventListener('dragend', function() { div.style.opacity = '1'; });
+    if (canEdit) {
+      div.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+          userId: userId, assignId: assignId || '', fromExId: exId || '', resp: resp || ''
+        }));
+        div.style.opacity = '0.4';
+      });
+      div.addEventListener('dragend', function() { div.style.opacity = '1'; });
+    }
     attachProfileHints(div, userId);
     return div;
   }
 
   function openRespEditor(chipEl, assignId, exId, userId, currentResp, userName) {
+    if (!canEdit) return;
     hideUserPopoverForce();
     if (editingChip && editingChip !== chipEl) closeRespEditor(editingChip);
     if (chipEl.dataset.editing === '1') return;
@@ -873,11 +901,13 @@ function _assignBoardJs() {
     chips.forEach(function(c) { zone.appendChild(c); });
 
     zone.addEventListener('dragover', function(e) {
+      if (!canEdit) return;
       e.preventDefault();
       zone.classList.add('drag-over');
     });
     zone.addEventListener('dragleave', function() { zone.classList.remove('drag-over'); });
     zone.addEventListener('drop', function(e) {
+      if (!canEdit) return;
       e.preventDefault();
       zone.classList.remove('drag-over');
       var payload;
@@ -901,6 +931,7 @@ function _assignBoardJs() {
   }
 
   function bindPoolDropZone(zone) {
+    if (!canEdit) return;
     zone.addEventListener('dragover', function(e) {
       e.preventDefault();
       zone.classList.add('drag-over');
@@ -995,6 +1026,7 @@ function _assignBoardJs() {
   }
 
   function saveChanges() {
+    if (!canEdit) return;
     var changes = computePendingChanges();
     if (!changes.length) return;
     var summary = changes.map(function(ch, i) { return (i + 1) + '. ' + changeLabel(ch); }).join('\\n');

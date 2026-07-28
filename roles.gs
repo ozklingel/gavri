@@ -52,12 +52,13 @@ function Roles_hasAdminAccess(role) {
 }
 
 function Roles_hasTimelineAccess(role) {
-  const r = Roles_normalize(role);
-  return ['unitCommander', 'companyCommander', 'departmentCommander', 'tutor'].indexOf(r) !== -1;
+  // כל ישות מחוברת יכולה לצפות בציר הזמן (עריכה נשארת לסגל)
+  return !!Roles_normalize(role);
 }
 
 function Roles_canSeeAllExercises(role) {
-  return Roles_isAdmin(role) || Roles_isUnitCommander(role);
+  // כל ישות במערכת יכולה לצפות בכל התרגילים והשיבוצים
+  return !!Roles_normalize(role);
 }
 
 function Roles_isTeamCommanderRole(role) {

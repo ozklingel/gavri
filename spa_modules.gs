@@ -77,7 +77,7 @@ function SpaModule_render(moduleId, p) {
       throw new Error('עדכן views_timeline.gs מהפרויקט המקומי.');
 
     case 'assign.main':
-      return _assignMainModuleHtml(user, sid);
+      return _assignMainModuleHtml(user, sid, _parseOpenSections(p), Roles_hasAdminAccess(user.role));
 
     case 'exercises.list':
       return _exercisesListModuleHtml(user, sid);

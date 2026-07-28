@@ -803,35 +803,8 @@ function _timelineWeekSelectOptionsHtml(selectedOffset) {
 }
 
 function _timelineExercisesForUser(user) {
-  let exercises = Exercises_all();
-
-  if (Roles_isCompanyCommander(user.role)) {
-    const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
-    const teamExerciseIds = {};
-    traineeIds.forEach(function(tid) {
-      (Assignments_byUser(tid) || []).forEach(function(a) {
-        teamExerciseIds[a.exercise_id] = true;
-      });
-    });
-    exercises = exercises.filter(function(ex) {
-      return !!teamExerciseIds[ex.id];
-    });
-  } else if (Roles_isTutor(user.role)) {
-    const tutoredExIds = {};
-    Assignments_byTutor(user.id).forEach(function(a) {
-      tutoredExIds[a.exercise_id] = true;
-    });
-    exercises = exercises.filter(function(ex) {
-      return !!tutoredExIds[ex.id];
-    });
-  } else if (Roles_isTrainee(user.role)) {
-    const myExIds = Assignments_byUser(user.id).map(function(a) { return a.exercise_id; });
-    exercises = exercises.filter(function(ex) {
-      return myExIds.indexOf(ex.id) !== -1;
-    });
-  }
-
-  return exercises;
+  // כל המשתמשים רואים את כל תרגילי הסדרה הפעילה
+  return Exercises_all();
 }
 
 function _timelineRoughOverlapsView(ex, viewStartMs, viewEndMs) {

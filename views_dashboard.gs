@@ -1,51 +1,57 @@
 // views_dashboard.gs — exercises list + dashboard pages
 function Views_exercises(p) {
-  const user = Auth_requireRole(p, ['admin']);
+  const user = Auth_current(p);
+  if (!user) return Views_login({ error: 'נדרשת התחברות.' });
   const sid = user.id;
   const sidQ = encodeURIComponent(sid);
+  const isAdmin = Roles_hasAdminAccess(user.role);
   const openSet = _parseOpenSections(p);
   let tab = String(p.tab || 'list').trim();
-  const allowedTabs = ['list', 'calendar', 'new'];
+  const allowedTabs = isAdmin ? ['list', 'calendar', 'new'] : ['list', 'calendar'];
   if (allowedTabs.indexOf(tab) === -1) tab = 'list';
   const exs = Exercises_all();
 
-  let s = _spaTabsBar('exercises', {}, [
+  const tabItems = [
     { id: 'list', label: '📋 כל התרגילים' },
-    { id: 'calendar', label: '📅 לוח שנה' },
-    { id: 'new', label: '➕ תרגיל חדש' }
-  ], tab);
+    { id: 'calendar', label: '📅 לוח שנה' }
+  ];
+  if (isAdmin) tabItems.push({ id: 'new', label: '➕ תרגיל חדש' });
+
+  let s = _spaTabsBar('exercises', {}, tabItems, tab);
 
   if (tab === 'list') {
     s += _exercisesListModuleHtml(user, sid);
   } else if (tab === 'calendar') {
     s += _exercisesCalendarModuleHtml(user, sid);
-  } else {
+  } else if (isAdmin) {
     s += '<div class="spa-tab-panel" style="margin-top:14px">' +
       _exercisesSidebarModuleHtml(user, sid, openSet) + '</div>';
   }
 
-  s += '<div class="expandable-stack" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">' +
-    _expandablePanel('exercises', { tab: tab }, 'seriesArchive', '🗄 ארכיון סדרות',
-      '<p class="rules-muted" style="font-size:12px;margin:0 0 10px">סדרות קודמות נשמרות במלואן — תרגילים, שיבוצים ונוה״ק.</p>' +
-      _a('page=seriesArchive', 'פתח ארכיון סדרות', 'btn btn-secondary btn-sm'), openSet) +
-    _expandablePanel('exercises', { tab: tab }, 'seriesRules', '📅 הסבר — לוגיקת בניית סדרה',
-      Series_rulesExplainHtml(), openSet) +
-    '</div>';
+  if (isAdmin) {
+    s += '<div class="expandable-stack" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">' +
+      _expandablePanel('exercises', { tab: tab }, 'seriesArchive', '🗄 ארכיון סדרות',
+        '<p class="rules-muted" style="font-size:12px;margin:0 0 10px">סדרות קודמות נשמרות במלואן — תרגילים, שיבוצים ונוה״ק.</p>' +
+        _a('page=seriesArchive', 'פתח ארכיון סדרות', 'btn btn-secondary btn-sm'), openSet) +
+      _expandablePanel('exercises', { tab: tab }, 'seriesRules', '📅 הסבר — לוגיקת בניית סדרה',
+        Series_rulesExplainHtml(), openSet) +
+      '</div>';
+  }
 
   const body =
     _topbar(user, sid) +
     '<div class="page">' + _flash(p) +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-      '<h1 class="page-title" style="margin:0">🎯 ניהול תרגילים</h1>' +
-      (exs.length
+      '<h1 class="page-title" style="margin:0">🎯 ' + (isAdmin ? 'ניהול תרגילים' : 'תרגילים') + '</h1>' +
+      (isAdmin && exs.length
         ? '<button type="button" class="btn btn-secondary btn-sm" onclick="toggleCollapsible(\'ex-duplicate-panel\')">⎘ שכפל תרגיל</button>'
         : '') +
     '</div>' +
-    (exs.length ? _exercisesDuplicatePanelHtml(exs) : '') +
+    (isAdmin && exs.length ? _exercisesDuplicatePanelHtml(exs) : '') +
     s +
     '</div>';
 
-  return _wrapPage(body, 'ניהול תרגילים');
+  return _wrapPage(body, isAdmin ? 'ניהול תרגילים' : 'תרגילים');
 }
 
 function _exercisesDuplicatePanelHtml(exs) {
@@ -70,6 +76,7 @@ function _exercisesDuplicatePanelHtml(exs) {
 
 function _exercisesListModuleHtml(user, sid) {
   const sidQ = encodeURIComponent(sid);
+  const isAdmin = Roles_hasAdminAccess(user.role);
   const exs = Exercises_all();
   const mpCounts = Assignments_mpCountByExercise();
 
@@ -97,14 +104,14 @@ function _exercisesListModuleHtml(user, sid) {
         '<td>' + _esc(e.end_date || '—') + '</td>' +
         '<td style="text-align:left;white-space:nowrap">' +
           _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
-             '✎ ערוך', 'btn btn-primary btn-sm') +
-          ' ' +
-          _confirmDelete(
-            'action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
-            'למחוק את התרגיל "' + e.title + '"?'
-          ) +
-        '</td>' +
-      '</tr>';
+             isAdmin ? '✎ ערוך' : '👁 צפה', isAdmin ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm');
+      if (isAdmin) {
+        s += ' ' + _confirmDelete(
+          'action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
+          'למחוק את התרגיל "' + e.title + '"?'
+        );
+      }
+      s += '</td></tr>';
     });
 
     s += '</tbody></table>';

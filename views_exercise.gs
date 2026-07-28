@@ -1,27 +1,9 @@
 // views_exercise.gs — exercise detail page + user profile
 
 function _canViewExercise(user, exId) {
-  if (Roles_canSeeAllExercises(user.role)) return true;
-  if (Roles_isTrainee(user.role)) {
-    return Assignments_byUser(user.id).some(function(a) {
-      return String(a.exercise_id) === String(exId);
-    });
-  }
-  if (Roles_isCompanyCommander(user.role)) {
-    const traineeIds = Users_traineesOfCommander(user.id).map(function(t) { return t.id; });
-    return Assignments_byExercise(exId).some(function(a) {
-      return traineeIds.indexOf(a.user_id) !== -1;
-    });
-  }
-  if (Roles_isDepartmentCommander(user.role)) {
-    return Assignments_byExercise(exId).length > 0;
-  }
-  if (Roles_isTutor(user.role)) {
-    return Assignments_byExercise(exId).some(function(a) {
-      return String(a.tutor) === String(user.id);
-    });
-  }
-  return false;
+  if (!user) return false;
+  // כל ישות מחוברת יכולה לצפות בכל התרגילים (פעילים)
+  return Roles_canSeeAllExercises(user.role);
 }
 
 function Views_exercise(p) {

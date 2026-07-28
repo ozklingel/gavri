@@ -213,9 +213,10 @@ function getExercisesData(sid) {
     } catch (err) {}
   }
 
+  // תרגילים + לוח שיבוץ — זמינים לצפייה לכל הישויות
+  pushPage('exercises', { tab: 'list' });
+  pushPage('exercises', { tab: 'calendar' });
   if (Roles_hasAdminAccess(user.role)) {
-    pushPage('exercises', { tab: 'list' });
-    pushPage('exercises', { tab: 'calendar' });
     pushPage('exercises', { tab: 'new' });
   }
 
@@ -280,10 +281,10 @@ function getRemainingAppData(sid) {
   pushPage('homeConstraints', {});
   pushPage('fieldForces', {});
   pushPage('fireZones', {});
-  if (Roles_hasTimelineAccess(user.role)) pushPage('timeline', {});
+  pushPage('timeline', {});
+  pushPage('assign', {});
 
   if (Roles_hasAdminAccess(user.role)) {
-    pushPage('assign', {});
     pushPage('users', { tab: 'users' });
     pushPage('users', { tab: 'teams' });
     pushPage('statistics', { section: 'kpi' });
@@ -334,22 +335,20 @@ function apiPrefetchPlan(sid) {
     { page: 'dashboard', params: { tab: 'exercise' } },
     { page: 'homeConstraints', params: {} },
     { page: 'fieldForces', params: {} },
-    { page: 'fireZones', params: {} }
+    { page: 'fireZones', params: {} },
+    { page: 'exercises', params: { tab: 'list' } },
+    { page: 'exercises', params: { tab: 'calendar' } },
+    { page: 'assign', params: {} },
+    { page: 'timeline', params: {} }
   ];
 
   if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
     pages.push({ page: 'dashboard', params: { tab: 'team' } });
   }
-  if (Roles_hasTimelineAccess(user.role)) {
-    pages.push({ page: 'timeline', params: {} });
-  }
   if (Roles_hasAdminAccess(user.role)) {
     pages.push(
       { page: 'dashboard', params: { tab: 'conflicts' } },
-      { page: 'exercises', params: { tab: 'list' } },
-      { page: 'exercises', params: { tab: 'calendar' } },
       { page: 'exercises', params: { tab: 'new' } },
-      { page: 'assign', params: {} },
       { page: 'users', params: { tab: 'users' } },
       { page: 'users', params: { tab: 'teams' } },
       { page: 'statistics', params: { section: 'kpi' } },
