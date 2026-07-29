@@ -484,13 +484,14 @@ function Users_importBulk(p) {
   let autoIdx = 0;
 
   let added = 0;
-  let skipped = 0;
+  let updated = 0;
   let teamsCreated = 0;
   let errors = [];
   const newUserRows = [];
   const newCredRows = [];
   const createdTeamNames = {};
   const teamsBefore = Teams_all().length;
+  const usersSheet = _sheet('Users');
 
   rows.forEach(function(row, i) {
     const name = String(row.name || '').trim();
@@ -510,17 +511,50 @@ function Users_importBulk(p) {
 
     if (!password) password = id;
 
-    if (existing.has(id)) {
-      skipped++;
-      errors.push('שורה ' + line + ': מספר אישי ' + id + ' כבר קיים — דולג');
-      return;
-    }
-
     const finalRole = typeof Roles_fromImport === 'function'
       ? Roles_fromImport(row.role || 'trainee')
       : 'trainee';
 
     const teamRaw = String(row.team_id || row.team || '').trim();
+    const unitAffiliation = String(row.unit_affiliation || '').trim();
+    const serviceType = String(row.service_type || '').trim();
+    const militaryAffiliation = String(row.military_affiliation || '').trim();
+    const unitClassification = String(row.unit_classification || '').trim();
+    const targetRole = String(row.target_role || '').trim();
+    const phone = String(row.phone || '').trim();
+    const email = String(row.email || '').trim();
+
+    if (existing.has(id)) {
+      const sheetRow = _findRowIndex('Users', id);
+      if (sheetRow < 0) {
+        errors.push('שורה ' + line + ': מספר אישי ' + id + ' קיים בקאש אך לא בגיליון');
+        return;
+      }
+      const cur = Users_get(id) || {};
+      const teamId = teamRaw
+        ? Users_ensureTeamIdForImport(teamRaw, createdTeamNames)
+        : String(cur.team_id || '');
+      const roleToWrite = row.role
+        ? finalRole
+        : (Roles_normalize(cur.role || 'trainee') || 'trainee');
+
+      // עמודות 2–11: name … email (לא נוגעים בסיסמה)
+      usersSheet.getRange(sheetRow, 2, 1, 10).setValues([[
+        name,
+        roleToWrite,
+        teamId,
+        unitAffiliation !== '' ? unitAffiliation : String(cur.unit_affiliation || ''),
+        serviceType !== '' ? serviceType : String(cur.service_type || ''),
+        militaryAffiliation !== '' ? militaryAffiliation : String(cur.military_affiliation || ''),
+        unitClassification !== '' ? unitClassification : String(cur.unit_classification || ''),
+        targetRole !== '' ? targetRole : String(cur.target_role || ''),
+        phone !== '' ? phone : String(cur.phone || ''),
+        email !== '' ? email : String(cur.email || '')
+      ]]);
+      updated++;
+      return;
+    }
+
     const teamId = Users_ensureTeamIdForImport(teamRaw, createdTeamNames);
 
     newUserRows.push([
@@ -528,13 +562,13 @@ function Users_importBulk(p) {
       name,
       finalRole,
       teamId,
-      String(row.unit_affiliation || '').trim(),
-      String(row.service_type || '').trim(),
-      String(row.military_affiliation || '').trim(),
-      String(row.unit_classification || '').trim(),
-      String(row.target_role || '').trim(),
-      String(row.phone || '').trim(),
-      String(row.email || '').trim()
+      unitAffiliation,
+      serviceType,
+      militaryAffiliation,
+      unitClassification,
+      targetRole,
+      phone,
+      email
     ]);
     newCredRows.push([id, password]);
     existing.add(id);
@@ -545,24 +579,23 @@ function Users_importBulk(p) {
 
   if (newUserRows.length) _appendBatch('Users', newUserRows);
   if (newCredRows.length) _appendBatch('Credentials', newCredRows);
-  if (added) {
+  if (added || updated) {
     _cacheInvalidate('Users');
-    _cacheInvalidate('Credentials');
+    if (added) _cacheInvalidate('Credentials');
   }
   if (teamsCreated) _cacheInvalidate('Teams');
 
-  if (!added) {
+  if (!added && !updated) {
     const detail = errors.length ? errors.slice(0, 5).join(' | ') : 'לא זוהו שורות תקינות';
-    throw new Error('לא נוסף אף משתמש. ' + detail);
+    throw new Error('לא נוסף/עודכן אף משתמש. ' + detail);
   }
 
-  let info = '✓ ייבוא הושלם: ' + added + ' משתמשים נוספו';
+  let info = '✓ ייבוא הושלם';
+  if (added) info += ': ' + added + ' נוספו';
+  if (updated) info += (added ? ' · ' : ': ') + updated + ' עודכנו';
   if (teamsCreated) info += ' · ' + teamsCreated + ' צוותים נוצרו';
-  if (skipped) info += ' · ' + skipped + ' דולגו (כבר קיימים)';
-  if (errors.length && errors.length > skipped) {
-    info += ' · התראות: ' + errors.filter(function(e) {
-      return e.indexOf('כבר קיים') === -1;
-    }).slice(0, 3).join(' | ');
+  if (errors.length) {
+    info += ' · התראות: ' + errors.slice(0, 3).join(' | ');
   }
 
   return Views_users({ sid: p.sid, tab: 'users', info: info });
