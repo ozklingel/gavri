@@ -4256,9 +4256,12 @@ body {
             return;
           }
           // לא מוחקים את כל הקאש — רק דפים שמושפעים + הדף הנוכחי יוחלף מ-result.body
-          invalidateClientRoutes(['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix', 'exercises']);
+          invalidateClientRoutes(['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix', 'exercises', 'users']);
           if (currentRoute && currentRoute.page) {
             invalidateClientRoutes([currentRoute.page]);
+          }
+          if (action === 'importUsers' || action === 'createUser' || action === 'deleteUser') {
+            currentRoute = normalizeRoute('users', { tab: 'users' });
           }
           applyResult(result, { skipPrime: true });
           // אחרי יצירת נוה״ק — גלול לכרטיס הנוהל אם קיים
@@ -4391,7 +4394,10 @@ body {
         MapimLoader.show('// SAVING...');
       }
       if (e.target.id === 'xlsxImportBtn' || e.target.closest('#xlsxImportBtn')) {
-        MapimLoader.show('// IMPORTING...');
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.doXlsxImport === 'function') window.doXlsxImport();
+        return;
       }
     }, true);
 
@@ -5062,6 +5068,7 @@ body {
       assignUndoBar: 'יומן שמירות ידניות שניתן לבטל',
       xlsxImportBtn: 'ייבוא משתמשים מהקובץ שנבחר',
       xlsxExampleDownload: 'הורדת קובץ CSV לדוגמה לייבוא משתמשים',
+      xlsxFile: 'בחירת קובץ Excel (XLSX) או CSV לייבוא משתמשים',
       timelineProcedureToggle: 'הצגה/הסתרה של נוהל קרב על ציר הזמן',
       timelineEditToggle: 'הפעלת מצב עריכה — גרירת תרגילים לשינוי זמנים',
       timelineToolsExpand: 'פתיחת לוח כלים בציר הזמן',
@@ -5691,150 +5698,407 @@ body {
     MapimLoader.hide();
   });
 
-  // ══ Hebrew-safe CSV importer ══
+  // ══ Hebrew-safe CSV / Excel (XLSX) importer ══
   (function(){
 
-    // Read file as ArrayBuffer, detect encoding from BOM and byte content,
-    // then decode correctly — handles UTF-8, UTF-8 BOM, and Windows-1255 (Hebrew Excel)
+    function hasHebrewText(s) {
+      return /[\u0590-\u05FF]/.test(s || '');
+    }
+
+    function isExcelFile(file) {
+      var n = String(file && file.name || '').toLowerCase();
+      return /\.xlsx?$/.test(n) ||
+        /spreadsheetml|ms-excel|excel/.test(String(file && file.type || ''));
+    }
+
+    function loadSheetJs(cb) {
+      if (window.XLSX) { cb(null, window.XLSX); return; }
+      if (window._mapimXlsxLoading) {
+        window._mapimXlsxLoading.push(cb);
+        return;
+      }
+      window._mapimXlsxLoading = [cb];
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.async = true;
+      s.onload = function() {
+        var q = window._mapimXlsxLoading || [];
+        window._mapimXlsxLoading = null;
+        if (!window.XLSX) {
+          q.forEach(function(fn) { fn(new Error('ספריית Excel לא נטענה')); });
+          return;
+        }
+        q.forEach(function(fn) { fn(null, window.XLSX); });
+      };
+      s.onerror = function() {
+        var q = window._mapimXlsxLoading || [];
+        window._mapimXlsxLoading = null;
+        q.forEach(function(fn) {
+          fn(new Error('לא ניתן לטעון ספריית Excel (CDN חסום). נסה CSV UTF-8.'));
+        });
+      };
+      document.head.appendChild(s);
+    }
+
+    // Read CSV/TSV as ArrayBuffer with Hebrew encoding detection
     function readFileHebrew(file, cb) {
       var reader = new FileReader();
       reader.onload = function(e) {
         var buf = e.target.result;
         var bytes = new Uint8Array(buf);
 
-        // Check for UTF-8 BOM (EF BB BF)
         if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
           cb(new TextDecoder('utf-8').decode(buf.slice(3)));
           return;
         }
-
-        // Check for UTF-16 LE BOM (FF FE)
         if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
           cb(new TextDecoder('utf-16le').decode(buf.slice(2)));
           return;
         }
 
-        // Try UTF-8 first
+        var utfText = '';
+        var utfOk = false;
         try {
-          var utfText = new TextDecoder('utf-8', { fatal: true }).decode(buf);
-          // Valid UTF-8 — check if Hebrew chars are present (U+05D0–U+05EA range)
-          // If so, great. If text looks like question marks, fall through.
+          utfText = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+          utfOk = true;
+        } catch (e) { /* not utf-8 */ }
+
+        if (utfOk && hasHebrewText(utfText)) {
           cb(utfText);
-        } catch(e) {
-          // Not valid UTF-8 — must be Windows-1255 (Hebrew Excel default)
-          try {
-            cb(new TextDecoder('windows-1255').decode(buf));
-          } catch(e2) {
-            // Last resort: ISO-8859-8 (Hebrew)
-            cb(new TextDecoder('iso-8859-8').decode(buf));
+          return;
+        }
+
+        var candidates = [];
+        try { candidates.push(new TextDecoder('windows-1255').decode(buf)); } catch (e2) {}
+        try { candidates.push(new TextDecoder('iso-8859-8').decode(buf)); } catch (e3) {}
+        if (utfOk) candidates.push(utfText);
+
+        for (var i = 0; i < candidates.length; i++) {
+          if (hasHebrewText(candidates[i])) {
+            cb(candidates[i]);
+            return;
           }
         }
+        cb(candidates[0] || utfText || '');
       };
       reader.onerror = function() { cb(''); };
       reader.readAsArrayBuffer(file);
     }
 
-    function parseCSVorTSV(text) {
-      text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
-      if (!text) throw new Error('הקובץ ריק.');
-      var lines = text.split('\n').filter(function(l){return l.trim();});
-      if (lines.length < 2) throw new Error('נדרשת שורת כותרת + לפחות שורת נתונים.');
+    function cellToStr(v) {
+      if (v == null || v === '') return '';
+      if (typeof v === 'number') {
+        if (!isFinite(v)) return '';
+        // טלפון / מספר אישי — בלי סימון מדעי
+        if (Math.abs(v) >= 1e5 && Math.abs(v) < 1e15 && Math.floor(v) === v) {
+          return String(Math.round(v));
+        }
+        return String(v);
+      }
+      if (v instanceof Date) {
+        try { return v.toISOString().slice(0, 10); } catch (e) { return String(v); }
+      }
+      return String(v).trim();
+    }
 
-      // Auto-detect delimiter
-      var delim = lines[0].indexOf('\t') > -1 ? '\t' : ',';
-
-      var headers = splitLine(lines[0], delim).map(function(h){
-        return h.trim().toLowerCase().replace(/^"|"$/g,'').replace(/^\uFEFF/,'');
+    function readExcelFile(file, cb) {
+      loadSheetJs(function(err, XLSXlib) {
+        if (err) { cb(err); return; }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            var data = new Uint8Array(e.target.result);
+            var wb = XLSXlib.read(data, { type: 'array', cellDates: true });
+            if (!wb.SheetNames || !wb.SheetNames.length) {
+              cb(new Error('קובץ Excel ריק — אין גיליונות.'));
+              return;
+            }
+            var sheet = wb.Sheets[wb.SheetNames[0]];
+            var aoa = XLSXlib.utils.sheet_to_json(sheet, {
+              header: 1,
+              raw: true,
+              defval: '',
+              blankrows: false
+            });
+            cb(null, aoa);
+          } catch (ex) {
+            cb(ex);
+          }
+        };
+        reader.onerror = function() { cb(new Error('קריאת הקובץ נכשלה.')); };
+        reader.readAsArrayBuffer(file);
       });
+    }
 
-      var req = ['name','password'];
-      var miss = req.filter(function(r){return headers.indexOf(r) < 0;});
-      if (miss.length) throw new Error('חסרות עמודות: ' + miss.join(', ') + '\nעמודות שנמצאו: ' + headers.join(', ') + '\n(מזהה id נוצר אוטומטית — אין צורך בעמודה)');
+    // סדר עמודות קבוע לפי קובץ «רשימת חניכים» (גיבוי אם הכותרות לא מזוהות)
+    var POSITIONAL_FIELDS = [
+      'email', 'phone', 'target_role', 'id',
+      'unit_classification', 'unit_affiliation', 'military_affiliation',
+      'service_type', 'name', 'team', 'role'
+    ];
 
-      return lines.slice(1).map(function(line) {
-        var vals = splitLine(line, delim);
-        var obj  = {};
-        headers.forEach(function(h,i){ obj[h] = (vals[i]||'').trim().replace(/^"|"$/g,''); });
-        return obj;
-      }).filter(function(r){ return r.name; });
+    // מיפוי כותרות עברית/אנגלית → שדות מערכת
+    var HEADER_ALIASES = {
+      'כתובת מייל': 'email',
+      'כתובת דואל': 'email',
+      'דואל': 'email',
+      'מייל': 'email',
+      'email': 'email',
+      'מספר טלפון': 'phone',
+      'טלפון': 'phone',
+      'phone': 'phone',
+      'תפקיד עתידי': 'target_role',
+      'target_role': 'target_role',
+      'מספר אישי': 'id',
+      'מספראישי': 'id',
+      'id': 'id',
+      'personal_id': 'id',
+      'חטיבה': 'unit_classification',
+      'unit_classification': 'unit_classification',
+      'יחידה': 'unit_affiliation',
+      'unit_affiliation': 'unit_affiliation',
+      'חיל': 'military_affiliation',
+      'military_affiliation': 'military_affiliation',
+      'סוג שירות': 'service_type',
+      'service_type': 'service_type',
+      'שם מלא': 'name',
+      'שם': 'name',
+      'name': 'name',
+      'צוות': 'team',
+      'team': 'team',
+      'team_id': 'team_id',
+      'סיסמה': 'password',
+      'password': 'password',
+      'תפקיד': 'role',
+      'role': 'role'
+    };
+
+    function mapHeader(h) {
+      var raw = String(h || '').replace(/^\uFEFF/, '').replace(/^"|"$/g, '').replace(/\s+/g, ' ').trim();
+      if (HEADER_ALIASES[raw]) return HEADER_ALIASES[raw];
+      var low = raw.toLowerCase();
+      if (HEADER_ALIASES[low]) return HEADER_ALIASES[low];
+      return low;
+    }
+
+    /** Excel לפעמים מייצא טלפון/מספר אישי כ־5.84E+08 */
+    function expandExcelNumber(v) {
+      var s = String(v == null ? '' : v).trim();
+      if (!s) return '';
+      if (/^\d+\.0+$/.test(s)) return s.replace(/\.0+$/, '');
+      if (/^[+-]?\d+(\.\d+)?e[+-]?\d+$/i.test(s)) {
+        var n = Number(s);
+        if (isFinite(n) && Math.abs(n) < 1e15) return String(Math.round(n));
+      }
+      return s;
+    }
+
+    function detectDelim(headerLine) {
+      var tabs = (headerLine.match(/\t/g) || []).length;
+      var commas = (headerLine.match(/,/g) || []).length;
+      var semis = (headerLine.match(/;/g) || []).length;
+      if (tabs >= commas && tabs >= semis && tabs > 0) return '\t';
+      if (semis > commas) return ';';
+      return ',';
     }
 
     function splitLine(line, delim) {
-      if (delim === '\t') return line.split('\t');
-      var res=[], cur='', inQ=false;
-      for (var i=0; i<line.length; i++) {
-        var ch=line[i];
-        if (ch==='"'){inQ=!inQ;continue;}
-        if (ch===delim&&!inQ){res.push(cur);cur='';continue;}
-        cur+=ch;
+      var res = [];
+      var cur = '';
+      var inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (ch === '"') {
+          // Excel: "" בתוך שדה מצוטט = מרכאה אחת
+          if (inQ && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+            continue;
+          }
+          inQ = !inQ;
+          continue;
+        }
+        if (ch === delim && !inQ) {
+          res.push(cur);
+          cur = '';
+          continue;
+        }
+        cur += ch;
       }
       res.push(cur);
       return res;
     }
 
-    function showPreview(rows, previewTbl, preview, importBtn, errDiv) {
-      if (!rows.length) { showErr(errDiv,'לא נמצאו שורות תקינות.'); return; }
-      var cols=['name','password','role','team_id','military_affiliation','service_type','phone','email'];
-      var tbl='<table class="tbl" style="font-size:11px"><thead><tr>'+
-        '<th>id (אוטומטי)</th>'+
-        cols.map(function(c){return '<th>'+c+'</th>';}).join('')+
-        '</tr></thead><tbody>';
-      rows.slice(0,8).forEach(function(row){
-        tbl+='<tr><td class="mono" style="color:var(--muted)">יווצר</td>'+cols.map(function(col){
-          var val=row[col]||'';
-          return '<td>'+(col==='password'?'••••':val)+'</td>';
-        }).join('')+'</tr>';
+    function parseMatrix(aoa) {
+      if (!aoa || !aoa.length) throw new Error('הקובץ ריק.');
+      var matrix = aoa.filter(function(row) {
+        if (!row || !row.length) return false;
+        return row.some(function(c) { return cellToStr(c) !== ''; });
       });
-      if(rows.length>8) tbl+='<tr><td colspan="'+(cols.length+1)+'" style="color:var(--muted);text-align:center;font-family:var(--mono);font-size:11px">… ועוד '+(rows.length-8)+' שורות</td></tr>';
-      tbl+='</tbody></table>';
-      tbl+='<div style="font-family:var(--mono);font-size:11px;color:var(--green);margin-top:8px">✓ '+rows.length+' משתמשים לייבוא · מזהים ייווצרו אוטומטית</div>';
+      if (matrix.length < 2) throw new Error('נדרשת שורת כותרת + לפחות שורת נתונים.');
+
+      var headersRaw = matrix[0].map(function(c) { return cellToStr(c); });
+      var headers = headersRaw.map(mapHeader);
+
+      var hasName = headers.indexOf('name') >= 0;
+      var hasId = headers.indexOf('id') >= 0;
+      if (!hasName || !hasId) {
+        if (headersRaw.length >= 9) {
+          headers = POSITIONAL_FIELDS.slice(0, Math.max(headersRaw.length, 10));
+          hasName = true;
+          hasId = true;
+        }
+      }
+      if (!hasName) {
+        throw new Error(
+          'חסרה עמודת «שם מלא».\n' +
+          'פורמט נדרש: כתובת מייל, מספר טלפון, תפקיד עתידי, מספר אישי, חטיבה, יחידה, חיל, סוג שירות, שם מלא, צוות\n' +
+          'כותרות שנמצאו: ' + headersRaw.join(' | ')
+        );
+      }
+
+      var rows = matrix.slice(1).map(function(vals, idx) {
+        var obj = {};
+        headers.forEach(function(h, i) {
+          if (!h) return;
+          var v = cellToStr(vals[i]);
+          if (obj[h] && !v) return;
+          obj[h] = v;
+        });
+        if (obj.phone) obj.phone = expandExcelNumber(obj.phone);
+        if (obj.id) obj.id = expandExcelNumber(obj.id);
+        if (obj.team && !obj.team_id) obj.team_id = obj.team;
+        if (!obj.password && obj.id) obj.password = obj.id;
+        if (!obj.role) obj.role = 'trainee';
+        obj._line = idx + 2;
+        return obj;
+      }).filter(function(r) {
+        return r.name || r.id;
+      });
+
+      if (!rows.length) {
+        throw new Error('לא נמצאו שורות עם שם מלא / מספר אישי אחרי הכותרת.');
+      }
+      return rows;
+    }
+
+    function parseCSVorTSV(text) {
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+      if (!text) throw new Error('הקובץ ריק.');
+      var lines = text.split('\n').filter(function(l) { return l.trim(); });
+      if (lines.length < 2) throw new Error('נדרשת שורת כותרת + לפחות שורת נתונים.');
+
+      var delim = detectDelim(lines[0]);
+      var aoa = lines.map(function(line) { return splitLine(line, delim); });
+      return parseMatrix(aoa);
+    }
+
+    function showPreview(rows, previewTbl, preview, importBtn, errDiv) {
+      if (!rows.length) { showErr(errDiv, 'לא נמצאו שורות תקינות.'); return; }
+      var cols = [
+        { key: 'id', label: 'מספר אישי' },
+        { key: 'name', label: 'שם מלא' },
+        { key: 'role', label: 'תפקיד' },
+        { key: 'phone', label: 'טלפון' },
+        { key: 'military_affiliation', label: 'חיל' },
+        { key: 'service_type', label: 'סוג שירות' },
+        { key: 'unit_classification', label: 'חטיבה' },
+        { key: 'unit_affiliation', label: 'יחידה' },
+        { key: 'target_role', label: 'תפקיד עתידי' },
+        { key: 'team_id', label: 'צוות' },
+        { key: 'email', label: 'מייל' }
+      ];
+      var tbl = '<table class="tbl" style="font-size:11px"><thead><tr>' +
+        cols.map(function(c) { return '<th>' + c.label + '</th>'; }).join('') +
+        '</tr></thead><tbody>';
+      rows.slice(0, 10).forEach(function(row) {
+        tbl += '<tr>' + cols.map(function(c) {
+          var val = row[c.key] || (c.key === 'id' ? '(יווצר)' : '');
+          return '<td>' + String(val).replace(/</g, '&lt;') + '</td>';
+        }).join('') + '</tr>';
+      });
+      if (rows.length > 10) {
+        tbl += '<tr><td colspan="' + cols.length + '" style="color:var(--muted);text-align:center;font-family:var(--mono);font-size:11px">… ועוד ' +
+          (rows.length - 10) + ' שורות</td></tr>';
+      }
+      tbl += '</tbody></table>';
+      tbl += '<div style="font-family:var(--mono);font-size:11px;color:var(--green);margin-top:8px">✓ ' +
+        rows.length + ' משתמשים לייבוא · סיסמה = מספר אישי (אם לא צוינה)</div>';
       previewTbl.innerHTML = tbl;
-      preview.style.display   = 'block';
+      preview.style.display = 'block';
       importBtn.style.display = 'inline-block';
       importBtn._rows = rows;
     }
 
     function showErr(errDiv, msg) {
-      errDiv.textContent   = '⚠ ' + msg;
+      errDiv.textContent = '⚠ ' + msg;
       errDiv.style.display = 'block';
     }
 
     function onFileChange(input) {
-      var preview    = document.getElementById('xlsxPreview');
+      var preview = document.getElementById('xlsxPreview');
       var previewTbl = document.getElementById('xlsxPreviewTable');
-      var errDiv     = document.getElementById('xlsxError');
-      var importBtn  = document.getElementById('xlsxImportBtn');
+      var errDiv = document.getElementById('xlsxError');
+      var importBtn = document.getElementById('xlsxImportBtn');
       if (!preview) return;
-      errDiv.style.display    = 'none';
-      preview.style.display   = 'none';
+      errDiv.style.display = 'none';
+      preview.style.display = 'none';
       importBtn.style.display = 'none';
-      importBtn._rows         = null;
+      importBtn._rows = null;
+      importBtn._importing = false;
       var file = input.files && input.files[0];
       if (!file) return;
 
+      function doneOk(rows) {
+        try {
+          showPreview(rows, previewTbl, preview, importBtn, errDiv);
+        } catch (err) {
+          showErr(errDiv, err.message || String(err));
+        }
+      }
+      function doneErr(err) {
+        showErr(errDiv, (err && err.message) ? err.message : String(err));
+      }
+
+      if (isExcelFile(file)) {
+        MapimLoader.show('// READING EXCEL...');
+        readExcelFile(file, function(err, aoa) {
+          MapimLoader.hide();
+          if (err) { doneErr(err); return; }
+          try { doneOk(parseMatrix(aoa)); } catch (ex) { doneErr(ex); }
+        });
+        return;
+      }
+
       readFileHebrew(file, function(text) {
         try {
-          var rows = parseCSVorTSV(text);
-          showPreview(rows, previewTbl, preview, importBtn, errDiv);
-        } catch(err) {
-          showErr(errDiv, err.message);
+          doneOk(parseCSVorTSV(text));
+        } catch (err) {
+          doneErr(err);
         }
       });
     }
 
     window.doXlsxImport = function() {
-      var btn  = document.getElementById('xlsxImportBtn');
+      var btn = document.getElementById('xlsxImportBtn');
+      var errDiv = document.getElementById('xlsxError');
       var rows = btn && btn._rows;
-      if (!rows || !rows.length) return;
+      if (!rows || !rows.length) {
+        if (errDiv) showErr(errDiv, 'אין שורות לייבוא — בחר קובץ תקין קודם.');
+        return;
+      }
+      if (btn._importing) return;
+      btn._importing = true;
       btn.textContent = '⏳ מייבא...';
-      btn.disabled    = true;
-      MapimLoader.show('// IMPORTING...');
-      var payload = rows.map(function(r){
+      btn.disabled = true;
+      if (errDiv) errDiv.style.display = 'none';
+      var payload = rows.map(function(r) {
         return {
+          id: r.id || '',
           name: r.name || '',
-          password: r.password || '',
+          password: r.password || r.id || '',
           role: r.role || 'trainee',
-          team_id: r.team_id || '',
+          team_id: r.team_id || r.team || '',
           military_affiliation: r.military_affiliation || '',
           service_type: r.service_type || '',
           unit_affiliation: r.unit_affiliation || '',
@@ -5844,21 +6108,31 @@ body {
           email: r.email || ''
         };
       });
+      if (!window.MapimSpa || typeof MapimSpa.runAction !== 'function') {
+        btn._importing = false;
+        btn.disabled = false;
+        btn.textContent = 'ייבוא למערכת';
+        showErr(errDiv, 'SPA לא מוכן — רענן את הדף ונסה שוב.');
+        return;
+      }
       MapimSpa.runAction('importUsers', { usersJson: JSON.stringify(payload) });
     };
 
     var EXAMPLE_CSV =
-      'name,password,role,team_id,military_affiliation,service_type,unit_affiliation,unit_classification,target_role,phone,email\n' +
-      'ישראל ישראלי,Pass1234,חניך,T1,חיר,מילואים,גדוד 401,מתמרן,מפ חיר א,0501234567,israel@example.com\n' +
-      'דנה כהן,Pass1234,trainee,T1,חשן,סדיר,גדוד 401,,מפ חשן,0529876543,\n' +
-      'אבי לוי,Abc!2345,חניך,,חהן,מילואים,,,מפ חהן,,\n' +
-      'נועה מזרחי,Abc!2345,trainee,T2,מסייעת,סדיר,גדוד 52,,מפ מסייעת,0541112233,noa@example.com\n' +
-      'רון אברהם,Trainee1,חניך,T2,מנהלי,מילואים,,,,0556667788,\n' +
-      'יוסי מפקד,CmdPass1,מפקצ,T1,,,,,מפקד צוות,0509998877,yossi@example.com\n' +
-      'מיכל חונכת,Tutor99,חונך,,,,,,חונך מפ א,0532223344,\n' +
-      'עמית מגד,Magad77,מגד,,,,,,,0514445566,amit@example.com\n' +
-      'ליאור ממ,MmPass88,ממ,,,,,,,,\n' +
-      'שרה אגמ,Admin123,admin,,,,,,,0500000001,admin@example.com\n';
+      'כתובת מייל,מספר טלפון,תפקיד עתידי,מספר אישי,חטיבה,יחידה,חיל,סוג שירות,שם מלא,צוות\n' +
+      ',584322261,"מ""פ מסייעת",8672190,חטיבה 205,"גדוד חש""ן 9206","חי""ר",מילואים,אמיתי פרייזלר,1\n' +
+      ',558874439,"מ""פ הכשרה פלס""ר 585",9074931,585,"פלס""ר 585","חי""ר",סדיר,דביר דישק,\n' +
+      ',509233488,"מ""פ הכשרה גדוד 13",9103383,גולני,"גדוד חי""ר 13","חי""ר",סדיר,עידן מרום,\n' +
+      ',527008809,"מ""פ תבל",8873941,מרום,"לוט""ר","חי""ר",סדיר,שקד בוגן,\n' +
+      ',546347732,,8898346,גבעתי,"גדוד ח""יר 424","חי""ר",סדיר,נתן אדלר,\n' +
+      ',505525510,,9079526,נחל,"בא""ח 933","חי""ר",סדיר,איתי ורדי,\n' +
+      ',587659812,"מפל""ג לוחמים",9058063,כנף 7,יחידת ארד,"חי""ר",סדיר,מתן לברם,\n' +
+      ',524594881,,5480756,גדוד מילואים 6113,שייטת 13,"ח""י",מילואים,נדב עמר,\n' +
+      ',584092605,,9026381,14,"בא""ח הכשרות 614","חה""ן",סדיר,אריאל חלמיש,\n' +
+      ',586488564,,9132638,גדוד פיקוד 196,460/401,"חש""ן",סדיר,נעם רייזנר,\n' +
+      ',522227935,,9117544,"גדוד חש""ן 46",חטיבה 401,"חש""ן",סדיר,צור גורפינקל,\n' +
+      ',587893282,,8537265,"גדוד חש""ן 9212",חטיבה 205,"חש""ן",מילואים,שי חן,\n' +
+      ',506686769,"מפקד פלס""ם גדוד חיר""ם 202",9130909,סיירת 5135,אוגדה 98,"חל""ג",סדיר,ליאור וקנין,\n';
 
     function downloadExampleCsv() {
       var blob = new Blob(['\ufeff' + EXAMPLE_CSV], { type: 'text/csv;charset=utf-8;' });
@@ -5867,13 +6141,13 @@ body {
       a.download = 'users-import-example.csv';
       document.body.appendChild(a);
       a.click();
-      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+      setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 400);
     }
 
-    document.addEventListener('change', function(e){
+    document.addEventListener('change', function(e) {
       if (e.target && e.target.id === 'xlsxFile') onFileChange(e.target);
     });
-    document.addEventListener('click', function(e){
+    document.addEventListener('click', function(e) {
       if (e.target && e.target.id === 'xlsxExampleDownload') {
         e.preventDefault();
         downloadExampleCsv();

@@ -47,19 +47,18 @@ function _usersNewUserForm(sid, teams) {
 
 function _usersImportCsvPanel() {
   return '<div class="card"><div class="card-body">' +
-    '<p style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-    '<b>עמודות חובה:</b> name, password<br>' +
-    '<b>אופציונלי:</b> role, team_id, military_affiliation, service_type, unit_affiliation, unit_classification, target_role, phone, email<br>' +
-    '<b>מזהה (id):</b> נוצר אוטומטית — אין צורך בעמודה בקובץ.<br>' +
-    '<b>תפקיד (role):</b> חניך / חונך / ממ / מפקצ / מגד / אגמ מלפק (או באנגלית: trainee, tutor, …)' +
+    '<p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.55">' +
+    '<b>פורמט הקובץ (Excel XLSX / CSV):</b><br>' +
+    'כתובת מייל, מספר טלפון, תפקיד עתידי, מספר אישי, חטיבה, יחידה, חיל, סוג שירות, שם מלא, צוות<br>' +
+    '<span style="color:var(--muted)">חובה: שם מלא + מספר אישי. סיסמה = מספר אישי. תפקיד במערכת = trainee. מומלץ XLSX לשמירה על עברית.</span>' +
     '</p>' +
     '<div style="margin-bottom:10px">' +
-    '<button type="button" id="xlsxExampleDownload" class="btn btn-secondary btn-sm">📄 הורד קובץ דוגמה</button>' +
+    '<button type="button" id="xlsxExampleDownload" class="btn btn-secondary btn-sm">📄 הורד קובץ דוגמה (CSV)</button>' +
     '</div>' +
-    '<input type="file" id="xlsxFile" accept=".csv,.tsv,.txt" class="form-input">' +
+    '<input type="file" id="xlsxFile" accept=".xlsx,.xls,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="form-input">' +
     '<div id="xlsxError" class="flash flash-error" style="display:none;margin-top:8px"></div>' +
     '<div id="xlsxPreview" style="display:none;margin-top:10px"><table class="tbl" id="xlsxPreviewTable"></table></div>' +
-    '<button type="button" id="xlsxImportBtn" class="btn btn-primary" style="display:none;margin-top:10px">ייבוא למערכת</button>' +
+    '<button type="button" id="xlsxImportBtn" class="btn btn-primary" style="display:none;margin-top:10px" onclick="doXlsxImport()">ייבוא למערכת</button>' +
     '</div></div>';
 }
 
@@ -92,7 +91,7 @@ function _usersTab(sid, openSet) {
   s += '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">';
   s += _expandablePanel('users', baseParams, 'newUser', '➕ משתמש חדש',
     _usersNewUserForm(sid, teams), openSet);
-  s += _expandablePanel('users', baseParams, 'importCsv', '📥 ייבוא מקובץ CSV',
+  s += _expandablePanel('users', baseParams, 'importCsv', '📥 ייבוא מקובץ Excel / CSV',
     _usersImportCsvPanel(), openSet);
   s += _expandablePanel('users', baseParams, 'fieldDefs', '⚙ שדות פרופיל נוספים',
     _userFieldDefsAdminHtml(sid), openSet);

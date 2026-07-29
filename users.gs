@@ -412,10 +412,24 @@ function Users_updateProfile(p) {
 }
 
 // ═══════════════════════════════════════
-//  Users_importBulk — ייבוא משתמשים מאקסל/CSV
-//  p.usersJson = JSON array of {name, password, role?, team_id?, ...}
-//  מזהה (id) נוצר אוטומטית — אין צורך בעמודה בקובץ
+//  Users_importBulk — ייבוא משתמשים מקובץ
+//  מספר אישי = id · סיסמה ברירת מחדל = מספר אישי
 // ═══════════════════════════════════════
+function Users_resolveTeamIdForImport(raw) {
+  raw = String(raw == null ? '' : raw).trim();
+  if (!raw) return '';
+  if (Teams_get(raw)) return String(raw);
+  if (/^\d+$/.test(raw) && Teams_get('T' + raw)) return 'T' + raw;
+  const all = Teams_all();
+  for (let i = 0; i < all.length; i++) {
+    const t = all[i];
+    if (String(t.name) === raw) return t.id;
+    if (String(t.name) === ('צוות ' + raw)) return t.id;
+    if (String(t.name).replace(/^צוות\s+/, '') === raw) return t.id;
+  }
+  return '';
+}
+
 function Users_importBulk(p) {
   Auth_requireRole(p, ['admin']);
 
@@ -426,37 +440,56 @@ function Users_importBulk(p) {
     throw new Error('JSON לא תקין: ' + e.message);
   }
 
-  if (!Array.isArray(rows) || !rows.length) throw new Error('לא נמצאו שורות לייבוא.');
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new Error('לא נמצאו שורות לייבוא. ודא שהקובץ בפורמט CSV עם כותרות בעברית.');
+  }
 
   const existing = new Set(_rows('Users').data.map(function(r) { return String(r[0]).trim(); }));
-  const ids = Users_nextIds(rows.length);
+  let autoIds = null;
+  let autoIdx = 0;
 
   let added = 0;
+  let skipped = 0;
   let errors = [];
   const newUserRows = [];
   const newCredRows = [];
 
   rows.forEach(function(row, i) {
     const name = String(row.name || '').trim();
-    const password = String(row.password || '').trim();
-    if (!name) { errors.push('שורה ' + (i + 1) + ': חסר שם'); return; }
-    if (!password) { errors.push('שורה ' + (i + 1) + ': חסרה סיסמה ל־' + name); return; }
+    let id = String(row.id || row.personal_id || '').trim();
+    let password = String(row.password || '').trim();
+    const line = i + 1;
 
-    const id = ids[i] || ('U' + Date.now() + '_' + i);
+    if (!name) {
+      errors.push('שורה ' + line + ': חסר שם מלא');
+      return;
+    }
+
+    if (!id) {
+      if (!autoIds) autoIds = Users_nextIds(rows.length);
+      id = autoIds[autoIdx++] || ('U' + Date.now() + '_' + i);
+    }
+
+    if (!password) password = id;
+
     if (existing.has(id)) {
-      errors.push('שורה ' + (i + 1) + ': מזהה פנימי כפול — נסה שוב');
+      skipped++;
+      errors.push('שורה ' + line + ': מספר אישי ' + id + ' כבר קיים — דולג');
       return;
     }
 
     const finalRole = typeof Roles_fromImport === 'function'
-      ? Roles_fromImport(row.role)
+      ? Roles_fromImport(row.role || 'trainee')
       : 'trainee';
+
+    const teamRaw = String(row.team_id || row.team || '').trim();
+    const teamId = Users_resolveTeamIdForImport(teamRaw);
 
     newUserRows.push([
       id,
       name,
       finalRole,
-      String(row.team_id || '').trim(),
+      teamId,
       String(row.unit_affiliation || '').trim(),
       String(row.service_type || '').trim(),
       String(row.military_affiliation || '').trim(),
@@ -472,9 +505,23 @@ function Users_importBulk(p) {
 
   if (newUserRows.length) _appendBatch('Users', newUserRows);
   if (newCredRows.length) _appendBatch('Credentials', newCredRows);
+  if (added) {
+    _cacheInvalidate('Users');
+    _cacheInvalidate('Credentials');
+  }
 
-  let info = 'ייבוא הושלם: ' + added + ' משתמשים נוספו (מזהים נוצרו אוטומטית).';
-  if (errors.length) info += ' שגיאות: ' + errors.slice(0, 3).join(' | ');
+  if (!added) {
+    const detail = errors.length ? errors.slice(0, 5).join(' | ') : 'לא זוהו שורות תקינות';
+    throw new Error('לא נוסף אף משתמש. ' + detail);
+  }
+
+  let info = '✓ ייבוא הושלם: ' + added + ' משתמשים נוספו';
+  if (skipped) info += ' · ' + skipped + ' דולגו (כבר קיימים)';
+  if (errors.length && errors.length > skipped) {
+    info += ' · התראות: ' + errors.filter(function(e) {
+      return e.indexOf('כבר קיים') === -1;
+    }).slice(0, 3).join(' | ');
+  }
 
   return Views_users({ sid: p.sid, tab: 'users', info: info });
 }
