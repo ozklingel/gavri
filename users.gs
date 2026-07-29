@@ -430,6 +430,41 @@ function Users_resolveTeamIdForImport(raw) {
   return '';
 }
 
+/** מזהה צוות קיים, או יוצר צוות חדש לפי שם/מספר מהקובץ */
+function Users_ensureTeamIdForImport(raw, createdNames) {
+  raw = String(raw == null ? '' : raw).trim();
+  if (!raw) return '';
+
+  const existing = Users_resolveTeamIdForImport(raw);
+  if (existing) return existing;
+
+  const key = raw.toLowerCase();
+  if (createdNames && createdNames[key]) return createdNames[key];
+
+  let newId;
+  let name;
+  if (/^T\d+$/i.test(raw)) {
+    newId = 'T' + raw.replace(/^T/i, '');
+    if (Teams_get(newId)) newId = _nextTeamId();
+    name = 'צוות ' + newId.replace(/^T/i, '');
+  } else if (/^\d+$/.test(raw)) {
+    newId = 'T' + raw;
+    if (Teams_get(newId)) newId = _nextTeamId();
+    name = 'צוות ' + raw;
+  } else {
+    newId = _nextTeamId();
+    name = raw;
+  }
+
+  _append('Teams', [newId, name, '']);
+  if (createdNames) {
+    createdNames[key] = newId;
+    createdNames[String(name).toLowerCase()] = newId;
+    createdNames[String(newId).toLowerCase()] = newId;
+  }
+  return newId;
+}
+
 function Users_importBulk(p) {
   Auth_requireRole(p, ['admin']);
 
@@ -450,9 +485,12 @@ function Users_importBulk(p) {
 
   let added = 0;
   let skipped = 0;
+  let teamsCreated = 0;
   let errors = [];
   const newUserRows = [];
   const newCredRows = [];
+  const createdTeamNames = {};
+  const teamsBefore = Teams_all().length;
 
   rows.forEach(function(row, i) {
     const name = String(row.name || '').trim();
@@ -483,7 +521,7 @@ function Users_importBulk(p) {
       : 'trainee';
 
     const teamRaw = String(row.team_id || row.team || '').trim();
-    const teamId = Users_resolveTeamIdForImport(teamRaw);
+    const teamId = Users_ensureTeamIdForImport(teamRaw, createdTeamNames);
 
     newUserRows.push([
       id,
@@ -503,12 +541,15 @@ function Users_importBulk(p) {
     added++;
   });
 
+  teamsCreated = Math.max(0, Teams_all().length - teamsBefore);
+
   if (newUserRows.length) _appendBatch('Users', newUserRows);
   if (newCredRows.length) _appendBatch('Credentials', newCredRows);
   if (added) {
     _cacheInvalidate('Users');
     _cacheInvalidate('Credentials');
   }
+  if (teamsCreated) _cacheInvalidate('Teams');
 
   if (!added) {
     const detail = errors.length ? errors.slice(0, 5).join(' | ') : 'לא זוהו שורות תקינות';
@@ -516,6 +557,7 @@ function Users_importBulk(p) {
   }
 
   let info = '✓ ייבוא הושלם: ' + added + ' משתמשים נוספו';
+  if (teamsCreated) info += ' · ' + teamsCreated + ' צוותים נוצרו';
   if (skipped) info += ' · ' + skipped + ' דולגו (כבר קיימים)';
   if (errors.length && errors.length > skipped) {
     info += ' · התראות: ' + errors.filter(function(e) {
