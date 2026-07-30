@@ -298,14 +298,37 @@ function HomeConstraints_blocksMapForAssign() {
 
 function HomeConstraints_blockedPairsForAssign() {
   const pairs = {};
-  const exercises = Exercises_all();
-  exercises.forEach(function(ex) {
-    Users_all().forEach(function(u) {
-      const conflicts = HomeConstraints_conflictsForExercise(u.id, ex.id);
-      if (conflicts.length) {
-        pairs[u.id + '\x1f' + ex.id] = HomeConstraints_formatRange(conflicts[0]);
+  const approved = HomeConstraints_allApproved();
+  if (!approved.length) return pairs;
+
+  // רק משתמשים עם אילוץ מאושר — לא כל המערכת × כל התרגילים
+  const byUser = {};
+  approved.forEach(function(c) {
+    const uid = String(c.user_id);
+    if (!byUser[uid]) byUser[uid] = [];
+    const range = HomeConstraints_timeRange(c);
+    if (range) byUser[uid].push({ c: c, range: range });
+  });
+
+  const exRanges = [];
+  Exercises_all().forEach(function(ex) {
+    const range = _exerciseTimeRange(ex);
+    if (range) exRanges.push({ id: ex.id, range: range });
+  });
+  if (!exRanges.length) return pairs;
+
+  Object.keys(byUser).forEach(function(userId) {
+    const constraints = byUser[userId];
+    if (!constraints.length) return;
+    for (let e = 0; e < exRanges.length; e++) {
+      const ex = exRanges[e];
+      for (let i = 0; i < constraints.length; i++) {
+        if (_timesOverlap(ex.range, constraints[i].range)) {
+          pairs[userId + '\x1f' + ex.id] = HomeConstraints_formatRange(constraints[i].c);
+          break;
+        }
       }
-    });
+    }
   });
   return pairs;
 }

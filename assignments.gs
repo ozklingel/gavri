@@ -997,7 +997,7 @@ function removeAssignmentById(sid, assignId) {
   var row = _findRowIndex('Assignments', assignId);
   if (row < 0) throw new Error('ההקצאה לא נמצאה: ' + assignId);
   _sheet('Assignments').deleteRow(row);
-  _assignmentsInvalidate();
+  _cachePatchDeleteRow('Assignments', row);
   return { ok: true };
 }
 
@@ -1016,7 +1016,7 @@ function moveAssignmentById(sid, assignId, toExId) {
     if (w.type === 'time') throw new Error('אזהרה חמורה — שיבוץ בשני תרגילים חופפים: ' + w.message);
   });
   sh.getRange(row, 2).setValue(toExId);
-  _assignmentsInvalidate();
+  _cachePatchRow('Assignments', row, { 2: toExId });
   return { ok: true };
 }
 
@@ -1039,7 +1039,7 @@ function updateAssignmentRespFromBoard(sid, assignId, exerciseId, responsibility
   }
 
   sh.getRange(row, 6).setValue(resp);
-  _assignmentsInvalidate();
+  _cachePatchRow('Assignments', row, { 6: resp });
   return { ok: true, responsibility: resp };
 }
 

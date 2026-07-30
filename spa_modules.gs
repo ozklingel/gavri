@@ -111,7 +111,7 @@ function _cacheWarmForModule(moduleId, p) {
     const dash = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
       ? DB_DASHBOARD_SHEETS
       : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
-    _readSheetsBatch(dash, { force: false });
+    _readSheetsBatch(dash.concat(['HomeConstraints', 'SystemLog']), { force: false });
     return;
   }
   if (id === 'timeline.main' && typeof DB_TIMELINE_SHEETS !== 'undefined') {

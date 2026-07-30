@@ -20,9 +20,9 @@ function Views_exercises(p) {
   let s = _spaTabsBar('exercises', {}, tabItems, tab);
 
   if (tab === 'list') {
-    s += _exercisesListModuleHtml(user, sid);
+    s += _exercisesListModuleHtml(user, sid, exs);
   } else if (tab === 'calendar') {
-    s += _exercisesCalendarModuleHtml(user, sid);
+    s += _exercisesCalendarModuleHtml(user, sid, exs);
   } else if (isAdmin) {
     s += '<div class="spa-tab-panel" style="margin-top:14px">' +
       _exercisesSidebarModuleHtml(user, sid, openSet) + '</div>';
@@ -79,10 +79,10 @@ function _exercisesDuplicatePanelHtml(exs) {
     '</div></div></div>';
 }
 
-function _exercisesListModuleHtml(user, sid) {
+function _exercisesListModuleHtml(user, sid, exs) {
   const sidQ = encodeURIComponent(sid);
   const isAdmin = Roles_hasAdminAccess(user.role);
-  const exs = Exercises_all();
+  if (!exs) exs = Exercises_all();
   const mpCounts = Assignments_mpCountByExercise();
 
   let s = '<div class="card"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
@@ -174,8 +174,8 @@ function _exerciseCalendarCardHtml(opts) {
     '</div>';
 }
 
-function _exercisesCalendarModuleHtml(user, sid) {
-  const exs = Exercises_all();
+function _exercisesCalendarModuleHtml(user, sid, exs) {
+  if (!exs) exs = Exercises_all();
   const mpCounts = Assignments_mpCountByExercise();
   const events = _exerciseCalendarEvents(exs, function(ev, ex) {
     ev.mpCount = mpCounts[ex.id] || 0;

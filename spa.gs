@@ -195,7 +195,7 @@ function getExercisesData(sid) {
   const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
     ? DB_DASHBOARD_SHEETS
     : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
-  _cacheWarmSheetsIfNeeded(dashSheets);
+  _cacheWarmSheetsIfNeeded(dashSheets.concat(['HomeConstraints', 'SystemLog']));
 
   const pages = [];
   function pushPage(page, params) {
@@ -213,12 +213,13 @@ function getExercisesData(sid) {
     } catch (err) {}
   }
 
-  // תרגילים + לוח שיבוץ — זמינים לצפייה לכל הישויות
+  // תרגילים + לוח שיבוץ — זמינים מוקדם (בלי לחכות ל־remaining)
   pushPage('exercises', { tab: 'list' });
   pushPage('exercises', { tab: 'calendar' });
   if (Roles_hasAdminAccess(user.role)) {
     pushPage('exercises', { tab: 'new' });
   }
+  pushPage('assign', {});
 
   // טאבי דשבורד נוספים — שימושיים מיד אחרי הדשבורד הראשי
   pushPage('dashboard', { tab: 'exercise' });
@@ -282,7 +283,7 @@ function getRemainingAppData(sid) {
   pushPage('fieldForces', {});
   pushPage('fireZones', {});
   pushPage('timeline', {});
-  pushPage('assign', {});
+  // assign כבר נטען ב־getExercisesData
 
   if (Roles_hasAdminAccess(user.role)) {
     pushPage('users', { tab: 'users' });

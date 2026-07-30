@@ -436,6 +436,9 @@ function _cacheNotifyDerived(name) {
   if (name === 'Exercises' || name === 'ExerciseDetails') {
     if (typeof _exercisesClearDerived === 'function') _exercisesClearDerived();
   }
+  if (name === 'Assignments') {
+    if (typeof _assignmentsClearDerived === 'function') _assignmentsClearDerived();
+  }
 }
 
 /**
@@ -511,6 +514,26 @@ function _cachePatchRow(name, sheetRow, updates) {
     if (!isNaN(col) && col >= 1) row[col - 1] = updates[k];
   });
   cur.data[idx] = row;
+  _rowsCache[name] = cur;
+  _putScriptCacheRows(name, cur);
+  _cacheNotifyDerived(name);
+  _htmlCacheBump();
+}
+
+/** מחיקת שורה מהקאש אחרי deleteRow — בלי קריאת Sheets מחדש */
+function _cachePatchDeleteRow(name, sheetRow) {
+  let cur = _rowsCache[name];
+  if (!cur || !cur.data) cur = _getScriptCacheRows(name);
+  if (!cur || !cur.data) {
+    _cacheInvalidate(name);
+    return;
+  }
+  const idx = sheetRow - 2;
+  if (idx < 0 || idx >= cur.data.length) {
+    _cacheInvalidate(name);
+    return;
+  }
+  cur.data.splice(idx, 1);
   _rowsCache[name] = cur;
   _putScriptCacheRows(name, cur);
   _cacheNotifyDerived(name);

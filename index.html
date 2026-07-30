@@ -3814,7 +3814,7 @@ body {
       page = String(page || '');
       if (page === 'login') return null;
       if (page === 'dashboard') return 'dashboard';
-      if (page === 'exercises' || page === 'exercise') return 'exercises';
+      if (page === 'exercises' || page === 'exercise' || page === 'assign') return 'exercises';
       return 'remaining';
     }
 
@@ -4048,6 +4048,7 @@ body {
       if (typeof initExerciseProcedurePanel === 'function') initExerciseProcedurePanel();
       if (typeof initExerciseEditShiftPrompt === 'function') initExerciseEditShiftPrompt();
       if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
+      if (window.MapimModules && MapimModules.load) MapimModules.load();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
         try { openPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (x) {}
@@ -4255,13 +4256,65 @@ body {
             applyResult(result);
             return;
           }
-          // לא מוחקים את כל הקאש — רק דפים שמושפעים + הדף הנוכחי יוחלף מ-result.body
-          invalidateClientRoutes(['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix', 'exercises', 'users']);
+          // לא מוחקים את כל הקאש — רק דפים שמושפעים מהפעולה
+          var routesByAction = {
+            createExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics'],
+            editExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics'],
+            duplicateExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline'],
+            deleteExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+            buildSeries: ['exercises', 'dashboard', 'assign', 'timeline', 'statistics', 'seriesArchive'],
+            addDetail: ['exercise', 'timeline', 'dashboard'],
+            updateDetail: ['exercise', 'timeline', 'dashboard'],
+            deleteDetail: ['exercise', 'timeline', 'dashboard'],
+            generateTimeline: ['exercise', 'timeline', 'dashboard'],
+            assign: ['assign', 'exercise', 'dashboard', 'exercises', 'statistics'],
+            assignTeam: ['assign', 'exercise', 'dashboard', 'exercises'],
+            removeAssignment: ['assign', 'exercise', 'dashboard', 'exercises', 'statistics'],
+            updateAssignment: ['assign', 'exercise', 'dashboard', 'statistics'],
+            complete: ['assign', 'exercise', 'dashboard', 'statistics'],
+            autoAssignAll: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+            autoAssignGroup: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+            clearAllAssignments: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+            clearAssignGroup: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics'],
+            createUser: ['users', 'dashboard', 'assign'],
+            importUsers: ['users', 'dashboard', 'assign'],
+            deleteUser: ['users', 'dashboard', 'assign'],
+            updateRole: ['users', 'dashboard', 'assign'],
+            updateProfile: ['users', 'user', 'dashboard', 'assign'],
+            createTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
+            renameTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
+            deleteTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
+            autoSplitTeams: ['users', 'assign', 'dashboard', 'teamMatrix'],
+            setCommander: ['users', 'assign', 'dashboard'],
+            addMember: ['users', 'assign', 'dashboard'],
+            removeMember: ['users', 'assign', 'dashboard'],
+            saveFeedback: ['feedback', 'exercise', 'dashboard', 'statistics'],
+            updateExerciseTimes: ['timeline', 'dashboard', 'exercises', 'assign', 'statistics', 'exercise'],
+            createHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
+            approveHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
+            rejectHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
+            createTimelineBlock: ['timeline'],
+            deleteTimelineBlock: ['timeline'],
+            createFieldForce: ['fieldForces', 'exercises', 'exercise'],
+            updateFieldForce: ['fieldForces', 'exercises', 'exercise'],
+            deleteFieldForce: ['fieldForces', 'exercises', 'exercise'],
+            createFireZone: ['fireZones', 'exercises', 'exercise'],
+            updateFireZone: ['fireZones', 'exercises', 'exercise'],
+            deleteFireZone: ['fireZones', 'exercises', 'exercise'],
+            deleteArchivedSeries: ['seriesArchive', 'exercises', 'dashboard']
+          };
+          var toInvalidate = routesByAction[action] ||
+            ['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix', 'exercises'];
+          invalidateClientRoutes(toInvalidate);
           if (currentRoute && currentRoute.page) {
             invalidateClientRoutes([currentRoute.page]);
           }
           if (action === 'importUsers' || action === 'createUser' || action === 'deleteUser') {
             currentRoute = normalizeRoute('users', { tab: 'users' });
+          }
+          if (action === 'autoAssignAll' || action === 'autoAssignGroup' ||
+              action === 'clearAllAssignments' || action === 'clearAssignGroup') {
+            currentRoute = normalizeRoute('assign', {});
           }
           applyResult(result, { skipPrime: true });
           // אחרי יצירת נוה״ק — גלול לכרטיס הנוהל אם קיים
@@ -5263,6 +5316,11 @@ body {
     if (panel) panel.classList.toggle('open', isOpen);
     var arrow = btn.querySelector('.arrow');
     if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
+    if (isOpen && window.MapimModules) {
+      content.querySelectorAll('[data-spa-module]').forEach(function(slot) {
+        MapimModules.loadSlot(slot);
+      });
+    }
   });
 
   function initCollapsibles() {

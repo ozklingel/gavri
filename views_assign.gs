@@ -160,14 +160,14 @@ function _assignMainModuleHtml(user, sid, openSet, canEdit) {
       _expandablePanel('assign', {}, 'autoAssign', '⚡ הסבר — שיבוץ אוטומטי',
         _autoAssignRulesExplainHtml(), openSet) +
       _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
-        _assignConflictsSectionHtml(sid), openSet) +
+        _assignConflictsLazySlotHtml(openSet), openSet) +
       _expandablePanel('assign', {}, 'least', '📊 חניך מועדף לשיבוץ',
         _assignLeastSectionHtml(), openSet) +
       '</div>';
   } else {
     html += '<div class="expandable-stack" style="margin-top:12px">' +
       _expandablePanel('assign', {}, 'conflicts', '⚠ התנגשויות שיבוץ',
-        _assignConflictsSectionHtml(sid), openSet) +
+        _assignConflictsLazySlotHtml(openSet), openSet) +
       '</div>';
   }
   html += '<script>' + _assignBoardJs() + '</script>';
@@ -176,6 +176,16 @@ function _assignMainModuleHtml(user, sid, openSet, canEdit) {
 
 function _assignConflictsSectionHtml(sid) {
   return _assignmentConflictsPanel(AssignmentConflicts_scan(), { alwaysShow: true });
+}
+
+/** סריקת התנגשויות כבדה — נטענת רק בפתיחת הפאנל (מודול lazy) */
+function _assignConflictsLazySlotHtml(openSet) {
+  if (openSet && openSet.conflicts) {
+    return _assignConflictsSectionHtml();
+  }
+  return '<div data-spa-module="assign.section.conflicts">' +
+    '<p class="rules-muted" style="font-size:12px;margin:0">פתח לטעינת התנגשויות…</p>' +
+    '</div>';
 }
 
 function _assignGroupActionsHtml(sidQ, groupKey, label) {
@@ -566,6 +576,9 @@ function _assignBoardJs() {
         hidePageLoader();
         var n = (res && res.applied) || 0;
         if (window.MapimSpa && MapimSpa.navigate) {
+          if (MapimSpa.invalidateRoutes) {
+            MapimSpa.invalidateRoutes(['assign', 'dashboard', 'exercises', 'exercise', 'exerciseMatrix', 'teamMatrix', 'statistics', 'timeline']);
+          }
           MapimSpa.navigate('assign', { info: 'בוטלו ' + n + ' שינויים מהיומן' });
         } else {
           setStatus('✓ בוטלו ' + n + ' שינויים', '#4ade80');
@@ -1143,6 +1156,9 @@ function _assignBoardJs() {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 שמירה ואישור'; }
         var n = (res && res.applied) || changes.length;
         if (window.MapimSpa && MapimSpa.navigate) {
+          if (MapimSpa.invalidateRoutes) {
+            MapimSpa.invalidateRoutes(['assign', 'dashboard', 'exercises', 'exercise', 'exerciseMatrix', 'teamMatrix', 'statistics', 'timeline']);
+          }
           MapimSpa.navigate('assign', { info: 'נשמרו ' + n + ' שינויים בהצלחה' });
         } else {
           setStatus('✓ נשמרו ' + n + ' שינויים', '#4ade80');
