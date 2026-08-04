@@ -3764,6 +3764,31 @@ body {
       return false;
     }
 
+    var dashboardHydrateReq = 0;
+    function scheduleDashboardHydrate() {
+      var app = document.getElementById('app-content');
+      if (!app || !app.querySelector('[data-dashboard-light="1"]')) return;
+      if (!getSid()) return;
+      var req = ++dashboardHydrateReq;
+      var sid = getSid();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (req !== dashboardHydrateReq) return;
+          if (!result || !result.body) return;
+          var route = normalizeRoute('dashboard', { tab: 'search', searchUserId: sid });
+          storeClientPage(route, result);
+          if (!currentRoute || currentRoute.page !== 'dashboard') return;
+          if (String((currentRoute.params && currentRoute.params.tab) || 'search') !== 'search') return;
+          var app2 = document.getElementById('app-content');
+          if (!app2 || !app2.querySelector('[data-dashboard-light="1"]')) return;
+          app2.innerHTML = result.body;
+          runScripts(app2);
+          afterRender();
+        })
+        .withFailureHandler(function() {})
+        .apiRenderPage(sid, 'dashboard', JSON.stringify({ tab: 'search', searchUserId: sid }));
+    }
+
     // ── Staged load: dashboard → exercises → remaining ──
     var loadStage = {
       dashboard: false,
@@ -3814,7 +3839,7 @@ body {
       page = String(page || '');
       if (page === 'login') return null;
       if (page === 'dashboard') return 'dashboard';
-      if (page === 'exercises' || page === 'exercise' || page === 'assign') return 'exercises';
+      if (page === 'exercises' || page === 'exercise' || page === 'assign' || page === 'users') return 'exercises';
       return 'remaining';
     }
 
@@ -4048,6 +4073,8 @@ body {
       if (typeof initExerciseProcedurePanel === 'function') initExerciseProcedurePanel();
       if (typeof initExerciseEditShiftPrompt === 'function') initExerciseEditShiftPrompt();
       if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
+      if (typeof initBulkSelectTables === 'function') initBulkSelectTables();
+      scheduleDashboardHydrate();
       if (window.MapimModules && MapimModules.load) MapimModules.load();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
@@ -4262,6 +4289,7 @@ body {
             editExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics'],
             duplicateExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline'],
             deleteExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+            deleteExercisesBulk: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix'],
             buildSeries: ['exercises', 'dashboard', 'assign', 'timeline', 'statistics', 'seriesArchive'],
             addDetail: ['exercise', 'timeline', 'dashboard'],
             updateDetail: ['exercise', 'timeline', 'dashboard'],
@@ -4279,6 +4307,7 @@ body {
             createUser: ['users', 'dashboard', 'assign'],
             importUsers: ['users', 'dashboard', 'assign'],
             deleteUser: ['users', 'dashboard', 'assign'],
+            deleteUsersBulk: ['users', 'dashboard', 'assign'],
             updateRole: ['users', 'dashboard', 'assign'],
             updateProfile: ['users', 'user', 'dashboard', 'assign'],
             createTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
@@ -4309,8 +4338,11 @@ body {
           if (currentRoute && currentRoute.page) {
             invalidateClientRoutes([currentRoute.page]);
           }
-          if (action === 'importUsers' || action === 'createUser' || action === 'deleteUser') {
+          if (action === 'importUsers' || action === 'createUser' || action === 'deleteUser' || action === 'deleteUsersBulk') {
             currentRoute = normalizeRoute('users', { tab: 'users' });
+          }
+          if (action === 'deleteExercisesBulk') {
+            currentRoute = normalizeRoute('exercises', { tab: 'list' });
           }
           if (action === 'autoAssignAll' || action === 'autoAssignGroup' ||
               action === 'clearAllAssignments' || action === 'clearAssignGroup') {
@@ -5026,6 +5058,63 @@ body {
     return true;
   }
 
+  function toggleBulkSelectAll(master) {
+    var table = master.closest('table');
+    if (!table) return;
+    table.querySelectorAll('.bulk-select-cb:not(:disabled)').forEach(function(cb) {
+      cb.checked = master.checked;
+    });
+    updateBulkSelectCount(table);
+  }
+
+  function updateBulkSelectCount(root) {
+    root = root || document;
+    var n = root.querySelectorAll('.bulk-select-cb:checked').length;
+    root.querySelectorAll('.bulk-select-count').forEach(function(el) {
+      el.textContent = n ? ('נבחרו: ' + n) : '';
+    });
+  }
+
+  function initBulkSelectTables() {
+    document.querySelectorAll('.bulk-select-table').forEach(function(table) {
+      if (table._bulkBound) return;
+      table._bulkBound = true;
+      table.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('bulk-select-cb')) {
+          updateBulkSelectCount(table);
+        }
+      });
+    });
+    document.querySelectorAll('.bulk-delete-btn').forEach(function(btn) {
+      if (btn._bulkDelBound) return;
+      btn._bulkDelBound = true;
+      btn.addEventListener('click', function() {
+        bulkDeleteChecked(
+          btn.getAttribute('data-bulk-action'),
+          btn.getAttribute('data-bulk-param'),
+          btn.getAttribute('data-bulk-msg')
+        );
+      });
+    });
+    updateBulkSelectCount(document);
+  }
+
+  function bulkDeleteChecked(action, idsParam, msgTemplate) {
+    var boxes = document.querySelectorAll('.bulk-select-cb:checked');
+    if (!boxes.length) {
+      alert('לא נבחרו פריטים למחיקה.');
+      return false;
+    }
+    var ids = Array.prototype.map.call(boxes, function(cb) { return cb.value; });
+    var msg = (msgTemplate || 'למחוק {n} פריטים?').replace('{n}', String(ids.length));
+    if (!confirm(msg)) return false;
+    var params = {};
+    params[idsParam] = JSON.stringify(ids);
+    MapimLoader.show(MapimLoader.labelFor('action=' + action));
+    MapimSpa.runAction(action, params);
+    return false;
+  }
+
   function initActionButtonTooltips() {
     var ACTION_TIPS = {
       logout: 'יציאה מהמערכת (נדרש אישור)',
@@ -5037,6 +5126,7 @@ body {
       editExercise: 'שמירת שינויים בפרטי התרגיל',
       duplicateExercise: 'יצירת עותק של התרגיל',
       deleteExercise: 'מחיקת התרגיל וכל השיבוצים שלו (נדרש אישור)',
+      deleteExercisesBulk: 'מחיקת תרגילים נבחרים (נדרש אישור)',
       addDetail: 'הוספת אירוע לנוהל הקרב',
       updateDetail: 'שמירת עריכת אירוע נוהל קרב',
       deleteDetail: 'מחיקת אירוע מנוהל הקרב (נדרש אישור)',
@@ -5054,6 +5144,7 @@ body {
       createUser: 'יצירת משתמש חדש',
       importUsers: 'ייבוא משתמשים מקובץ',
       deleteUser: 'מחיקת משתמש (נדרש אישור)',
+      deleteUsersBulk: 'מחיקת משתמשים נבחרים (נדרש אישור)',
       updateRole: 'עדכון תפקיד משתמש',
       updateProfile: 'שמירת שינויים בפרופיל',
       createTeam: 'יצירת צוות חדש',

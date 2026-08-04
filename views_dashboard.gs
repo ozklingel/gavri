@@ -90,13 +90,18 @@ function _exercisesListModuleHtml(user, sid, exs) {
   if (!exs.length) {
     s += '<div class="empty">אין תרגילים במערכת</div>';
   } else {
-    s += '<table class="tbl"><thead><tr>' +
+    if (isAdmin) {
+      s += _bulkDeleteBar('deleteExercisesBulk', 'idsJson', 'למחוק {n} תרגילים? כל השיבוצים וציר הזמן יימחקו.');
+    }
+    s += '<table class="tbl bulk-select-table"><thead><tr>' +
+      (isAdmin ? _bulkSelectHeader() : '') +
       '<th>שם</th><th>סוג</th><th>מפים</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
       '</tr></thead><tbody>';
 
     exs.forEach(function(e) {
       const mpN = mpCounts[e.id] || 0;
       s += '<tr>' +
+        (isAdmin ? _bulkSelectCell(e.id) : '') +
         '<td>' +
           '<div class="ex-title">' + _exerciseLink(e.id, e.title) + '</div>' +
           '<div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div>' +

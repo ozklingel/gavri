@@ -4,11 +4,11 @@ function apiRenderPage(sid, page, paramsJson) {
   const p = _spaMergeParams(sid, paramsJson);
   const pg = String(page || 'login').trim();
   if (pg !== 'login') {
-    _cacheEnsureFullWarm();
     const cached = _htmlCacheGet(sid, pg, p);
     if (cached) {
       return _spaEnsureWrap(cached);
     }
+    _cacheWarmForPage(pg);
   } else {
     // login — אל תחמם הכול
   }
@@ -221,6 +221,11 @@ function getExercisesData(sid) {
   }
   pushPage('assign', {});
 
+  if (Roles_hasAdminAccess(user.role)) {
+    pushPage('users', { tab: 'users' });
+    pushPage('users', { tab: 'teams' });
+  }
+
   // טאבי דשבורד נוספים — שימושיים מיד אחרי הדשבורד הראשי
   pushPage('dashboard', { tab: 'exercise' });
   if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
@@ -286,8 +291,6 @@ function getRemainingAppData(sid) {
   // assign כבר נטען ב־getExercisesData
 
   if (Roles_hasAdminAccess(user.role)) {
-    pushPage('users', { tab: 'users' });
-    pushPage('users', { tab: 'teams' });
     pushPage('statistics', { section: 'kpi' });
     pushPage('statistics', { section: 'team' });
     pushPage('statistics', { section: 'compare' });
@@ -517,6 +520,7 @@ function _spaDispatchAction(action, p) {
     case 'editExercise':       return Exercises_edit(p);
     case 'duplicateExercise':  return Exercises_duplicate(p);
     case 'deleteExercise':     return Exercises_delete(p);
+    case 'deleteExercisesBulk': return Exercises_deleteBulk(p);
     case 'addDetail':          return Exercises_addDetail(p);
     case 'updateDetail':       return Exercises_updateDetail(p);
     case 'deleteDetail':       return Exercises_deleteDetail(p);
@@ -533,6 +537,7 @@ function _spaDispatchAction(action, p) {
     case 'createUser':         return Users_create(p);
     case 'importUsers':        return Users_importBulk(p);
     case 'deleteUser':         return Users_delete(p);
+    case 'deleteUsersBulk':    return Users_deleteBulk(p);
     case 'updateRole':         return Users_updateRole(p);
     case 'updateProfile':      return Users_updateProfile(p);
     case 'createUserFieldDef': return UserProfileFields_createDef(p);

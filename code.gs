@@ -74,6 +74,31 @@ function _cacheClearWarmFlag() {
   } catch (e1) {}
 }
 
+/** חימום ממוקד לפי דף — במקום טעינת כל הגיליונות בכל ניווט */
+function _cacheWarmForPage(page) {
+  const pg = String(page || '').trim();
+  if (!pg || pg === 'login') return;
+  const PAGE_SHEETS = {
+    dashboard: DB_DASHBOARD_SHEETS,
+    exercises: ['Exercises', 'ExerciseDetails', 'Assignments', 'Series', 'Users', 'Teams'],
+    exercise: DB_DASHBOARD_SHEETS,
+    users: ['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues'],
+    assign: DB_DASHBOARD_SHEETS.concat(['HomeConstraints']),
+    user: ['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues', 'Assignments', 'Exercises', 'ExerciseDetails'],
+    timeline: DB_TIMELINE_SHEETS,
+    homeConstraints: ['HomeConstraints', 'Users', 'Exercises', 'Assignments'],
+    statistics: DB_DASHBOARD_SHEETS,
+    fieldForces: ['FieldForces', 'Exercises'],
+    fireZones: ['FireZones', 'Exercises'],
+    teamMatrix: DB_DASHBOARD_SHEETS,
+    exerciseMatrix: DB_DASHBOARD_SHEETS,
+    seriesArchive: ['Series', 'Exercises', 'ExerciseDetails', 'Assignments'],
+    feedback: ['Assignments', 'Users', 'Exercises']
+  };
+  const sheets = PAGE_SHEETS[pg] || DB_SESSION_SHEETS;
+  _cacheWarmSheetsIfNeeded(sheets);
+}
+
 /** מחמם את כל הגיליונות פעם אחת; בקשות הבאות משתמשות רק ב-Script Cache (ללא Sheets). */
 function _cacheEnsureFullWarm() {
   if (_cacheIsFullyWarmed()) {

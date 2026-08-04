@@ -74,6 +74,21 @@ function _confirmDelete(query, msg, title) {
     ' data-confirm="' + _esc(msg) + '" onclick="return confirmDelete(this)">🗑 מחק</a>';
 }
 
+function _bulkSelectHeader() {
+  return '<th style="width:36px;text-align:center"><input type="checkbox" class="bulk-select-all" title="בחר הכל" onclick="toggleBulkSelectAll(this)"></th>';
+}
+
+function _bulkSelectCell(id, disabled) {
+  const dis = disabled ? ' disabled' : '';
+  return '<td style="text-align:center"><input type="checkbox" class="bulk-select-cb" value="' + _esc(id) + '"' + dis + '></td>';
+}
+
+function _bulkDeleteBar(action, idsParam, msg) {
+  return '<div class="bulk-actions-bar" style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+    '<button type="button" class="btn btn-danger btn-sm bulk-delete-btn" data-bulk-action="' + _esc(action) + '" data-bulk-param="' + _esc(idsParam) + '" data-bulk-msg="' + _esc(msg) + '">🗑 מחק נבחרים</button>' +
+    '<span class="bulk-select-count" style="font-size:12px;color:var(--muted)"></span></div>';
+}
+
 function _confirmAction(query, label, msg, cls, title) {
   cls = cls || 'btn btn-secondary';
   title = title || msg || label;
@@ -658,6 +673,7 @@ function _isoWeekLabel(dateStr) {
 function _dashboardResolveSearchUserId(p, user, tab) {
   const explicit = String((p && p.searchUserId) || '').trim();
   if (explicit) return explicit;
+  if (p && _parseBool(p.light)) return '';
   if (String(tab || 'search').trim() === 'search' && user && user.id) {
     return String(user.id).trim();
   }
@@ -741,7 +757,7 @@ function Views_dashboard(p) {
   const tab = _dashboardResolveTab(p, user);
 
   const body = _topbar(user, sid) +
-    '<div class="page page-dashboard">' + _flash(p) +
+    '<div class="page page-dashboard"' + (p && _parseBool(p.light) ? ' data-dashboard-light="1"' : '') + '>' + _flash(p) +
     _dashboardTabsShell(user, sid, tab, p) +
     '</div>';
   return _wrapPage(body, 'מסך הבית');

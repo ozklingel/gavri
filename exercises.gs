@@ -964,52 +964,92 @@ function Exercises_clearAllBeforeSeries() {
 
 // (החלף את הפונקציה Exercises_delete בקובץ exercises.gs בגרסה הזו)
 
+function Exercises_deleteCore_(exerciseIds, logUserId) {
+  const idSet = {};
+  (exerciseIds || []).forEach(function(id) {
+    const t = String(id || '').trim();
+    if (t) idSet[t] = true;
+  });
+  const ids = Object.keys(idSet);
+  if (!ids.length) return { deleted: 0 };
+
+  if (logUserId) {
+    ids.forEach(function(id) {
+      const ex = Exercises_get(id);
+      SystemLog_write({
+        user_id: logUserId,
+        action: 'exercise.delete',
+        entity_type: 'exercise',
+        entity_id: id,
+        details: {
+          title: ex ? ex.title : '',
+          series_id: ex ? ex.series_id : ''
+        }
+      });
+    });
+  }
+
+  const assignSh = _sheet('Assignments');
+  const assignData = _rows('Assignments').data;
+  const assignRows = [];
+  assignData.forEach(function(r, i) {
+    if (idSet[String(r[1])]) assignRows.push(i + 2);
+  });
+  assignRows.sort(function(a, b) { return b - a; });
+  assignRows.forEach(function(row) { assignSh.deleteRow(row); });
+  _cacheInvalidate('Assignments');
+
+  const detailSh = _sheet('ExerciseDetails');
+  const detailData = _rows('ExerciseDetails').data;
+  const detailRows = [];
+  detailData.forEach(function(r, i) {
+    if (idSet[String(r[1])]) detailRows.push(i + 2);
+  });
+  detailRows.sort(function(a, b) { return b - a; });
+  detailRows.forEach(function(row) { detailSh.deleteRow(row); });
+  _cacheInvalidate('ExerciseDetails');
+
+  const exSh = _sheet('Exercises');
+  const exData = _rows('Exercises').data;
+  const exRows = [];
+  exData.forEach(function(r, i) {
+    if (idSet[String(r[0])]) exRows.push(i + 2);
+  });
+  exRows.sort(function(a, b) { return b - a; });
+  exRows.forEach(function(row) { exSh.deleteRow(row); });
+  _cacheInvalidate('Exercises');
+  SpreadsheetApp.flush();
+
+  return { deleted: exRows.length };
+}
+
 function Exercises_delete(p) {
   const u = Auth_requireRole(p, ['admin']);
   const id = (p.id || '').trim();
   if (!id) throw new Error('חסר מזהה תרגיל.');
-
-  const ex = Exercises_get(id);
-  SystemLog_write({
-    user_id: u.id,
-    action: 'exercise.delete',
-    entity_type: 'exercise',
-    entity_id: id,
-    details: {
-      title: ex ? ex.title : '',
-      series_id: ex ? ex.series_id : ''
-    }
-  });
-
-  // Delete related assignments
-  const assignSh   = _sheet('Assignments');
-  const assignData = _rows('Assignments').data;
-  for (let i = assignData.length - 1; i >= 0; i--) {
-    if (String(assignData[i][1]) === id) assignSh.deleteRow(i + 2);
-  }
-  _cacheInvalidate('Assignments');
-
-  // Delete related details
-  const detailSh   = _sheet('ExerciseDetails');
-  const detailData = _rows('ExerciseDetails').data;
-  for (let i = detailData.length - 1; i >= 0; i--) {
-    if (String(detailData[i][1]) === id) detailSh.deleteRow(i + 2);
-  }
-  _cacheInvalidate('ExerciseDetails');
-
-  const row = _findRowIndex('Exercises', id);
-  if (row < 0) throw new Error('התרגיל לא נמצא.');
-  _sheet('Exercises').deleteRow(row);
-  _cacheInvalidate('Exercises');
+  const r = Exercises_deleteCore_([id], u.id);
+  if (!r.deleted) throw new Error('התרגיל לא נמצא.');
 
   const msg = 'התרגיל נמחק יחד עם כל ההקצאות ורשומות ציר הזמן.';
   const from = (p.from || '').trim();
 
-  // השאר את המשתמש באותו עמוד שממנו הגיעה המחיקה
   if (from === 'dashboard')  return Views_dashboard({ sid: p.sid, info: msg });
   if (from === 'exercise')   return Views_exercises ? Views_exercises({ sid: p.sid, info: msg })
                                                     : Views_dashboard({ sid: p.sid, info: msg });
-  // ברירת מחדל: עמוד ניהול התרגילים
   if (typeof Views_exercises === 'function') return Views_exercises({ sid: p.sid, info: msg });
   return Views_dashboard({ sid: p.sid, info: msg });
+}
+
+function Exercises_deleteBulk(p) {
+  const u = Auth_requireRole(p, ['admin']);
+  let ids = [];
+  try { ids = JSON.parse(p.idsJson || '[]'); } catch (e1) { ids = []; }
+  if (!ids.length) throw new Error('לא נבחרו תרגילים למחיקה.');
+  const r = Exercises_deleteCore_(ids, u.id);
+  if (!r.deleted) throw new Error('לא נמצאו תרגילים למחיקה.');
+  return Views_exercises({
+    sid: p.sid,
+    tab: 'list',
+    info: 'נמחקו ' + r.deleted + ' תרגילים יחד עם השיבוצים וציר הזמן שלהם.'
+  });
 }

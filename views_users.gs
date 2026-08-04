@@ -65,23 +65,29 @@ function _usersImportCsvPanel() {
 function _usersTab(sid, openSet) {
   const users = Users_all();
   const teams = Teams_all();
+  const teamById = Teams_byIdMap();
   const baseParams = { tab: 'users' };
 
   let s = '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">📋 משתמשים (' + users.length + ')</div></div>';
   if (!users.length) {
     s += '<div class="empty">אין משתמשים</div>';
   } else {
-    s += '<div class="card-body" style="padding:0"><table class="tbl"><thead><tr>' +
+    s += _bulkDeleteBar('deleteUsersBulk', 'idsJson', 'למחוק {n} משתמשים? פעולה זו לא ניתנת לביטול.') +
+      '<div class="card-body" style="padding:0"><table class="tbl bulk-select-table"><thead><tr>' +
+      _bulkSelectHeader() +
       '<th>שיוך חיילי</th><th>שם</th><th>תפקיד</th><th>צוות</th><th>פעולות</th></tr></thead><tbody>';
     users.forEach(function(u) {
-      const team = u.team_id ? Teams_get(u.team_id) : null;
+      const team = u.team_id ? teamById[u.team_id] : null;
+      const isSelf = u.id === sid;
       s += '<tr>' +
+        _bulkSelectCell(u.id, isSelf) +
         '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td>' + _userLink(u.id, u.name, '') + '</td>' +
         '<td>' + _badge(_roleHe(u.role), _roleBadgeType(u.role)) + '</td>' +
         '<td>' + _esc(team ? team.name : '—') + '</td>' +
         '<td class="actions" style="white-space:nowrap">' +
-        _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?') +
+        (isSelf ? '<span style="font-size:11px;color:var(--muted)">מחובר</span> ' : '') +
+        (isSelf ? '' : _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?')) +
         '</td></tr>';
     });
     s += '</tbody></table></div>';
@@ -127,11 +133,20 @@ function _teamsAutoSplitForm(unassignedTrainees, freeCommanders, previewTeams) {
 function _teamsTab(sid, openSet) {
   const allUsers = Users_all();
   const teams = Teams_all();
+  const membersByTeam = {};
+  const unassigned = [];
+  allUsers.forEach(function(u) {
+    if (u.team_id) {
+      if (!membersByTeam[u.team_id]) membersByTeam[u.team_id] = [];
+      membersByTeam[u.team_id].push(u);
+    } else {
+      unassigned.push(u);
+    }
+  });
   const commanders = allUsers.filter(function(u) {
     return Roles_isCompanyCommander(u.role) || Roles_isAdmin(u.role) || Roles_isUnitCommander(u.role);
   });
   const cmdOpts = [['', '— ללא —']].concat(commanders.map(function(u) { return [u.id, u.id + ' — ' + u.name]; }));
-  const unassigned = allUsers.filter(function(u) { return !u.team_id; });
   const baseParams = { tab: 'teams' };
 
   let s = '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">🪖 צוותים (' + teams.length + ')</div></div>';
@@ -139,7 +154,7 @@ function _teamsTab(sid, openSet) {
     s += '<div class="empty">אין צוותים</div>';
   } else {
     teams.forEach(function(t) {
-      const members = allUsers.filter(function(u) { return u.team_id === t.id; });
+      const members = membersByTeam[t.id] || [];
       const cmd = t.commander_id ? Users_get(t.commander_id) : null;
       s += '<div class="card" style="margin:10px;border:1px solid var(--border)"><div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +

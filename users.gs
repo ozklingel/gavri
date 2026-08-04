@@ -123,45 +123,81 @@ function Users_create(p) {
   return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש ' + name + ' (' + newId + ') נוצר בהצלחה.' });
 }
 
+/** מחיקת משתמשים (אחד או יותר) — מחיקת שורות מלמטה למעלה + invalidate פעם אחת */
+function Users_deleteCore_(targetIds, sid) {
+  const idSet = {};
+  (targetIds || []).forEach(function(id) {
+    const t = String(id || '').trim();
+    if (t && t !== String(sid || '').trim()) idSet[t] = true;
+  });
+  const ids = Object.keys(idSet);
+  if (!ids.length) return { deleted: 0 };
+
+  const usersSh = _sheet('Users');
+  const usersData = _rows('Users').data;
+  const userRows = [];
+  usersData.forEach(function(r, i) {
+    if (idSet[String(r[0])]) userRows.push(i + 2);
+  });
+  userRows.sort(function(a, b) { return b - a; });
+  userRows.forEach(function(row) { usersSh.deleteRow(row); });
+
+  const credSh = _sheet('Credentials');
+  const credData = _rows('Credentials').data;
+  const credRows = [];
+  credData.forEach(function(r, i) {
+    if (idSet[String(r[0])]) credRows.push(i + 2);
+  });
+  credRows.sort(function(a, b) { return b - a; });
+  credRows.forEach(function(row) { credSh.deleteRow(row); });
+
+  const assignSh = _sheet('Assignments');
+  const assignData = _rows('Assignments').data;
+  const assignRows = [];
+  assignData.forEach(function(r, i) {
+    if (idSet[String(r[2])]) assignRows.push(i + 2);
+  });
+  assignRows.sort(function(a, b) { return b - a; });
+  assignRows.forEach(function(row) { assignSh.deleteRow(row); });
+
+  const teamsSh = _sheet('Teams');
+  const teamsData = _rows('Teams').data;
+  teamsData.forEach(function(r, i) {
+    if (idSet[String(r[2])]) teamsSh.getRange(i + 2, 3).setValue('');
+  });
+
+  _cacheInvalidate('Users');
+  _cacheInvalidate('Credentials');
+  _cacheInvalidate('Assignments');
+  _cacheInvalidate('Teams');
+  SpreadsheetApp.flush();
+
+  return { deleted: userRows.length };
+}
+
 // Delete a user (admin only)
 function Users_delete(p) {
   Auth_requireRole(p, ['admin']);
   const targetId = (p.targetId || '').trim();
   if (!targetId) throw new Error('חסר מזהה משתמש.');
   if (targetId === p.sid) throw new Error('לא ניתן למחוק את המשתמש המחובר.');
-
-  const row = _findRowIndex('Users', targetId);
-  if (row < 0) throw new Error('המשתמש לא נמצא.');
-  _sheet('Users').deleteRow(row);
-  _cacheInvalidate('Users');
-
-  const credRow = _findRowIndex('Credentials', targetId);
-  if (credRow > 0) {
-    _sheet('Credentials').deleteRow(credRow);
-    _cacheInvalidate('Credentials');
-  }
-
-  // Cascade-delete assignments
-  const assignSh = _sheet('Assignments');
-  const assignData = _rows('Assignments').data;
-  for (let i = assignData.length - 1; i >= 0; i--) {
-    if (String(assignData[i][2]) === targetId) {
-      assignSh.deleteRow(i + 2);
-    }
-  }
-  _cacheInvalidate('Assignments');
-
-  // Remove as commander from any team
-  const teamsSh = _sheet('Teams');
-  const teamsData = _rows('Teams').data;
-  teamsData.forEach(function(r, i) {
-    if (String(r[2]) === targetId) {
-      teamsSh.getRange(i + 2, 3).setValue('');
-    }
-  });
-  _cacheInvalidate('Teams');
-
+  const r = Users_deleteCore_([targetId], p.sid);
+  if (!r.deleted) throw new Error('המשתמש לא נמצא.');
   return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש נמחק יחד עם כל ההקצאות שלו.' });
+}
+
+function Users_deleteBulk(p) {
+  Auth_requireRole(p, ['admin']);
+  let ids = [];
+  try { ids = JSON.parse(p.idsJson || '[]'); } catch (e1) { ids = []; }
+  if (!ids.length) throw new Error('לא נבחרו משתמשים למחיקה.');
+  const r = Users_deleteCore_(ids, p.sid);
+  if (!r.deleted) throw new Error('לא נמצאו משתמשים למחיקה (ייתכן שניסית למחוק את עצמך).');
+  return Views_users({
+    sid: p.sid,
+    tab: 'users',
+    info: 'נמחקו ' + r.deleted + ' משתמשים יחד עם ההקצאות שלהם.'
+  });
 }
 
 // Update role only (from users tab)
@@ -188,8 +224,19 @@ function Teams_all() {
   }));
 }
 
+var _teamsById = null;
+
+function Teams_byIdMap() {
+  if (!_rowsCache['Teams']) _teamsById = null;
+  if (_teamsById) return _teamsById;
+  _teamsById = {};
+  Teams_all().forEach(function(t) { _teamsById[t.id] = t; });
+  return _teamsById;
+}
+
 function Teams_get(id) {
-  return Teams_all().find(t => t.id === String(id)) || null;
+  if (!id) return null;
+  return Teams_byIdMap()[String(id)] || null;
 }
 
 function _nextTeamId() {
