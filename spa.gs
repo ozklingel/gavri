@@ -78,8 +78,8 @@ function apiRunAction(sid, action, paramsJson) {
 }
 
 /**
- * Step 1 — מינימום לדשבורד (טאב search).
- * Batch-read של גיליונות הדשבורד (SS אחד) → JSON מאוחד + HTML קל לציור ראשון.
+ * שלב 1 — משתמשים בלבד + דשבורד shell.
+ * מציגים ללקוח מיד אחרי שלב זה; drawer נפתח עם תפריט (nav ב-HTML).
  */
 function getDashboardData(sid) {
   const profile = { marks: {} };
@@ -104,24 +104,21 @@ function getDashboardData(sid) {
     return { ok: false, error: 'not logged in' };
   }
 
-  const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
-    ? DB_DASHBOARD_SHEETS
-    : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
+  const userSheets = (typeof DB_USER_BOOT_SHEETS !== 'undefined' && DB_USER_BOOT_SHEETS.length)
+    ? DB_USER_BOOT_SHEETS
+    : ['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues'];
 
-  // Prefer Script Cache / request cache; only hit Spreadsheet on miss.
-  // One SS.open + one getValues() per missing sheet — never force-reload all every entry.
   const tBatch = Date.now();
   console.time('getDashboardData:sheets');
-  _cacheWarmSheetsIfNeeded(dashSheets);
+  _cacheWarmSheetsIfNeeded(userSheets);
   console.timeEnd('getDashboardData:sheets');
   profile.marks.sheetsMs = Date.now() - tBatch;
 
-  // Unified JSON for client profiling / future client-side paint (no raw row dumps — sizes only + ids).
   const data = {
     userId: user.id,
     counts: {}
   };
-  dashSheets.forEach(function(name) {
+  userSheets.forEach(function(name) {
     const cur = _rowsCache[name];
     data.counts[name] = cur && cur.data ? cur.data.length : 0;
   });
@@ -130,76 +127,6 @@ function getDashboardData(sid) {
       return { id: u.id, name: u.name, role: Roles_label(u.role) };
     });
   }
-
-  let dash;
-  const tRender = Date.now();
-  try {
-    console.time('getDashboardData:render');
-    // light: shell + search bar; heavy results hydrate via module after paint
-    dash = _spaEnsureWrap(Views_dashboard({ sid: s, tab: 'search', light: true }));
-    console.timeEnd('getDashboardData:render');
-    profile.marks.renderMs = Date.now() - tRender;
-  } catch (e1) {
-    console.timeEnd('getDashboardData');
-    return {
-      ok: false,
-      error: e1 && e1.message ? e1.message : String(e1),
-      profile: profile
-    };
-  }
-  if (!dash || dash.body == null) {
-    console.timeEnd('getDashboardData');
-    return { ok: false, error: 'dashboard render failed', pages: [], profile: profile };
-  }
-
-  const page = {
-    page: 'dashboard',
-    params: { tab: 'search' },
-    body: dash.body,
-    title: dash.title || 'מסך הבית'
-  };
-
-  profile.marks.totalMs = Date.now() - t0;
-  console.timeEnd('getDashboardData');
-  Logger.log('getDashboardData profile: ' + JSON.stringify(profile));
-
-  return {
-    ok: true,
-    stage: 'dashboard',
-    sheets: dashSheets.length,
-    pages: [page],
-    dashboard: page,
-    data: data,
-    profile: profile,
-    modules: ['drawer.panels']
-  };
-}
-
-/** תאימות לאחור */
-function apiReadyDashboard(sid) {
-  return getDashboardData(sid);
-}
-
-/**
- * Step 3 — נתוני עמוד תרגילים (ברקע, אחרי הצגת דשבורד).
- */
-function getExercisesData(sid) {
-  const s = String(sid || '').trim();
-  if (!s) return { ok: false, pages: [] };
-
-  let user;
-  try {
-    user = Auth_current({ sid: s });
-  } catch (e0) {
-    return { ok: false, pages: [] };
-  }
-  if (!user) return { ok: false, pages: [] };
-
-  // בקשה חדשה — טוענים מ-Script Cache שכבר מולא ב-getDashboardData
-  const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
-    ? DB_DASHBOARD_SHEETS
-    : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
-  _cacheWarmSheetsIfNeeded(dashSheets.concat(['HomeConstraints', 'SystemLog']));
 
   const pages = [];
   function pushPage(page, params) {
@@ -217,17 +144,102 @@ function getExercisesData(sid) {
     } catch (err) {}
   }
 
-  // תרגילים + לוח שיבוץ — זמינים מוקדם (בלי לחכות ל־remaining)
+  let dash;
+  const tRender = Date.now();
+  try {
+    console.time('getDashboardData:render');
+    dash = _spaEnsureWrap(Views_dashboard({ sid: s, tab: 'search', light: true }));
+    console.timeEnd('getDashboardData:render');
+    profile.marks.renderMs = Date.now() - tRender;
+  } catch (e1) {
+    console.timeEnd('getDashboardData');
+    return {
+      ok: false,
+      error: e1 && e1.message ? e1.message : String(e1),
+      profile: profile
+    };
+  }
+  if (!dash || dash.body == null) {
+    console.timeEnd('getDashboardData');
+    return { ok: false, error: 'dashboard render failed', pages: [], profile: profile };
+  }
+
+  const dashPage = {
+    page: 'dashboard',
+    params: { tab: 'search' },
+    body: dash.body,
+    title: dash.title || 'מסך הבית'
+  };
+  pages.unshift(dashPage);
+
+  const modules = [];
+  if (Roles_hasAdminAccess(user.role)) {
+    pushPage('users', { tab: 'users' });
+    pushPage('users', { tab: 'teams' });
+    modules.push('users.tab.users', 'users.tab.teams');
+  }
+
+  profile.marks.totalMs = Date.now() - t0;
+  console.timeEnd('getDashboardData');
+  Logger.log('getDashboardData profile: ' + JSON.stringify(profile));
+
+  return {
+    ok: true,
+    stage: 'users',
+    sheets: userSheets.length,
+    pages: pages,
+    dashboard: dashPage,
+    data: data,
+    profile: profile,
+    modules: modules
+  };
+}
+
+/** תאימות לאחור */
+function apiReadyDashboard(sid) {
+  return getDashboardData(sid);
+}
+
+/**
+ * שלב 2 — תרגילים (ברקע, אחרי הצגת דשבורד).
+ */
+function getExercisesData(sid) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, pages: [] };
+
+  let user;
+  try {
+    user = Auth_current({ sid: s });
+  } catch (e0) {
+    return { ok: false, pages: [] };
+  }
+  if (!user) return { ok: false, pages: [] };
+
+  const exSheets = (typeof DB_EXERCISES_BOOT_SHEETS !== 'undefined' && DB_EXERCISES_BOOT_SHEETS.length)
+    ? DB_EXERCISES_BOOT_SHEETS
+    : ['Exercises', 'ExerciseDetails', 'Series'];
+  _cacheWarmSheetsIfNeeded(exSheets);
+
+  const pages = [];
+  function pushPage(page, params) {
+    try {
+      const p = Object.assign({}, params || {}, { sid: s });
+      const result = _spaEnsureWrap(_spaDispatchPage(page, p));
+      if (result && result.body != null) {
+        pages.push({
+          page: page,
+          params: params || {},
+          body: result.body,
+          title: result.title || ''
+        });
+      }
+    } catch (err) {}
+  }
+
   pushPage('exercises', { tab: 'list' });
   pushPage('exercises', { tab: 'calendar' });
   if (Roles_hasAdminAccess(user.role)) {
     pushPage('exercises', { tab: 'new' });
-  }
-  pushPage('assign', {});
-
-  if (Roles_hasAdminAccess(user.role)) {
-    pushPage('users', { tab: 'users' });
-    pushPage('users', { tab: 'teams' });
   }
 
   const modules = ['dashboard.tab.exercise'];
@@ -242,9 +254,9 @@ function getExercisesData(sid) {
 }
 
 /**
- * Step 4 — שאר הגיליונות + שאר דפי האפליקציה (ברקע).
+ * שלב 3 — שיבוצים + drawer panels + שאר דפים (ברקע).
  */
-function getRemainingAppData(sid) {
+function getAssignData(sid) {
   const s = String(sid || '').trim();
   if (!s) return { ok: false, pages: [] };
 
@@ -256,18 +268,24 @@ function getRemainingAppData(sid) {
   }
   if (!user) return { ok: false, pages: [] };
 
+  const assignSheets = (typeof DB_ASSIGN_BOOT_SHEETS !== 'undefined' && DB_ASSIGN_BOOT_SHEETS.length)
+    ? DB_ASSIGN_BOOT_SHEETS
+    : ['Assignments', 'HomeConstraints', 'SystemLog'];
+  _cacheWarmSheetsIfNeeded(assignSheets);
+
   const dashSheets = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
     ? DB_DASHBOARD_SHEETS
     : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
-
   const rest = DB_FULL_CACHE_SHEETS.filter(function(name) {
-    return dashSheets.indexOf(name) < 0;
+    return dashSheets.indexOf(name) < 0 &&
+      assignSheets.indexOf(name) < 0 &&
+      (typeof DB_USER_BOOT_SHEETS === 'undefined' || DB_USER_BOOT_SHEETS.indexOf(name) < 0) &&
+      (typeof DB_EXERCISES_BOOT_SHEETS === 'undefined' || DB_EXERCISES_BOOT_SHEETS.indexOf(name) < 0);
   });
-  // Warm remaining sheets (batch) — do not force-reload if Script Cache already has them
   if (rest.length) {
-    console.time('getRemainingAppData:sheets');
+    console.time('getAssignData:restSheets');
     _readSheetsBatch(rest, { force: false });
-    console.timeEnd('getRemainingAppData:sheets');
+    console.timeEnd('getAssignData:restSheets');
   }
   _cacheMarkWarmed();
 
@@ -287,11 +305,12 @@ function getRemainingAppData(sid) {
     } catch (err) {}
   }
 
+  pushPage('assign', {});
+
   pushPage('homeConstraints', {});
   pushPage('fieldForces', {});
   pushPage('fireZones', {});
   pushPage('timeline', {});
-  // assign כבר נטען ב־getExercisesData
 
   if (Roles_hasAdminAccess(user.role)) {
     pushPage('statistics', { section: 'kpi' });
@@ -307,10 +326,16 @@ function getRemainingAppData(sid) {
 
   return {
     ok: true,
-    stage: 'remaining',
-    sheets: rest.length,
-    pages: pages
+    stage: 'assign',
+    sheets: assignSheets.length + rest.length,
+    pages: pages,
+    modules: ['drawer.panels']
   };
+}
+
+/** @deprecated — השתמש ב-getAssignData */
+function getRemainingAppData(sid) {
+  return getAssignData(sid);
 }
 
 function apiGetUsersIndex(sid) {
@@ -330,14 +355,14 @@ function apiGetUsersIndex(sid) {
   };
 }
 
-/** תאימות לאחור — מחזיר טאבי דשבורד נוספים + שאר גיליונות */
+/** תאימות לאחור — מחזיר טאבי דשבורד + שיבוצים */
 function apiWarmRestAfterDashboard(sid) {
   const ex = getExercisesData(sid);
-  const rem = getRemainingAppData(sid);
+  const asn = getAssignData(sid);
   return {
     ok: true,
-    pages: [].concat((ex && ex.pages) || [], (rem && rem.pages) || []),
-    modules: (rem && rem.modules) || []
+    pages: [].concat((ex && ex.pages) || [], (asn && asn.pages) || []),
+    modules: [].concat((ex && ex.modules) || [], (asn && asn.modules) || [])
   };
 }
 

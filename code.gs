@@ -36,11 +36,15 @@ var DB_SHEET_NAMES = [
   'Assignments', 'FieldForces', 'FireZones', 'HomeConstraints', 'TimelineBlocks',
   'UserFieldDefs', 'UserFieldValues', 'Series', 'SystemLog'
 ];
-// מינימום לעלייה אחרי התחברות — דשבורד, חיפוש, שיבוצים (ללא Credentials / שטחי אש / ציר זמן)
+// שלב 1 עלייה — רק משתמשים/צוותים (+ שדות פרופיל)
+var DB_USER_BOOT_SHEETS = ['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues'];
+// שלב 2 — תרגילים
+var DB_EXERCISES_BOOT_SHEETS = ['Exercises', 'ExerciseDetails', 'Series'];
+// שלב 3 — שיבוצים (+ drawer)
+var DB_ASSIGN_BOOT_SHEETS = ['Assignments', 'HomeConstraints', 'SystemLog'];
+// מינimum session — כל גיליונות הליבה (לאחר 3 שלבי עלייה)
 var DB_SESSION_SHEETS = ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
-// כל מה שטאבי הדשבורד (חיפוש / צוות / תרגיל / התנגשויות) קוראים
 var DB_DASHBOARD_SHEETS = DB_SESSION_SHEETS;
-var DB_BOOT_SHEETS = DB_SESSION_SHEETS;
 var DB_TIMELINE_SHEETS = ['Users', 'Exercises', 'ExerciseDetails', 'TimelineBlocks', 'Assignments', 'FieldForces', 'FireZones'];
 var DB_CACHE_TTL_SEC = 21600;
 var DB_CACHE_PREFIX = 'mdb:';

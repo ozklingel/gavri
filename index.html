@@ -3574,18 +3574,14 @@ body {
       return true;
     }
 
-    /** LOADING מיידי + טעינת מודול (קאש או שרת) */
+    /** טעינת מודול — LOADING רק כשאין קאש וצריך שרת */
     function activateSlot(slot, opts) {
       if (!slot) return false;
       opts = opts || {};
-      showSlotLoading(slot);
-      slot.setAttribute('data-spa-module-loaded', '0');
-      return loadSlot(slot, {
-        skipLoader: true,
-        deferCacheFill: !opts.force,
-        force: !!opts.force
-      });
+      if (!opts.force && slot.getAttribute('data-spa-module-loaded') === '1') return false;
+      return loadSlot(slot, opts);
     }
+
     function load(root) {
       root = root || document.getElementById('app-content');
       if (!root) return;
@@ -3595,7 +3591,7 @@ body {
         if (tabPanel && tabPanel.hidden) return;
         var coll = slot.closest('.collapsible-content');
         if (coll && !coll.classList.contains('open')) return;
-        activateSlot(slot);
+        loadSlot(slot, { skipLoader: true });
       });
     }
     return {
@@ -3779,14 +3775,42 @@ body {
     }
 
     function activateTabModuleSlot(slot, opts) {
+      opts = opts || {};
       if (!slot || !window.MapimModules) return;
-      if (MapimModules.activateSlot) {
-        MapimModules.activateSlot(slot, opts || {});
-      } else {
+      if (opts.force) {
         MapimModules.showSlotLoading(slot);
         slot.setAttribute('data-spa-module-loaded', '0');
-        MapimModules.loadSlot(slot, { skipLoader: true });
+        MapimModules.loadSlot(slot, { skipLoader: true, force: true });
+        return;
       }
+      if (slot.getAttribute('data-spa-module-loaded') === '1') return;
+      var modId = slot.getAttribute('data-spa-module');
+      var params = MapimSpa.parseSpaParams ? MapimSpa.parseSpaParams(slot) : {};
+      var cached = MapimModules.get && modId ? MapimModules.get(modId, params) : null;
+      if (cached != null) {
+        MapimModules.loadSlot(slot, { skipLoader: true });
+        return;
+      }
+      MapimModules.showSlotLoading(slot);
+      slot.setAttribute('data-spa-module-loaded', '0');
+      MapimModules.loadSlot(slot, { skipLoader: true });
+    }
+
+    function prefillAllCachedModules() {
+      if (!window.MapimModules) return;
+      document.querySelectorAll('[data-spa-module]').forEach(function(slot) {
+        if (slot.getAttribute('data-spa-module-loaded') === '1') return;
+        var modId = slot.getAttribute('data-spa-module');
+        if (!modId) return;
+        var tabPanel = slot.closest('[data-users-tab-panel], [data-dash-tab-panel]');
+        if (tabPanel && tabPanel.hidden) return;
+        var coll = slot.closest('.collapsible-content');
+        if (coll && !coll.classList.contains('open')) return;
+        var params = MapimSpa.parseSpaParams ? MapimSpa.parseSpaParams(slot) : {};
+        if (MapimModules.get(modId, params) != null) {
+          MapimModules.loadSlot(slot, { skipLoader: true });
+        }
+      });
     }
 
     function refreshUsersPageAfterWrite(result, tabId) {
@@ -4049,11 +4073,29 @@ body {
         app.innerHTML = dash.body;
         runScripts(app);
         afterRender();
+        prefillAllCachedModules();
         if (dash.title) document.title = dash.title;
-        finishPriming({});
         return true;
       }
       return false;
+    }
+
+    function finishBootAndReveal() {
+      if (revealDashboardFromCache()) {
+        finishPriming({});
+        return;
+      }
+      gsCall('apiRenderPage', getSid(), 'dashboard', JSON.stringify({ tab: 'search' }))
+        .then(function(dash) {
+          if (dash && dash.body) {
+            storeClientPage(normalizeRoute('dashboard', { tab: 'search' }), dash);
+            revealDashboardFromCache();
+          }
+          finishPriming({});
+        })
+        .catch(function() {
+          finishPriming({});
+        });
     }
 
     var drawerPrefetchStarted = false;
@@ -4061,14 +4103,14 @@ body {
       prefetchDrawerModuleEarly();
     }
 
-    // ── Staged load: dashboard → exercises → remaining ──
+    // ── Staged load: users → exercises → assign (ברקע) ──
     var loadStage = {
-      dashboard: false,
+      users: false,
       exercises: false,
-      remaining: false,
+      assign: false,
       running: false
     };
-    var stageWaiters = { dashboard: [], exercises: [], remaining: [] };
+    var stageWaiters = { users: [], exercises: [], assign: [] };
 
     function gsCall(methodName) {
       var args = Array.prototype.slice.call(arguments, 1);
@@ -4110,9 +4152,10 @@ body {
     function stageForPage(page) {
       page = String(page || '');
       if (page === 'login') return null;
-      if (page === 'dashboard') return 'dashboard';
-      if (page === 'exercises' || page === 'exercise' || page === 'assign' || page === 'users') return 'exercises';
-      return 'remaining';
+      if (page === 'dashboard' || page === 'users' || page === 'user') return 'users';
+      if (page === 'exercises' || page === 'exercise') return 'exercises';
+      if (page === 'assign') return 'assign';
+      return 'assign';
     }
 
     function showLocalPageLoader(msg) {
@@ -4133,6 +4176,7 @@ body {
         }
       });
       if (gotDrawer) prefillDrawerModuleSlot();
+      prefillAllCachedModules();
     }
 
     function prefillDrawerModuleSlot() {
@@ -4168,28 +4212,26 @@ body {
     }
 
     /**
-     * Staged session load:
-     * 1) getDashboardData → paint dashboard, hide full-screen loader
-     * 2) getExercisesData (background, no modal)
-     * 3) getRemainingAppData (background, no modal)
+     * שלב 1 — משתמשים → הצגת דשבורד מיד (drawer + תפריט).
+     * שלב 2 — תרגילים (ברקע).
+     * שלב 3 — שיבוצים + drawer panels + שאר דפים (ברקע).
      */
     function startStagedLoad() {
       if (!getSid()) return;
       if (loadStage.running) return;
 
       loadStage.running = true;
-      loadStage.dashboard = false;
+      loadStage.users = false;
       loadStage.exercises = false;
-      loadStage.remaining = false;
+      loadStage.assign = false;
       primingInProgress = true;
       appPrimed = false;
 
-      MapimLoader.showPersistent('// LOADING DASHBOARD...');
-      MapimLoader.showSplashStatus('// LOADING DASHBOARD...');
+      MapimLoader.showPersistent('// LOADING USERS...');
+      MapimLoader.showSplashStatus('// LOADING USERS...');
 
       console.time('client:stagedLoad');
       console.time('client:getDashboardData');
-      var tDashRpc = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
       gsCall('getDashboardData', getSid())
         .catch(function() {
@@ -4197,14 +4239,6 @@ body {
         })
         .then(function(dashRes) {
           console.timeEnd('client:getDashboardData');
-          var rpcMs = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - tDashRpc;
-          if (dashRes && dashRes.profile) {
-            console.log('[mapim profile] server getDashboardData', dashRes.profile);
-            console.log('[mapim profile] unified data', dashRes.data || null);
-          }
-          console.log('[mapim profile] client RPC+transfer getDashboardData ms=', Math.round(rpcMs));
-
-          console.time('client:paintDashboard');
           if (dashRes && dashRes.ok !== false) {
             storePagesList(dashRes.pages);
             if (dashRes.data && dashRes.data.usersIndex) {
@@ -4217,89 +4251,64 @@ body {
               );
             }
           }
-          if (!revealDashboardFromCache()) {
-            // fallback server render
-            return gsCall('apiRenderPage', getSid(), 'dashboard', JSON.stringify({ tab: 'search' }))
-              .then(function(dash) {
-                if (dash && dash.body) {
-                  storeClientPage(normalizeRoute('dashboard', { tab: 'search' }), dash);
-                  revealDashboardFromCache();
-                } else {
-                  finishPriming({});
-                }
-                return dashRes;
-              });
-          }
-          return dashRes;
-        })
-        .then(function(dashRes) {
-          console.timeEnd('client:paintDashboard');
-          notifyStage('dashboard');
-          appPrimed = true;
-          primingInProgress = false;
-          if (dashRes && dashRes.modules && dashRes.modules.length) {
-            gsCall('apiPrefetchModules', getSid(), JSON.stringify(dashRes.modules))
-              .then(function(modRes) { storeModulesList(modRes && modRes.modules); })
-              .catch(function() {});
-          } else {
-            prefetchDrawerModuleEarly();
-          }
-          // Step 3 — background, no full-screen loader
-          console.time('client:getExercisesData');
-          return gsCall('getExercisesData', getSid());
-        })
-        .then(function(res) {
-          console.timeEnd('client:getExercisesData');
-          storePagesList(res && res.pages);
-          var modPrefetch = (res && res.modules && res.modules.length)
-            ? gsCall('apiPrefetchModules', getSid(), JSON.stringify(res.modules))
+          notifyStage('users');
+          var modP1 = (dashRes && dashRes.modules && dashRes.modules.length)
+            ? gsCall('apiPrefetchModules', getSid(), JSON.stringify(dashRes.modules))
                 .then(function(modRes) { storeModulesList(modRes && modRes.modules); })
                 .catch(function() {})
             : Promise.resolve();
-          return modPrefetch.then(function() {
-            notifyStage('exercises');
-            console.time('client:getRemainingAppData');
-            return gsCall('getRemainingAppData', getSid());
+          return modP1.then(function() {
+            finishBootAndReveal();
+            appPrimed = true;
+            primingInProgress = false;
           });
         })
-        .then(function(res) {
-          console.timeEnd('client:getRemainingAppData');
-          storePagesList(res && res.pages);
-          if (res && res.modules && res.modules.length) {
-            return gsCall('apiPrefetchModules', getSid(), JSON.stringify(res.modules))
-              .then(function(modRes) {
-                storeModulesList(modRes && modRes.modules);
-              })
-              .catch(function() {});
-          }
-        })
         .then(function() {
-          notifyStage('remaining');
-          loadStage.running = false;
-          appPrimed = true;
-          primingInProgress = false;
-          console.timeEnd('client:stagedLoad');
+          console.time('client:getExercisesData');
+          return gsCall('getExercisesData', getSid());
+        })
+        .then(function(exRes) {
+          console.timeEnd('client:getExercisesData');
+          storePagesList(exRes && exRes.pages);
+          var modP2 = (exRes && exRes.modules && exRes.modules.length)
+            ? gsCall('apiPrefetchModules', getSid(), JSON.stringify(exRes.modules))
+                .then(function(modRes) { storeModulesList(modRes && modRes.modules); })
+                .catch(function() {})
+            : Promise.resolve();
+          return modP2.then(function() {
+            notifyStage('exercises');
+            console.time('client:getAssignData');
+            return gsCall('getAssignData', getSid())
+              .catch(function() { return gsCall('getRemainingAppData', getSid()); });
+          });
+        })
+        .then(function(asnRes) {
+          console.timeEnd('client:getAssignData');
+          storePagesList(asnRes && asnRes.pages);
+          var modP3 = (asnRes && asnRes.modules && asnRes.modules.length)
+            ? gsCall('apiPrefetchModules', getSid(), JSON.stringify(asnRes.modules))
+                .then(function(modRes) { storeModulesList(modRes && modRes.modules); })
+                .catch(function() {})
+            : Promise.resolve();
+          return modP3.then(function() {
+            notifyStage('assign');
+            loadStage.running = false;
+            console.timeEnd('client:stagedLoad');
+          });
         })
         .catch(function(err) {
           try { console.timeEnd('client:getDashboardData'); } catch (e1) {}
-          try { console.timeEnd('client:paintDashboard'); } catch (e2) {}
-          try { console.timeEnd('client:getExercisesData'); } catch (e3) {}
-          try { console.timeEnd('client:getRemainingAppData'); } catch (e4) {}
-          try { console.timeEnd('client:stagedLoad'); } catch (e5) {}
+          try { console.timeEnd('client:getExercisesData'); } catch (e2) {}
+          try { console.timeEnd('client:getAssignData'); } catch (e3) {}
+          try { console.timeEnd('client:stagedLoad'); } catch (e4) {}
           console.warn('[mapim profile] stagedLoad error', err);
           loadStage.running = false;
           primingInProgress = false;
           appPrimed = true;
-          notifyStage('dashboard');
+          notifyStage('users');
           notifyStage('exercises');
-          notifyStage('remaining');
-          if (!document.getElementById('app-content') ||
-              !document.getElementById('app-content').innerHTML) {
-            revealDashboardFromCache();
-            finishPriming({});
-          }
-          MapimLoader.hide();
-          finishBootUi();
+          notifyStage('assign');
+          finishBootAndReveal();
         });
     }
 
@@ -4428,15 +4437,11 @@ body {
         document.body.classList.add('drawer-open');
         var panelsSlot = document.querySelector('#appDrawerPanels [data-spa-module="drawer.panels"]');
         if (panelsSlot && window.MapimModules) {
-          var cached = MapimModules.get && MapimModules.get('drawer.panels', {}) != null;
-          if (cached) {
+          if (MapimModules.get && MapimModules.get('drawer.panels', {}) != null) {
             MapimModules.loadSlot(panelsSlot, { skipLoader: true });
-          } else {
-            if (panelsSlot.getAttribute('data-spa-module-loaded') !== '1') {
-              panelsSlot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
-            }
-            MapimModules.loadSlot(panelsSlot);
-            prefetchDrawerModuleEarly();
+          } else if (panelsSlot.getAttribute('data-spa-module-loaded') !== '1') {
+            panelsSlot.innerHTML = '';
+            MapimModules.loadSlot(panelsSlot, { skipLoader: true });
           }
         }
       }
@@ -4548,8 +4553,6 @@ body {
       if (!options.fromBack && !options.fromForward) forwardStack = [];
       var prevRoute = currentRoute;
       var nextRoute = normalizeRoute(page, params);
-      var isSamePageTab = prevRoute && prevRoute.page === page &&
-        routeKey(prevRoute) !== routeKey(nextRoute);
 
       function commitNav(result, fromCache) {
         if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
@@ -4560,27 +4563,19 @@ body {
         applyResult(result, fromCache ? { fromClientCache: true, skipPrime: true } : { skipPrime: true });
       }
 
-      if (isSamePageTab && !options.fromBack && !options.fromForward && page !== 'login') {
-        showLocalPageLoader('// LOADING...');
-      }
-
-      // קאש לקוח — מיידי
+      // קאש לקוח — מיידי, בלי loader
       if (!options.force && !options.skipCache && page !== 'login') {
         var cached = getClientPage(nextRoute);
         if (cached) {
-          if (isSamePageTab) {
-            requestAnimationFrame(function() { commitNav(cached, true); });
-          } else {
-            commitNav(cached, true);
-          }
+          commitNav(cached, true);
           return;
         }
       }
 
-      // שלב רקע עדיין רץ — ממתין עם לוודר מקומי (לא חוסם מסך מלא)
+      // שלב רקע עדיין רץ — ממתין (בעיקר בזמן עלייה)
       var needed = stageForPage(page);
       if (needed && !loadStage[needed] && loadStage.running && page !== 'login' && !options.force) {
-        showLocalPageLoader('// LOADING ' + page.toUpperCase() + '...');
+        showLocalPageLoader('// LOADING...');
         currentRoute = nextRoute;
         whenStageReady(needed).then(function() {
           var hit = getClientPage(nextRoute);
@@ -4588,7 +4583,6 @@ body {
             commitNav(hit, true);
             return;
           }
-          // עדיין אין בקאש — קריאה לשרת
           google.script.run
             .withSuccessHandler(function(result) {
               if (result && result.body) storeClientPage(nextRoute, result);
@@ -4605,8 +4599,13 @@ body {
       var booting = initialBoot;
       if (booting) initialBoot = false;
       var loadLabel = MapimLoader.labelFor('page=' + page);
-      if (booting) MapimLoader.showSplashStatus(loadLabel);
-      else MapimLoader.show(loadLabel);
+      if (booting) {
+        MapimLoader.showSplashStatus(loadLabel);
+      } else if (appPrimed) {
+        showLocalPageLoader('// LOADING...');
+      } else {
+        MapimLoader.show(loadLabel);
+      }
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
@@ -4619,10 +4618,71 @@ body {
         .apiRenderPage(getSid(), page, JSON.stringify(nextRoute.params || {}));
     }
 
+    /** פעולות עם תשובה קלה — רק מודול/נתיב, בלי החלפת דף מלא */
+    var LIGHT_ACTIONS = {
+      importUsers: true,
+      deleteUser: true,
+      deleteUsersBulk: true
+    };
+
+    var routesByAction = {
+      createExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics'],
+      editExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics'],
+      duplicateExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline'],
+      deleteExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+      deleteExercisesBulk: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+      buildSeries: ['exercises', 'dashboard', 'assign', 'timeline', 'statistics', 'seriesArchive'],
+      addDetail: ['exercise', 'timeline', 'dashboard'],
+      updateDetail: ['exercise', 'timeline', 'dashboard'],
+      deleteDetail: ['exercise', 'timeline', 'dashboard'],
+      generateTimeline: ['exercise', 'timeline', 'dashboard'],
+      assign: ['assign', 'exercise', 'dashboard', 'exercises', 'statistics'],
+      assignTeam: ['assign', 'exercise', 'dashboard', 'exercises'],
+      removeAssignment: ['assign', 'exercise', 'dashboard', 'exercises', 'statistics'],
+      updateAssignment: ['assign', 'exercise', 'dashboard', 'statistics'],
+      complete: ['assign', 'exercise', 'dashboard', 'statistics'],
+      autoAssignAll: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+      autoAssignGroup: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+      clearAllAssignments: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
+      clearAssignGroup: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics'],
+      createUser: ['users', 'dashboard', 'assign'],
+      importUsers: ['users', 'dashboard', 'assign'],
+      deleteUser: ['users', 'dashboard', 'assign'],
+      deleteUsersBulk: ['users', 'dashboard', 'assign'],
+      updateRole: ['users', 'dashboard', 'assign'],
+      updateProfile: ['users', 'user', 'dashboard', 'assign'],
+      createTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
+      renameTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
+      deleteTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
+      autoSplitTeams: ['users', 'assign', 'dashboard', 'teamMatrix'],
+      setCommander: ['users', 'assign', 'dashboard'],
+      addMember: ['users', 'assign', 'dashboard'],
+      removeMember: ['users', 'assign', 'dashboard'],
+      saveFeedback: ['feedback', 'exercise', 'dashboard', 'statistics'],
+      updateExerciseTimes: ['timeline', 'dashboard', 'exercises', 'assign', 'statistics', 'exercise'],
+      createHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
+      approveHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
+      rejectHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
+      createTimelineBlock: ['timeline'],
+      deleteTimelineBlock: ['timeline'],
+      createFieldForce: ['fieldForces', 'exercises', 'exercise'],
+      updateFieldForce: ['fieldForces', 'exercises', 'exercise'],
+      deleteFieldForce: ['fieldForces', 'exercises', 'exercise'],
+      createFireZone: ['fireZones', 'exercises', 'exercise'],
+      updateFireZone: ['fireZones', 'exercises', 'exercise'],
+      deleteFireZone: ['fireZones', 'exercises', 'exercise'],
+      deleteArchivedSeries: ['seriesArchive', 'exercises', 'dashboard']
+    };
+
     function runAction(action, params) {
       var myReq = ++reqId;
       loading = true;
-      MapimLoader.show(MapimLoader.labelFor('action=' + (action || '')));
+      var isLight = !!LIGHT_ACTIONS[action];
+      if (!appPrimed) {
+        MapimLoader.show(MapimLoader.labelFor('action=' + (action || '')));
+      } else if (!isLight) {
+        MapimLoader.show('// SAVING...');
+      }
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
@@ -4632,59 +4692,10 @@ body {
             applyResult(result);
             return;
           }
-          // לא מוחקים את כל הקאש — רק דפים שמושפעים מהפעולה
-          var routesByAction = {
-            createExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics'],
-            editExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics'],
-            duplicateExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline'],
-            deleteExercise: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix'],
-            deleteExercisesBulk: ['exercises', 'exercise', 'dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix'],
-            buildSeries: ['exercises', 'dashboard', 'assign', 'timeline', 'statistics', 'seriesArchive'],
-            addDetail: ['exercise', 'timeline', 'dashboard'],
-            updateDetail: ['exercise', 'timeline', 'dashboard'],
-            deleteDetail: ['exercise', 'timeline', 'dashboard'],
-            generateTimeline: ['exercise', 'timeline', 'dashboard'],
-            assign: ['assign', 'exercise', 'dashboard', 'exercises', 'statistics'],
-            assignTeam: ['assign', 'exercise', 'dashboard', 'exercises'],
-            removeAssignment: ['assign', 'exercise', 'dashboard', 'exercises', 'statistics'],
-            updateAssignment: ['assign', 'exercise', 'dashboard', 'statistics'],
-            complete: ['assign', 'exercise', 'dashboard', 'statistics'],
-            autoAssignAll: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
-            autoAssignGroup: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
-            clearAllAssignments: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix'],
-            clearAssignGroup: ['assign', 'dashboard', 'exercises', 'exercise', 'statistics'],
-            createUser: ['users', 'dashboard', 'assign'],
-            importUsers: ['users', 'dashboard', 'assign'],
-            deleteUser: ['users', 'dashboard', 'assign'],
-            deleteUsersBulk: ['users', 'dashboard', 'assign'],
-            updateRole: ['users', 'dashboard', 'assign'],
-            updateProfile: ['users', 'user', 'dashboard', 'assign'],
-            createTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
-            renameTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
-            deleteTeam: ['users', 'assign', 'dashboard', 'teamMatrix'],
-            autoSplitTeams: ['users', 'assign', 'dashboard', 'teamMatrix'],
-            setCommander: ['users', 'assign', 'dashboard'],
-            addMember: ['users', 'assign', 'dashboard'],
-            removeMember: ['users', 'assign', 'dashboard'],
-            saveFeedback: ['feedback', 'exercise', 'dashboard', 'statistics'],
-            updateExerciseTimes: ['timeline', 'dashboard', 'exercises', 'assign', 'statistics', 'exercise'],
-            createHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
-            approveHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
-            rejectHomeConstraint: ['homeConstraints', 'assign', 'dashboard'],
-            createTimelineBlock: ['timeline'],
-            deleteTimelineBlock: ['timeline'],
-            createFieldForce: ['fieldForces', 'exercises', 'exercise'],
-            updateFieldForce: ['fieldForces', 'exercises', 'exercise'],
-            deleteFieldForce: ['fieldForces', 'exercises', 'exercise'],
-            createFireZone: ['fireZones', 'exercises', 'exercise'],
-            updateFireZone: ['fireZones', 'exercises', 'exercise'],
-            deleteFireZone: ['fireZones', 'exercises', 'exercise'],
-            deleteArchivedSeries: ['seriesArchive', 'exercises', 'dashboard']
-          };
           var toInvalidate = routesByAction[action] ||
             ['dashboard', 'assign', 'timeline', 'statistics', 'exerciseMatrix', 'teamMatrix', 'exercises'];
           invalidateClientRoutes(toInvalidate);
-          if (currentRoute && currentRoute.page) {
+          if (!(result && result.body) && currentRoute && currentRoute.page) {
             invalidateClientRoutes([currentRoute.page]);
           }
           if (action === 'importUsers' || action === 'createUser' || action === 'deleteUser' || action === 'deleteUsersBulk') {
@@ -4721,14 +4732,12 @@ body {
             currentRoute = normalizeRoute('assign', {});
           }
           applyResult(result, { skipPrime: true });
-          // אחרי יצירת נוה״ק — גלול לכרטיס הנוהל אם קיים
           if (action === 'generateTimeline' || action === 'addDetail' || action === 'updateDetail' || action === 'deleteDetail') {
             setTimeout(function() {
               var card = document.getElementById('exercise-procedure-card');
               if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 50);
           }
-          // בלי reprime מלא אחרי כל כתיבה (זה גרם ל-3–4ש׳ לקליק הבא)
         })
         .withFailureHandler(function(err) {
           if (myReq !== reqId) return;
@@ -4781,8 +4790,8 @@ body {
       setTimeout(loadAppBackgroundLazy, 0);
       var sid = getSid();
       if (sid) {
-        MapimLoader.showSplashStatus('// LOADING DASHBOARD...');
-        MapimLoader.showPersistent('// LOADING DASHBOARD...');
+        MapimLoader.showSplashStatus('// LOADING USERS...');
+        MapimLoader.showPersistent('// LOADING USERS...');
         startStagedLoad();
       } else {
         MapimLoader.showSplashStatus('טוען...');
@@ -4889,9 +4898,9 @@ body {
       isPriming: function() { return !!loadStage.running || !!primingInProgress; },
       getLoadStage: function() {
         return {
-          dashboard: !!loadStage.dashboard,
+          users: !!loadStage.users,
           exercises: !!loadStage.exercises,
-          remaining: !!loadStage.remaining,
+          assign: !!loadStage.assign,
           running: !!loadStage.running
         };
       },
@@ -5833,11 +5842,7 @@ body {
       content.querySelectorAll('[data-spa-module]').forEach(function(slot) {
         if (window.MapimSpa && MapimSpa.activateTabModuleSlot) {
           MapimSpa.activateTabModuleSlot(slot);
-        } else if (MapimModules.activateSlot) {
-          MapimModules.activateSlot(slot);
         } else {
-          MapimModules.showSlotLoading(slot);
-          slot.setAttribute('data-spa-module-loaded', '0');
           MapimModules.loadSlot(slot, { skipLoader: true });
         }
       });
