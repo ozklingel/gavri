@@ -85,7 +85,7 @@ function _exercisesListModuleHtml(user, sid, exs) {
   if (!exs) exs = Exercises_all();
   const mpCounts = Assignments_mpCountByExercise();
 
-  let s = '<div class="card"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
+  let s = '<div class="card card-list-scroll"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
 
   if (!exs.length) {
     s += '<div class="empty">אין תרגילים במערכת</div>';

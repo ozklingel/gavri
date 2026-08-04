@@ -550,6 +550,49 @@ function Users_extractTeamFromImportRow(row) {
   return '';
 }
 
+/** מפת שם צוות → מזהה (לייבוא — בלי קריאות חוזרות ל-Teams_all) */
+function Users_buildTeamNameMap() {
+  const map = {};
+  Teams_all().forEach(function(t) {
+    const n = String(t.name || '').trim();
+    if (!n) return;
+    map[n] = t.id;
+    if (/^\d+$/.test(n)) map['צוות ' + n] = t.id;
+  });
+  return map;
+}
+
+function Users_ensureTeamIdForImportMap(raw, teamNameToId, createdNames, pendingTeamRows, teamIdSeq) {
+  const nameKey = Users_normalizeTeamImportRaw(raw);
+  if (!nameKey) return '';
+
+  if (teamNameToId[nameKey]) return teamNameToId[nameKey];
+
+  const mapKey = nameKey.toLowerCase();
+  if (createdNames && createdNames[mapKey]) return createdNames[mapKey];
+
+  let newId;
+  if (teamIdSeq) {
+    teamIdSeq.next += 1;
+    newId = 'T' + teamIdSeq.next;
+  } else {
+    newId = _nextTeamId();
+  }
+  if (pendingTeamRows) pendingTeamRows.push([newId, nameKey, '']);
+  else _append('Teams', [newId, nameKey, '']);
+
+  teamNameToId[nameKey] = newId;
+  if (createdNames) {
+    createdNames[mapKey] = newId;
+    createdNames[String(newId).toLowerCase()] = newId;
+    if (/^\d+$/.test(nameKey)) {
+      createdNames[('צוות ' + nameKey).toLowerCase()] = newId;
+      teamNameToId['צוות ' + nameKey] = newId;
+    }
+  }
+  return newId;
+}
+
 function Users_importBulk(p) {
   Auth_requireRole(p, ['admin']);
 
@@ -572,17 +615,36 @@ function Users_importBulk(p) {
   var errors = [];
   var teamChangeNotes = [];
   try {
-  // איתור לפי מספר אישי + לפי שם מלא (אם המספר במערכת שונה מהקובץ)
+  const usersMeta = _rows('Users');
+  const sheetRows = usersMeta.data.map(function(r) { return r.slice(); });
+  const numCols = sheetRows.length ? sheetRows[0].length : 11;
+
   const idByNorm = {};
   const nameToSheetId = {};
-  _rows('Users').data.forEach(function(r) {
+  const idToSheetIdx = {};
+  const usersById = {};
+  sheetRows.forEach(function(r, idx) {
     const sheetId = String(r[0] || '').trim();
     const sheetName = String(r[1] || '').replace(/\s+/g, ' ').trim();
     if (!sheetId) return;
+    idToSheetIdx[sheetId] = idx;
     idByNorm[sheetId] = sheetId;
     const norm = Users_normalizeIdForImport(sheetId);
     if (norm) idByNorm[norm] = sheetId;
     if (sheetName) nameToSheetId[sheetName] = sheetId;
+    usersById[sheetId] = {
+      id: sheetId,
+      name: sheetName,
+      role: Roles_normalize(String(r[2] || '')),
+      team_id: String(r[3] || ''),
+      unit_affiliation: String(r[4] || ''),
+      service_type: String(r[5] || ''),
+      military_affiliation: String(r[6] || ''),
+      unit_classification: String(r[7] || ''),
+      target_role: String(r[8] || ''),
+      phone: r[9] == null ? '' : String(r[9]),
+      email: r[10] == null ? '' : String(r[10])
+    };
   });
 
   let autoIds = null;
@@ -591,11 +653,22 @@ function Users_importBulk(p) {
   const newUserRows = [];
   const newCredRows = [];
   const createdTeamNames = {};
-  const teamsBefore = Teams_all().length;
+  const teamNameToId = Users_buildTeamNameMap();
+  const pendingTeamRows = [];
+  let teamMax = 0;
+  _rows('Teams').data.forEach(function(r) {
+    const tid = String(r[0] || '');
+    const m = tid.match(/^T(\d+)$/i);
+    if (m) teamMax = Math.max(teamMax, parseInt(m[1], 10));
+    else {
+      const n = parseInt(tid, 10);
+      if (!isNaN(n)) teamMax = Math.max(teamMax, n);
+    }
+  });
+  const teamIdSeq = { next: teamMax };
   const usersSheet = _sheet('Users');
-  let teamCol = _colIndex('Users', 'team_id');
-  teamCol = teamCol >= 0 ? teamCol + 1 : 4;
   const teamById = Teams_byIdMap();
+  let sheetDirty = false;
 
   rows.forEach(function(row, i) {
     const name = String(row.name || '').replace(/\s+/g, ' ').trim();
@@ -633,9 +706,11 @@ function Users_importBulk(p) {
     let teamId = '';
     if (hasTeamInFile) {
       try {
-        teamId = Users_ensureTeamIdForImport(teamRaw, createdTeamNames);
+        teamId = Users_ensureTeamIdForImportMap(teamRaw, teamNameToId, createdTeamNames, pendingTeamRows, teamIdSeq);
         if (!teamId) {
           errors.push('שורה ' + line + ': לא נוצר צוות עבור «' + teamRaw + '»');
+        } else if (!teamById[teamId]) {
+          teamById[teamId] = { id: teamId, name: teamRaw, commander_id: '' };
         }
       } catch (teamErr) {
         errors.push('שורה ' + line + ': יצירת צוות «' + teamRaw + '» נכשלה — ' +
@@ -643,17 +718,16 @@ function Users_importBulk(p) {
       }
     }
 
-    // קודם לפי מספר אישי, אחרת לפי שם מלא מדויק (מתקן מקרה כמו הראל ליפשיץ)
     let sheetId = idByNorm[id] || '';
     if (!sheetId && nameToSheetId[name]) sheetId = nameToSheetId[name];
 
     if (sheetId) {
-      const sheetRow = _findRowIndex('Users', sheetId);
-      if (sheetRow < 0) {
+      const dataIdx = idToSheetIdx[sheetId];
+      if (dataIdx == null || dataIdx < 0) {
         errors.push('שורה ' + line + ': רשומה ' + sheetId + ' לא נמצאה בגיליון');
         return;
       }
-      const cur = Users_get(sheetId) || {};
+      const cur = usersById[sheetId] || {};
       const prevTeam = String(cur.team_id || '');
       if (!hasTeamInFile) teamId = prevTeam;
 
@@ -668,22 +742,32 @@ function Users_importBulk(p) {
       const nextTarget = targetRole !== '' ? targetRole : String(cur.target_role || '');
       const nextPhone = phone !== '' ? phone : String(cur.phone || '');
       const nextEmail = email !== '' ? email : String(cur.email || '');
+      const nextTeam = hasTeamInFile ? teamId : prevTeam;
 
-      // כתיבת כל השדות — team_id בעמודה 4 (או לפי כותרת)
-      const rowValues = [
-        name,
-        roleToWrite,
-        teamId,
-        nextUnitAff,
-        nextService,
-        nextMilitary,
-        nextUnitClass,
-        nextTarget,
-        nextPhone,
-        nextEmail
-      ];
-      usersSheet.getRange(sheetRow, 2, 1, 10).setValues([rowValues]);
-      usersSheet.getRange(sheetRow, teamCol).setValue(hasTeamInFile ? teamId : prevTeam);
+      sheetRows[dataIdx][1] = name;
+      sheetRows[dataIdx][2] = roleToWrite;
+      sheetRows[dataIdx][3] = nextTeam;
+      sheetRows[dataIdx][4] = nextUnitAff;
+      sheetRows[dataIdx][5] = nextService;
+      sheetRows[dataIdx][6] = nextMilitary;
+      sheetRows[dataIdx][7] = nextUnitClass;
+      sheetRows[dataIdx][8] = nextTarget;
+      sheetRows[dataIdx][9] = nextPhone;
+      sheetRows[dataIdx][10] = nextEmail;
+      sheetDirty = true;
+
+      usersById[sheetId] = Object.assign({}, cur, {
+        name: name,
+        role: roleToWrite,
+        team_id: nextTeam,
+        unit_affiliation: nextUnitAff,
+        service_type: nextService,
+        military_affiliation: nextMilitary,
+        unit_classification: nextUnitClass,
+        target_role: nextTarget,
+        phone: nextPhone,
+        email: nextEmail
+      });
 
       if (hasTeamInFile && String(teamId) !== String(prevTeam)) {
         teamsReassigned++;
@@ -718,13 +802,13 @@ function Users_importBulk(p) {
     added++;
   });
 
-  const createdIds = {};
-  Object.keys(createdTeamNames).forEach(function(k) {
-    createdIds[createdTeamNames[k]] = true;
-  });
-  teamsCreated = Object.keys(createdIds).length;
-  if (!teamsCreated) teamsCreated = Math.max(0, Teams_all().length - teamsBefore);
+  if (pendingTeamRows.length) _appendBatch('Teams', pendingTeamRows);
 
+  teamsCreated = pendingTeamRows.length;
+
+  if (sheetDirty && sheetRows.length) {
+    usersSheet.getRange(2, 1, sheetRows.length, numCols).setValues(sheetRows);
+  }
   if (newUserRows.length) _appendBatch('Users', newUserRows);
   if (newCredRows.length) _appendBatch('Credentials', newCredRows);
 
@@ -759,5 +843,5 @@ function Users_importBulk(p) {
     info += ' · התראות: ' + errors.slice(0, 3).join(' | ');
   }
 
-  return Views_users({ sid: p.sid, tab: 'users', info: info });
+  return { ok: true, info: info, page: 'users', tab: 'users' };
 }

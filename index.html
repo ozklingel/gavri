@@ -1148,6 +1148,7 @@ body {
       padding: 3px 8px;
     }
     .card-body { padding: 14px; }
+    .card.card-list-scroll { overflow: visible; }
     .card-actions {
       padding: 10px 14px;
       border-top: 1px solid var(--border);
@@ -2760,13 +2761,10 @@ body {
       display: flex;
       flex-direction: column;
       max-height: min(68vh, calc(100dvh - 240px));
-      overflow: hidden;
       border-top: 1px solid var(--border);
     }
     .list-scroll-toolbar {
       flex-shrink: 0;
-      position: sticky;
-      top: 0;
       z-index: 3;
       background: var(--surface, #fff);
       border-bottom: 1px solid var(--border);
@@ -3498,6 +3496,14 @@ body {
       moduleEpoch++;
     }
 
+    function invalidateModule(moduleId) {
+      var prefix = String(moduleId || '') + '::';
+      Object.keys(moduleCache).forEach(function(k) {
+        if (k.indexOf(prefix) === 0) delete moduleCache[k];
+      });
+      moduleEpoch++;
+    }
+
     function store(moduleId, params, html) {
       if (!moduleId || html == null) return;
       moduleCache[moduleKey(moduleId, params)] = { html: html, epoch: moduleEpoch };
@@ -3560,12 +3566,14 @@ body {
       if (!root) return;
       root.querySelectorAll('[data-spa-module]:not([data-spa-module-loaded="1"])').forEach(function(slot) {
         if (slot.closest('.lazy-tab-panel[hidden]')) return;
+        var tabPanel = slot.closest('[data-users-tab-panel], [data-dash-tab-panel]');
+        if (tabPanel && tabPanel.hidden) return;
         var coll = slot.closest('.collapsible-content');
         if (coll && !coll.classList.contains('open')) return;
         loadSlot(slot);
       });
     }
-    return { load: load, loadSlot: loadSlot, store: store, get: get, invalidate: invalidate };
+    return { load: load, loadSlot: loadSlot, store: store, get: get, invalidate: invalidate, invalidateModule: invalidateModule };
   })();
 
   // ══ SPA router — fixed URL, no full page reloads ══
@@ -3786,6 +3794,87 @@ body {
         e.stopPropagation();
         switchDashboardTab(link.getAttribute('data-dash-tab'));
       });
+    }
+
+    function switchUsersTab(tabId) {
+      var page = document.querySelector('.page-users');
+      if (!page) return;
+      tabId = String(tabId || 'users').trim() || 'users';
+      page.querySelectorAll('.users-local-tabs .tab-link').forEach(function(a) {
+        a.classList.toggle('active', a.getAttribute('data-users-tab') === tabId);
+      });
+      page.querySelectorAll('[data-users-tab-panel]').forEach(function(panel) {
+        var show = panel.getAttribute('data-users-tab-panel') === tabId;
+        panel.hidden = !show;
+        if (show) {
+          var slot = panel.querySelector('[data-spa-module]');
+          if (slot) {
+            var needsLoad = slot.getAttribute('data-spa-module-loaded') !== '1';
+            if (needsLoad && window.MapimModules) {
+              var params = MapimSpa.parseSpaParams ? MapimSpa.parseSpaParams(slot) : {};
+              var modId = slot.getAttribute('data-spa-module');
+              var cached = MapimModules.get && modId ? MapimModules.get(modId, params) : null;
+              if (cached == null) slot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
+            }
+            if (window.MapimModules) MapimModules.loadSlot(slot);
+          }
+        }
+      });
+      if (currentRoute && currentRoute.page === 'users') {
+        currentRoute = normalizeRoute('users', { tab: tabId });
+      }
+    }
+
+    function initUsersTabs() {
+      var page = document.querySelector('.page-users');
+      if (!page || page._usersTabsInited) return;
+      var bar = page.querySelector('.users-local-tabs');
+      if (!bar) return;
+      page._usersTabsInited = true;
+      bar.addEventListener('click', function(e) {
+        var link = e.target.closest('[data-users-tab]');
+        if (!link) return;
+        e.preventDefault();
+        e.stopPropagation();
+        switchUsersTab(link.getAttribute('data-users-tab'));
+      });
+    }
+
+    function reloadUsersTabModule(tabId) {
+      var panel = document.querySelector('[data-users-tab-panel="' + tabId + '"]');
+      if (!panel) return;
+      var slot = panel.querySelector('[data-spa-module]');
+      if (!slot || !window.MapimModules) return;
+      var modId = slot.getAttribute('data-spa-module');
+      if (MapimModules.invalidateModule && modId) MapimModules.invalidateModule(modId);
+      slot.setAttribute('data-spa-module-loaded', '0');
+      slot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
+      MapimModules.loadSlot(slot);
+    }
+
+    function showUsersPageFlash(msg) {
+      if (!msg) return;
+      var page = document.querySelector('.page-users');
+      if (!page) return;
+      var old = page.querySelector('.flash-users-inline');
+      if (old) old.remove();
+      var div = document.createElement('div');
+      div.className = 'flash flash-success flash-users-inline';
+      div.textContent = msg;
+      var anchor = page.querySelector('h1.page-title');
+      if (anchor && anchor.parentElement) {
+        anchor.parentElement.insertAdjacentElement('afterend', div);
+      } else {
+        page.insertBefore(div, page.firstChild);
+      }
+    }
+
+    function resetXlsxImportBtn() {
+      var btn = document.getElementById('xlsxImportBtn');
+      if (!btn) return;
+      btn._importing = false;
+      btn.disabled = false;
+      btn.textContent = 'ייבוא למערכת';
     }
     var appPrimed = false;
     var primingInProgress = false;
@@ -4213,6 +4302,7 @@ body {
       if (typeof initTimelineWeek === 'function') initTimelineWeek();
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
       if (typeof initDashboardTabs === 'function') initDashboardTabs();
+      if (typeof initUsersTabs === 'function') initUsersTabs();
       if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
       if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
@@ -4488,6 +4578,24 @@ body {
             currentRoute = normalizeRoute('users', { tab: 'users' });
             refreshUsersIndex();
           }
+          if (action === 'importUsers' && result.ok && !result.body) {
+            if (window.MapimModules && MapimModules.invalidateModule) {
+              MapimModules.invalidateModule('users.tab.users');
+              MapimModules.invalidateModule('users.tab.teams');
+            }
+            if (currentRoute && currentRoute.page === 'users') {
+              showUsersPageFlash(result.info || 'ייבוא הושלם');
+              reloadUsersTabModule('users');
+              resetXlsxImportBtn();
+              finishBootUi();
+              loading = false;
+              return;
+            }
+            finishBootUi();
+            loading = false;
+            navigate('users', { tab: 'users' });
+            return;
+          }
           if (action === 'deleteExercisesBulk') {
             currentRoute = normalizeRoute('exercises', { tab: 'list' });
           }
@@ -4571,7 +4679,8 @@ body {
       if (el.closest('.collapsible-toggle') ||
           el.closest('.expandable-closed') ||
           el.closest('.ex-matrix-tier-toggle') ||
-          el.closest('[data-dash-tab]')) return true;
+          el.closest('[data-dash-tab]') ||
+          el.closest('[data-users-tab]')) return true;
       if (el.closest('[data-spa-page]') || el.closest('[data-spa-action]')) return false;
       return el.closest('.dp-tab') ||
         el.closest('.dp-wrap') ||
@@ -4671,6 +4780,8 @@ body {
       parseSpaParams: parseSpaParams, runScripts: runScripts, afterRender: afterRender,
       storeUsersIndex: storeUsersIndex, getUsersIndex: getUsersIndex, refreshUsersIndex: refreshUsersIndex,
       switchDashboardTab: switchDashboardTab,
+      switchUsersTab: switchUsersTab,
+      reloadUsersTabModule: reloadUsersTabModule,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();

@@ -6,24 +6,60 @@ function Views_users(p) {
   const tab = (p.tab || 'users') === 'teams' ? 'teams' : 'users';
   const openSet = _parseOpenSections(p);
 
-  let s = _topbar(user, sid) + '<div class="page">' + _flash(p);
+  let s = _topbar(user, sid) + '<div class="page page-users">' + _flash(p);
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
   s += '<h1 class="page-title" style="margin:0">👤 ניהול משתמשים וצוותים</h1>';
   s += '</div>';
 
-  s += _spaTabsBar('users', {}, [
-    { id: 'users', label: 'משתמשים' },
-    { id: 'teams', label: 'צוותים' }
-  ], tab);
-
-  if (tab === 'users') {
-    s += _usersTab(sid, openSet);
-  } else {
-    s += _teamsTab(sid, openSet);
-  }
+  s += _usersPageTabsShell(sid, tab, openSet);
 
   s += '</div>';
   return _wrapPage(s, 'משתמשים וצוותים');
+}
+
+function _usersPageTabsShell(sid, activeTab, openSet) {
+  const teams = Teams_all();
+  const allUsers = Users_all();
+  const baseUsers = { tab: 'users' };
+  const baseTeams = { tab: 'teams' };
+
+  let bar = '<nav class="spa-tabs-bar tabs users-local-tabs" aria-label="לשוניות">';
+  bar += '<a href="#" class="tab-link' + (activeTab === 'users' ? ' active' : '') +
+    '" data-users-tab="users">משתמשים</a>';
+  bar += '<a href="#" class="tab-link' + (activeTab === 'teams' ? ' active' : '') +
+    '" data-users-tab="teams">צוותים</a></nav>';
+
+  let panels = '<div class="users-shell">';
+
+  panels += '<div class="users-tab-panel"' + (activeTab === 'users' ? '' : ' hidden') +
+    ' data-users-tab-panel="users">';
+  panels += '<div data-spa-module="users.tab.users" data-spa-module-loaded="0"></div>';
+  panels += '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">';
+  panels += _expandablePanel('users', baseUsers, 'newUser', '➕ משתמש חדש',
+    _usersNewUserForm(sid, teams), openSet);
+  panels += _expandablePanel('users', baseUsers, 'importCsv', '📥 ייבוא מקובץ Excel / CSV',
+    _usersImportCsvPanel(), openSet);
+  panels += _expandablePanel('users', baseUsers, 'fieldDefs', '⚙ שדות פרופיל נוספים',
+    _userFieldDefsAdminHtml(sid), openSet);
+  panels += '</div></div>';
+
+  panels += '<div class="users-tab-panel"' + (activeTab === 'teams' ? '' : ' hidden') +
+    ' data-users-tab-panel="teams">';
+  panels += '<div data-spa-module="users.tab.teams" data-spa-module-loaded="0"></div>';
+  panels += '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">';
+  panels += _expandablePanel('users', baseTeams, 'newTeam', '➕ צוות חדש',
+    _teamsNewTeamForm(), openSet);
+  const unassignedTrainees = allUsers.filter(function(u) { return !u.team_id && Roles_isTrainee(u.role); });
+  const freeCommanders = allUsers.filter(function(u) {
+    return Roles_isCompanyCommander(u.role) && !u.team_id;
+  });
+  const previewTeams = unassignedTrainees.length ? Math.ceil(unassignedTrainees.length / 10) : 0;
+  panels += _expandablePanel('users', baseTeams, 'autoSplit', '⚡ חלוקה אוטומטית לצוותים',
+    _teamsAutoSplitForm(unassignedTrainees, freeCommanders, previewTeams), openSet);
+  panels += '</div></div>';
+
+  panels += '</div>';
+  return bar + panels;
 }
 
 function _usersNewUserForm(sid, teams) {
@@ -64,11 +100,9 @@ function _usersImportCsvPanel() {
 
 function _usersTab(sid, openSet) {
   const users = Users_all();
-  const teams = Teams_all();
   const teamById = Teams_byIdMap();
-  const baseParams = { tab: 'users' };
 
-  let s = '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">📋 משתמשים (' + users.length + ')</div></div>';
+  let s = '<div class="card card-list-scroll" style="margin-top:14px"><div class="card-header"><div class="card-title">📋 משתמשים (' + users.length + ')</div></div>';
   if (!users.length) {
     s += '<div class="empty">אין משתמשים</div>';
   } else {
@@ -96,14 +130,6 @@ function _usersTab(sid, openSet) {
   }
   s += '</div>';
 
-  s += '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">';
-  s += _expandablePanel('users', baseParams, 'newUser', '➕ משתמש חדש',
-    _usersNewUserForm(sid, teams), openSet);
-  s += _expandablePanel('users', baseParams, 'importCsv', '📥 ייבוא מקובץ Excel / CSV',
-    _usersImportCsvPanel(), openSet);
-  s += _expandablePanel('users', baseParams, 'fieldDefs', '⚙ שדות פרופיל נוספים',
-    _userFieldDefsAdminHtml(sid), openSet);
-  s += '</div>';
   return s;
 }
 
@@ -150,9 +176,8 @@ function _teamsTab(sid, openSet) {
     return Roles_isCompanyCommander(u.role) || Roles_isAdmin(u.role) || Roles_isUnitCommander(u.role);
   });
   const cmdOpts = [['', '— ללא —']].concat(commanders.map(function(u) { return [u.id, u.id + ' — ' + u.name]; }));
-  const baseParams = { tab: 'teams' };
 
-  let s = '<div class="card" style="margin-top:14px"><div class="card-header"><div class="card-title">🪖 צוותים (' + teams.length + ')</div></div>';
+  let s = '<div class="card card-list-scroll" style="margin-top:14px"><div class="card-header"><div class="card-title">🪖 צוותים (' + teams.length + ')</div></div>';
   if (!teams.length) {
     s += '<div class="empty">אין צוותים</div>';
   } else {
@@ -211,21 +236,6 @@ function _teamsTab(sid, openSet) {
         _submitBtn('הוסף', 'btn btn-primary btn-sm') + '</form></div></div>';
     }
   }
-  s += '</div>';
-
-  const unassignedTrainees = unassigned.filter(function(u) { return Roles_isTrainee(u.role); });
-  const freeCommanders = allUsers.filter(function(u) {
-    return Roles_isCompanyCommander(u.role) && !u.team_id;
-  });
-  const previewTeams = unassignedTrainees.length
-    ? Math.ceil(unassignedTrainees.length / 10)
-    : 0;
-
-  s += '<div class="expandable-stack" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">';
-  s += _expandablePanel('users', baseParams, 'newTeam', '➕ צוות חדש',
-    _teamsNewTeamForm(), openSet);
-  s += _expandablePanel('users', baseParams, 'autoSplit', '⚡ חלוקה אוטומטית לצוותים',
-    _teamsAutoSplitForm(unassignedTrainees, freeCommanders, previewTeams), openSet);
   s += '</div>';
   return s;
 }

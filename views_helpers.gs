@@ -89,7 +89,7 @@ function _bulkDeleteBar(action, idsParam, msg) {
     '<span class="bulk-select-count"></span></div>';
 }
 
-/** מכלית גלילה — סרגל פעולות קבוע + גוף רשימה גולל */
+/** מכלית גלילה — סרגל פעולות קבוע; רק הטבלה גוללת */
 function _listScrollWrap(toolbarHtml, innerHtml) {
   return '<div class="list-scroll-container">' +
     (toolbarHtml ? '<div class="list-scroll-toolbar">' + toolbarHtml + '</div>' : '') +
