@@ -415,54 +415,92 @@ function Users_updateProfile(p) {
 //  Users_importBulk — ייבוא משתמשים מקובץ
 //  מספר אישי = id · סיסמה ברירת מחדל = מספר אישי
 // ═══════════════════════════════════════
+function Users_normalizeIdForImport(raw) {
+  let id = String(raw == null ? '' : raw)
+    .replace(/\u00a0/g, ' ')
+    .replace(/^\uFEFF/, '')
+    .replace(/\s+/g, '')
+    .trim();
+  if (!id) return '';
+  if (/^\d+\.0+$/.test(id)) id = String(parseInt(id, 10));
+  if (/^[+-]?\d+(\.\d+)?e[+-]?\d+$/i.test(id)) {
+    const n = Number(id);
+    if (isFinite(n) && Math.abs(n) < 1e15) id = String(Math.round(n));
+  }
+  return id;
+}
+
+function Users_normalizeTeamImportRaw(raw) {
+  raw = String(raw == null ? '' : raw)
+    .replace(/\u00a0/g, ' ')
+    .replace(/^\uFEFF/, '')
+    .replace(/^["']+|["']+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!raw || raw === '-' || raw === '—' || raw === '–') return '';
+  // Excel לעיתים נותן 1.0 / 2.00
+  if (/^\d+\.0+$/.test(raw)) raw = String(parseInt(raw, 10));
+  return raw;
+}
+
+/** חיפוש צוות לפי שם זהה לעמודת «צוות» בקובץ (לא לפי T{n}) */
 function Users_resolveTeamIdForImport(raw) {
-  raw = String(raw == null ? '' : raw).trim();
-  if (!raw) return '';
-  if (Teams_get(raw)) return String(raw);
-  if (/^\d+$/.test(raw) && Teams_get('T' + raw)) return 'T' + raw;
+  const nameKey = Users_normalizeTeamImportRaw(raw);
+  if (!nameKey) return '';
+
   const all = Teams_all();
+  // 1) שם זהה בדיוק לערך מהקובץ (למשל "3" או "צוות א")
   for (let i = 0; i < all.length; i++) {
-    const t = all[i];
-    if (String(t.name) === raw) return t.id;
-    if (String(t.name) === ('צוות ' + raw)) return t.id;
-    if (String(t.name).replace(/^צוות\s+/, '') === raw) return t.id;
+    if (String(all[i].name || '').trim() === nameKey) return all[i].id;
+  }
+  // 2) אם בקובץ מספר — נסה גם «צוות N»
+  if (/^\d+$/.test(nameKey)) {
+    const withPrefix = 'צוות ' + nameKey;
+    for (let j = 0; j < all.length; j++) {
+      if (String(all[j].name || '').trim() === withPrefix) return all[j].id;
+    }
   }
   return '';
 }
 
-/** מזהה צוות קיים, או יוצר צוות חדש לפי שם/מספר מהקובץ */
+/** מזהה צוות קיים לפי שם, או יוצר צוות חדש בשם הזהה לערך מהקובץ */
 function Users_ensureTeamIdForImport(raw, createdNames) {
-  raw = String(raw == null ? '' : raw).trim();
-  if (!raw) return '';
+  const nameKey = Users_normalizeTeamImportRaw(raw);
+  if (!nameKey) return '';
 
-  const existing = Users_resolveTeamIdForImport(raw);
+  const existing = Users_resolveTeamIdForImport(nameKey);
   if (existing) return existing;
 
-  const key = raw.toLowerCase();
-  if (createdNames && createdNames[key]) return createdNames[key];
+  const mapKey = nameKey.toLowerCase();
+  if (createdNames && createdNames[mapKey]) return createdNames[mapKey];
 
-  let newId;
-  let name;
-  if (/^T\d+$/i.test(raw)) {
-    newId = 'T' + raw.replace(/^T/i, '');
-    if (Teams_get(newId)) newId = _nextTeamId();
-    name = 'צוות ' + newId.replace(/^T/i, '');
-  } else if (/^\d+$/.test(raw)) {
-    newId = 'T' + raw;
-    if (Teams_get(newId)) newId = _nextTeamId();
-    name = 'צוות ' + raw;
-  } else {
-    newId = _nextTeamId();
-    name = raw;
-  }
-
+  // שם הצוות = הערך מעמודת «צוות»; המזהה (T…) נוצר בנפרד
+  const newId = _nextTeamId();
+  const name = nameKey;
   _append('Teams', [newId, name, '']);
+
   if (createdNames) {
-    createdNames[key] = newId;
-    createdNames[String(name).toLowerCase()] = newId;
+    createdNames[mapKey] = newId;
     createdNames[String(newId).toLowerCase()] = newId;
+    if (/^\d+$/.test(nameKey)) {
+      createdNames[('צוות ' + nameKey).toLowerCase()] = newId;
+    }
   }
   return newId;
+}
+
+function Users_extractTeamFromImportRow(row) {
+  const candidates = [row.team_id, row.team, row.Team, row['צוות']];
+  for (let i = 0; i < candidates.length; i++) {
+    const raw = candidates[i];
+    if (raw == null || String(raw).trim() === '') continue;
+    const s = String(raw).trim();
+    // לא לבלבל תפקיד מ"פ עם מספר/שם צוות
+    if (/^מ["״']?פ/.test(s) || s === 'מפ') continue;
+    const norm = Users_normalizeTeamImportRaw(s);
+    if (norm) return norm;
+  }
+  return '';
 }
 
 function Users_importBulk(p) {
@@ -479,23 +517,39 @@ function Users_importBulk(p) {
     throw new Error('לא נמצאו שורות לייבוא. ודא שהקובץ בפורמט CSV עם כותרות בעברית.');
   }
 
-  const existing = new Set(_rows('Users').data.map(function(r) { return String(r[0]).trim(); }));
+  // איתור לפי מספר אישי + לפי שם מלא (אם המספר במערכת שונה מהקובץ)
+  const idByNorm = {};
+  const nameToSheetId = {};
+  _rows('Users').data.forEach(function(r) {
+    const sheetId = String(r[0] || '').trim();
+    const sheetName = String(r[1] || '').replace(/\s+/g, ' ').trim();
+    if (!sheetId) return;
+    idByNorm[sheetId] = sheetId;
+    const norm = Users_normalizeIdForImport(sheetId);
+    if (norm) idByNorm[norm] = sheetId;
+    if (sheetName) nameToSheetId[sheetName] = sheetId;
+  });
+
   let autoIds = null;
   let autoIdx = 0;
 
   let added = 0;
   let updated = 0;
   let teamsCreated = 0;
+  let teamsReassigned = 0;
   let errors = [];
+  const teamChangeNotes = [];
   const newUserRows = [];
   const newCredRows = [];
   const createdTeamNames = {};
   const teamsBefore = Teams_all().length;
   const usersSheet = _sheet('Users');
+  let teamCol = _colIndex('Users', 'team_id');
+  teamCol = teamCol >= 0 ? teamCol + 1 : 4;
 
   rows.forEach(function(row, i) {
-    const name = String(row.name || '').trim();
-    let id = String(row.id || row.personal_id || '').trim();
+    const name = String(row.name || '').replace(/\s+/g, ' ').trim();
+    let id = Users_normalizeIdForImport(row.id || row.personal_id || '');
     let password = String(row.password || '').trim();
     const line = i + 1;
 
@@ -515,7 +569,9 @@ function Users_importBulk(p) {
       ? Roles_fromImport(row.role || 'trainee')
       : 'trainee';
 
-    const teamRaw = String(row.team_id || row.team || '').trim();
+    const teamRaw = Users_extractTeamFromImportRow(row);
+    const hasTeamInFile = !!teamRaw;
+
     const unitAffiliation = String(row.unit_affiliation || '').trim();
     const serviceType = String(row.service_type || '').trim();
     const militaryAffiliation = String(row.military_affiliation || '').trim();
@@ -524,38 +580,92 @@ function Users_importBulk(p) {
     const phone = String(row.phone || '').trim();
     const email = String(row.email || '').trim();
 
-    if (existing.has(id)) {
-      const sheetRow = _findRowIndex('Users', id);
+    let teamId = '';
+    if (hasTeamInFile) {
+      try {
+        teamId = Users_ensureTeamIdForImport(teamRaw, createdTeamNames);
+        if (!teamId) {
+          errors.push('שורה ' + line + ': לא נוצר צוות עבור «' + teamRaw + '»');
+        }
+      } catch (teamErr) {
+        errors.push('שורה ' + line + ': יצירת צוות «' + teamRaw + '» נכשלה — ' +
+          (teamErr && teamErr.message ? teamErr.message : String(teamErr)));
+      }
+    }
+
+    // קודם לפי מספר אישי, אחרת לפי שם מלא מדויק (מתקן מקרה כמו הראל ליפשיץ)
+    let sheetId = idByNorm[id] || '';
+    if (!sheetId && nameToSheetId[name]) sheetId = nameToSheetId[name];
+
+    if (sheetId) {
+      const sheetRow = _findRowIndex('Users', sheetId);
       if (sheetRow < 0) {
-        errors.push('שורה ' + line + ': מספר אישי ' + id + ' קיים בקאש אך לא בגיליון');
+        errors.push('שורה ' + line + ': רשומה ' + sheetId + ' לא נמצאה בגיליון');
         return;
       }
-      const cur = Users_get(id) || {};
-      const teamId = teamRaw
-        ? Users_ensureTeamIdForImport(teamRaw, createdTeamNames)
-        : String(cur.team_id || '');
+      const cur = Users_get(sheetId) || {};
+      const prevTeam = String(cur.team_id || '');
+      if (!hasTeamInFile) teamId = prevTeam;
+
       const roleToWrite = row.role
         ? finalRole
         : (Roles_normalize(cur.role || 'trainee') || 'trainee');
 
-      // עמודות 2–11: name … email (לא נוגעים בסיסמה)
-      usersSheet.getRange(sheetRow, 2, 1, 10).setValues([[
+      const nextUnitAff = unitAffiliation !== '' ? unitAffiliation : String(cur.unit_affiliation || '');
+      const nextService = serviceType !== '' ? serviceType : String(cur.service_type || '');
+      const nextMilitary = militaryAffiliation !== '' ? militaryAffiliation : String(cur.military_affiliation || '');
+      const nextUnitClass = unitClassification !== '' ? unitClassification : String(cur.unit_classification || '');
+      const nextTarget = targetRole !== '' ? targetRole : String(cur.target_role || '');
+      const nextPhone = phone !== '' ? phone : String(cur.phone || '');
+      const nextEmail = email !== '' ? email : String(cur.email || '');
+
+      // כתיבת כל השדות — team_id בעמודה 4 (או לפי כותרת)
+      const rowValues = [
         name,
         roleToWrite,
         teamId,
-        unitAffiliation !== '' ? unitAffiliation : String(cur.unit_affiliation || ''),
-        serviceType !== '' ? serviceType : String(cur.service_type || ''),
-        militaryAffiliation !== '' ? militaryAffiliation : String(cur.military_affiliation || ''),
-        unitClassification !== '' ? unitClassification : String(cur.unit_classification || ''),
-        targetRole !== '' ? targetRole : String(cur.target_role || ''),
-        phone !== '' ? phone : String(cur.phone || ''),
-        email !== '' ? email : String(cur.email || '')
-      ]]);
+        nextUnitAff,
+        nextService,
+        nextMilitary,
+        nextUnitClass,
+        nextTarget,
+        nextPhone,
+        nextEmail
+      ];
+      usersSheet.getRange(sheetRow, 2, 1, 10).setValues([rowValues]);
+      usersSheet.getRange(sheetRow, teamCol).setValue(hasTeamInFile ? teamId : prevTeam);
+
+      const patch = {
+        2: name,
+        3: roleToWrite,
+        4: hasTeamInFile ? teamId : prevTeam,
+        5: nextUnitAff,
+        6: nextService,
+        7: nextMilitary,
+        8: nextUnitClass,
+        9: nextTarget,
+        10: nextPhone,
+        11: nextEmail
+      };
+      if (teamCol !== 4) {
+        patch[teamCol] = hasTeamInFile ? teamId : prevTeam;
+      }
+      _cachePatchRow('Users', sheetRow, patch);
+      _usersById = null;
+
+      if (hasTeamInFile && String(teamId) !== String(prevTeam)) {
+        teamsReassigned++;
+        const prevLabel = prevTeam
+          ? ((Teams_get(prevTeam) && Teams_get(prevTeam).name) || prevTeam)
+          : '—';
+        const nextLabel = teamId
+          ? ((Teams_get(teamId) && Teams_get(teamId).name) || teamId)
+          : '—';
+        teamChangeNotes.push(name + ': ' + prevLabel + ' → ' + nextLabel);
+      }
       updated++;
       return;
     }
-
-    const teamId = Users_ensureTeamIdForImport(teamRaw, createdTeamNames);
 
     newUserRows.push([
       id,
@@ -571,15 +681,25 @@ function Users_importBulk(p) {
       email
     ]);
     newCredRows.push([id, password]);
-    existing.add(id);
+    idByNorm[id] = id;
+    nameToSheetId[name] = id;
     added++;
   });
 
-  teamsCreated = Math.max(0, Teams_all().length - teamsBefore);
+  const createdIds = {};
+  Object.keys(createdTeamNames).forEach(function(k) {
+    createdIds[createdTeamNames[k]] = true;
+  });
+  teamsCreated = Object.keys(createdIds).length;
+  if (!teamsCreated) teamsCreated = Math.max(0, Teams_all().length - teamsBefore);
 
   if (newUserRows.length) _appendBatch('Users', newUserRows);
   if (newCredRows.length) _appendBatch('Credentials', newCredRows);
+
+  try { SpreadsheetApp.flush(); } catch (flushErr) { /* ignore */ }
+
   if (added || updated) {
+    _usersById = null;
     _cacheInvalidate('Users');
     if (added) _cacheInvalidate('Credentials');
   }
@@ -593,6 +713,11 @@ function Users_importBulk(p) {
   let info = '✓ ייבוא הושלם';
   if (added) info += ': ' + added + ' נוספו';
   if (updated) info += (added ? ' · ' : ': ') + updated + ' עודכנו';
+  if (teamsReassigned) info += ' · ' + teamsReassigned + ' שיוכי צוות הוחלפו';
+  if (teamChangeNotes.length) {
+    info += ' (' + teamChangeNotes.slice(0, 5).join('; ') +
+      (teamChangeNotes.length > 5 ? '…' : '') + ')';
+  }
   if (teamsCreated) info += ' · ' + teamsCreated + ' צוותים נוצרו';
   if (errors.length) {
     info += ' · התראות: ' + errors.slice(0, 3).join(' | ');

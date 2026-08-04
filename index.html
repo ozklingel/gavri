@@ -5847,8 +5847,8 @@ body {
       if (v == null || v === '') return '';
       if (typeof v === 'number') {
         if (!isFinite(v)) return '';
-        // טלפון / מספר אישי — בלי סימון מדעי
-        if (Math.abs(v) >= 1e5 && Math.abs(v) < 1e15 && Math.floor(v) === v) {
+        // מספרים שלמים (צוות / טלפון / מספר אישי) — בלי 1.0 או סימון מדעי
+        if (Math.abs(v) < 1e15 && Math.floor(v) === v) {
           return String(Math.round(v));
         }
         return String(v);
@@ -5856,7 +5856,16 @@ body {
       if (v instanceof Date) {
         try { return v.toISOString().slice(0, 10); } catch (e) { return String(v); }
       }
-      return String(v).trim();
+      return String(v).replace(/\u00a0/g, ' ').trim();
+    }
+
+    function normalizeTeamValue(v) {
+      var s = cellToStr(v);
+      if (!s || s === '-' || s === '—' || s === '–') return '';
+      if (/^\d+\.0+$/.test(s)) s = String(parseInt(s, 10));
+      var m = s.match(/^צוות\s*[#:\-]?\s*(\d+)$/i) || s.match(/^T(\d+)$/i);
+      if (m) return m[1];
+      return s;
     }
 
     function readExcelFile(file, cb) {
@@ -5888,8 +5897,15 @@ body {
       });
     }
 
-    // סדר עמודות קבוע לפי קובץ «רשימת חניכים» (גיבוי אם הכותרות לא מזוהות)
-    var POSITIONAL_FIELDS = [
+    // סדר עמודות — פורמט Book1 / רשימת חניכים עדכני
+    // [אופציונלי: אישור], מייל, טלפון, תפקיד עתידי, מספר אישי, חטיבה, יחידה, חיל, סוג שירות, תפקיד, שם מלא, צוות
+    var POSITIONAL_FIELDS_BOOK1 = [
+      '_skip', 'email', 'phone', 'target_role', 'id',
+      'unit_classification', 'unit_affiliation', 'military_affiliation',
+      'service_type', 'role', 'name', 'team'
+    ];
+    // פורמט ישן בלי עמודת תפקיד לפני השם
+    var POSITIONAL_FIELDS_LEGACY = [
       'email', 'phone', 'target_role', 'id',
       'unit_classification', 'unit_affiliation', 'military_affiliation',
       'service_type', 'name', 'team', 'role'
@@ -5923,20 +5939,47 @@ body {
       'שם': 'name',
       'name': 'name',
       'צוות': 'team',
+      'מספר צוות': 'team',
+      'קבוצה': 'team',
       'team': 'team',
       'team_id': 'team_id',
       'סיסמה': 'password',
       'password': 'password',
       'תפקיד': 'role',
-      'role': 'role'
+      'role': 'role',
+      'בדקתי שכל הפרטים נכונים': '_skip'
     };
 
     function mapHeader(h) {
-      var raw = String(h || '').replace(/^\uFEFF/, '').replace(/^"|"$/g, '').replace(/\s+/g, ' ').trim();
+      var raw = String(h || '')
+        .replace(/^\uFEFF/, '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/^"|"$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (HEADER_ALIASES[raw]) return HEADER_ALIASES[raw];
       var low = raw.toLowerCase();
       if (HEADER_ALIASES[low]) return HEADER_ALIASES[low];
+      if (raw.indexOf('בדקתי') === 0) return '_skip';
       return low;
+    }
+
+    function pickPositionalFields(headersRaw) {
+      var joined = headersRaw.join(' | ');
+      // Book1: יש «תפקיד» לפני «שם מלא», ו«צוות» בסוף; לעיתים עמודת אישור בהתחלה
+      if (joined.indexOf('תפקיד') >= 0 && joined.indexOf('שם מלא') >= 0 &&
+          joined.indexOf('תפקיד') < joined.indexOf('שם מלא')) {
+        if (headersRaw.length >= 12 || String(headersRaw[0] || '').indexOf('בדקתי') === 0) {
+          return POSITIONAL_FIELDS_BOOK1.slice(0, Math.max(headersRaw.length, 12));
+        }
+        // בלי עמודת אישור: מייל…צוות (11 עמודות)
+        return [
+          'email', 'phone', 'target_role', 'id',
+          'unit_classification', 'unit_affiliation', 'military_affiliation',
+          'service_type', 'role', 'name', 'team'
+        ].slice(0, Math.max(headersRaw.length, 11));
+      }
+      return POSITIONAL_FIELDS_LEGACY.slice(0, Math.max(headersRaw.length, 10));
     }
 
     /** Excel לפעמים מייצא טלפון/מספר אישי כ־5.84E+08 */
@@ -6002,15 +6045,15 @@ body {
       var hasId = headers.indexOf('id') >= 0;
       if (!hasName || !hasId) {
         if (headersRaw.length >= 9) {
-          headers = POSITIONAL_FIELDS.slice(0, Math.max(headersRaw.length, 10));
-          hasName = true;
-          hasId = true;
+          headers = pickPositionalFields(headersRaw);
+          hasName = headers.indexOf('name') >= 0;
+          hasId = headers.indexOf('id') >= 0;
         }
       }
       if (!hasName) {
         throw new Error(
           'חסרה עמודת «שם מלא».\n' +
-          'פורמט נדרש: כתובת מייל, מספר טלפון, תפקיד עתידי, מספר אישי, חטיבה, יחידה, חיל, סוג שירות, שם מלא, צוות\n' +
+          'פורמט נדרש: מייל, מספר טלפון, תפקיד עתידי, מספר אישי, חטיבה, יחידה, חיל, סוג שירות, תפקיד, שם מלא, צוות\n' +
           'כותרות שנמצאו: ' + headersRaw.join(' | ')
         );
       }
@@ -6018,15 +6061,32 @@ body {
       var rows = matrix.slice(1).map(function(vals, idx) {
         var obj = {};
         headers.forEach(function(h, i) {
-          if (!h) return;
+          if (!h || h === '_skip') return;
           var v = cellToStr(vals[i]);
           if (obj[h] && !v) return;
           obj[h] = v;
         });
         if (obj.phone) obj.phone = expandExcelNumber(obj.phone);
         if (obj.id) obj.id = expandExcelNumber(obj.id);
-        if (obj.team && !obj.team_id) obj.team_id = obj.team;
+
+        // צוות: מהכותרת / עמודה אחרונה אם מספר (לא אינדקס 9 — ב־Book1 זה «תפקיד»)
+        var teamVal = normalizeTeamValue(obj.team_id || obj.team || '');
+        if (!teamVal) {
+          var teamCol = headers.indexOf('team');
+          if (teamCol < 0) teamCol = headers.indexOf('team_id');
+          if (teamCol >= 0) teamVal = normalizeTeamValue(vals[teamCol]);
+        }
+        if (!teamVal && vals.length >= 2) {
+          var lastVal = normalizeTeamValue(vals[vals.length - 1]);
+          if (/^\d+$/.test(lastVal)) teamVal = lastVal;
+        }
+        if (teamVal) {
+          obj.team = teamVal;
+          obj.team_id = teamVal;
+        }
+
         if (!obj.password && obj.id) obj.password = obj.id;
+        // תפקיד מערכת מהקובץ (מ"פ וכו') — ברירת מחדל trainee
         if (!obj.role) obj.role = 'trainee';
         obj._line = idx + 2;
         return obj;
@@ -6151,12 +6211,19 @@ body {
       btn.disabled = true;
       if (errDiv) errDiv.style.display = 'none';
       var payload = rows.map(function(r) {
+        var teamVal = '';
+        if (typeof normalizeTeamValue === 'function') {
+          teamVal = normalizeTeamValue(r.team_id != null && r.team_id !== '' ? r.team_id : r.team);
+        } else {
+          teamVal = String(r.team_id != null && r.team_id !== '' ? r.team_id : (r.team != null ? r.team : '')).trim();
+        }
         return {
           id: r.id || '',
           name: r.name || '',
           password: r.password || r.id || '',
           role: r.role || 'trainee',
-          team_id: r.team_id || r.team || '',
+          team_id: teamVal,
+          team: teamVal,
           military_affiliation: r.military_affiliation || '',
           service_type: r.service_type || '',
           unit_affiliation: r.unit_affiliation || '',
@@ -6166,6 +6233,17 @@ body {
           email: r.email || ''
         };
       });
+      // וידוא בתצוגה: אם יש צוות ב־preview וריק ב־payload — חסום
+      var missingTeam = payload.filter(function(p, idx) {
+        return rows[idx] && (rows[idx].team_id || rows[idx].team) && !p.team_id;
+      });
+      if (missingTeam.length && errDiv) {
+        btn._importing = false;
+        btn.disabled = false;
+        btn.textContent = 'ייבוא למערכת';
+        showErr(errDiv, 'שגיאה: ערך צוות לא הועבר לשרת. רענן את הדף (Ctrl+F5) ונסה שוב.');
+        return;
+      }
       if (!window.MapimSpa || typeof MapimSpa.runAction !== 'function') {
         btn._importing = false;
         btn.disabled = false;

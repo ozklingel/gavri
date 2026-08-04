@@ -43,9 +43,13 @@ function Roles_fromImport(raw) {
     'ממ': 'departmentCommander',
     'חונך': 'tutor',
     'חניך': 'trainee',
-    'מפ': 'trainee'
+    'מפ': 'trainee',
+    'מ"פ': 'trainee',
+    'מ״פ': 'trainee'
   };
   if (byHe[s]) return byHe[s];
+  // מ"פ חי"ר / מפ חשן וכו׳ → trainee
+  if (/^מ["״']?פ\b/.test(s) || /^מפ\s/.test(s)) return 'trainee';
   return Roles_isValid(s) ? Roles_normalize(s) : 'trainee';
 }
 

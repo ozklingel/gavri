@@ -49,8 +49,8 @@ function _usersImportCsvPanel() {
   return '<div class="card"><div class="card-body">' +
     '<p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.55">' +
     '<b>פורמט הקובץ (Excel XLSX / CSV):</b><br>' +
-    'כתובת מייל, מספר טלפון, תפקיד עתידי, מספר אישי, חטיבה, יחידה, חיל, סוג שירות, שם מלא, צוות<br>' +
-    '<span style="color:var(--muted)">חובה: שם מלא + מספר אישי. סיסמה = מספר אישי (למשתמשים חדשים). קיים במערכת → עדכון שדות. צוות חסר → נוצר.</span>' +
+    'מייל, מספר טלפון, תפקיד עתידי, מספר אישי, חטיבה, יחידה, חיל, סוג שירות, תפקיד, שם מלא, צוות<br>' +
+    '<span style="color:var(--muted)">(אופציונלי בהתחלה: עמודת אישור). חובה: שם מלא + מספר אישי. עמודת צוות = שם צוות בגיליון Teams (לא מזהה T…). קיים → דריסה. צוות חדש לפי שם → נוצר.</span>' +
     '</p>' +
     '<div style="margin-bottom:10px">' +
     '<button type="button" id="xlsxExampleDownload" class="btn btn-secondary btn-sm">📄 הורד קובץ דוגמה (CSV)</button>' +
