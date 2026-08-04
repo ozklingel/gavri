@@ -564,6 +564,14 @@ function Users_importBulk(p) {
     throw new Error('לא נמצאו שורות לייבוא. ודא שהקובץ בפורמט CSV עם כותרות בעברית.');
   }
 
+  _cacheBeginBatch();
+  var added = 0;
+  var updated = 0;
+  var teamsCreated = 0;
+  var teamsReassigned = 0;
+  var errors = [];
+  var teamChangeNotes = [];
+  try {
   // איתור לפי מספר אישי + לפי שם מלא (אם המספר במערכת שונה מהקובץ)
   const idByNorm = {};
   const nameToSheetId = {};
@@ -580,12 +588,6 @@ function Users_importBulk(p) {
   let autoIds = null;
   let autoIdx = 0;
 
-  let added = 0;
-  let updated = 0;
-  let teamsCreated = 0;
-  let teamsReassigned = 0;
-  let errors = [];
-  const teamChangeNotes = [];
   const newUserRows = [];
   const newCredRows = [];
   const createdTeamNames = {};
@@ -593,6 +595,7 @@ function Users_importBulk(p) {
   const usersSheet = _sheet('Users');
   let teamCol = _colIndex('Users', 'team_id');
   teamCol = teamCol >= 0 ? teamCol + 1 : 4;
+  const teamById = Teams_byIdMap();
 
   rows.forEach(function(row, i) {
     const name = String(row.name || '').replace(/\s+/g, ' ').trim();
@@ -682,31 +685,13 @@ function Users_importBulk(p) {
       usersSheet.getRange(sheetRow, 2, 1, 10).setValues([rowValues]);
       usersSheet.getRange(sheetRow, teamCol).setValue(hasTeamInFile ? teamId : prevTeam);
 
-      const patch = {
-        2: name,
-        3: roleToWrite,
-        4: hasTeamInFile ? teamId : prevTeam,
-        5: nextUnitAff,
-        6: nextService,
-        7: nextMilitary,
-        8: nextUnitClass,
-        9: nextTarget,
-        10: nextPhone,
-        11: nextEmail
-      };
-      if (teamCol !== 4) {
-        patch[teamCol] = hasTeamInFile ? teamId : prevTeam;
-      }
-      _cachePatchRow('Users', sheetRow, patch);
-      _usersById = null;
-
       if (hasTeamInFile && String(teamId) !== String(prevTeam)) {
         teamsReassigned++;
         const prevLabel = prevTeam
-          ? ((Teams_get(prevTeam) && Teams_get(prevTeam).name) || prevTeam)
+          ? ((teamById[prevTeam] && teamById[prevTeam].name) || prevTeam)
           : '—';
         const nextLabel = teamId
-          ? ((Teams_get(teamId) && Teams_get(teamId).name) || teamId)
+          ? ((teamById[teamId] && teamById[teamId].name) || teamId)
           : '—';
         teamChangeNotes.push(name + ': ' + prevLabel + ' → ' + nextLabel);
       }
@@ -745,12 +730,16 @@ function Users_importBulk(p) {
 
   try { SpreadsheetApp.flush(); } catch (flushErr) { /* ignore */ }
 
+  _usersById = null;
+  _teamsById = null;
   if (added || updated) {
-    _usersById = null;
     _cacheInvalidate('Users');
     if (added) _cacheInvalidate('Credentials');
   }
   if (teamsCreated) _cacheInvalidate('Teams');
+  } finally {
+    _cacheEndBatch();
+  }
 
   if (!added && !updated) {
     const detail = errors.length ? errors.slice(0, 5).join(' | ') : 'לא זוהו שורות תקינות';

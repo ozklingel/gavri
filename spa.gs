@@ -125,6 +125,11 @@ function getDashboardData(sid) {
     const cur = _rowsCache[name];
     data.counts[name] = cur && cur.data ? cur.data.length : 0;
   });
+  if (typeof Users_all === 'function') {
+    data.usersIndex = Users_all().map(function(u) {
+      return { id: u.id, name: u.name, role: Roles_label(u.role) };
+    });
+  }
 
   let dash;
   const tRender = Date.now();
@@ -224,16 +229,15 @@ function getExercisesData(sid) {
     pushPage('users', { tab: 'teams' });
   }
 
-  // טאבי דשבורד נוספים — שימושיים מיד אחרי הדשבורד הראשי
-  pushPage('dashboard', { tab: 'exercise' });
+  const modules = ['drawer.panels', 'dashboard.tab.exercise'];
   if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
-    pushPage('dashboard', { tab: 'team' });
+    modules.push('dashboard.tab.team');
   }
   if (Roles_hasAdminAccess(user.role)) {
-    pushPage('dashboard', { tab: 'conflicts' });
+    modules.push('dashboard.tab.conflicts');
   }
 
-  return { ok: true, stage: 'exercises', pages: pages };
+  return { ok: true, stage: 'exercises', pages: pages, modules: modules };
 }
 
 /**
@@ -306,6 +310,23 @@ function getRemainingAppData(sid) {
     sheets: rest.length,
     pages: pages,
     modules: ['drawer.panels']
+  };
+}
+
+function apiGetUsersIndex(sid) {
+  const s = String(sid || '').trim();
+  if (!s) return { ok: false, users: [] };
+  try {
+    Auth_current({ sid: s });
+  } catch (e1) {
+    return { ok: false, users: [] };
+  }
+  _cacheWarmSheetsIfNeeded(['Users']);
+  return {
+    ok: true,
+    users: Users_all().map(function(u) {
+      return { id: u.id, name: u.name, role: Roles_label(u.role) };
+    })
   };
 }
 

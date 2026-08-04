@@ -429,18 +429,13 @@ function _roleBadgeType(r) {
 }
 
 function _dashboardUserSearchBar(selectedUserId) {
-  const users = Users_all().map(function(u) {
-    return { id: u.id, name: u.name, role: Roles_label(u.role) };
-  });
-  const json = JSON.stringify(users).replace(/</g, '\\u003c');
   const selected = String(selectedUserId || '').trim();
   let selectedLabel = '';
   if (selected) {
-    const hit = users.find(function(u) { return u.id === selected; });
+    const hit = Users_get(selected);
     if (hit) selectedLabel = hit.name + ' (' + hit.id + ')';
   }
   return '<div class="dashboard-search-panel">' +
-    '<script id="dashboardUsersData" type="application/json">' + json + '</script>' +
     '<label class="form-label dashboard-search-label">🔍 חיפוש משתמש</label>' +
     '<div class="dashboard-search-row">' +
     '<div class="user-search-wrap">' +
@@ -452,6 +447,20 @@ function _dashboardUserSearchBar(selectedUserId) {
     '</div>' +
     '<div id="dashboardUserSearchResults" class="user-search-results dashboard-search-results" hidden></div>' +
     '</div>';
+}
+
+function _dashboardSearchTabHtml(user, sid, p) {
+  const searchUserId = _dashboardResolveSearchUserId(p, user, 'search');
+  let s = _dashboardUserSearchBar(searchUserId);
+  s += '<div id="dashboardSearchResultsPanel" class="dashboard-search-results-panel">';
+  if (searchUserId && (!p || !_parseBool(p.light))) {
+    s += _dashboardUserExerciseResults(user, searchUserId);
+  } else if (!p || !_parseBool(p.light)) {
+    s += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
+      'הקלד שם או מספר אישי בשורת החיפוש.</p>';
+  }
+  s += '</div>';
+  return s;
 }
 
 function _statusHe(s) {
@@ -724,34 +733,41 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
   if (tab === 'conflicts') {
     return _dashboardConflictsTabHtml(sid);
   }
-  const searchUserId = _dashboardResolveSearchUserId(p, user, tab);
-  let s = _dashboardUserSearchBar(searchUserId);
-  s += '<div id="dashboardSearchResultsPanel" class="dashboard-search-results-panel">';
-  if (searchUserId) {
-    s += _dashboardUserExerciseResults(user, searchUserId);
-  } else if (!p || !_parseBool(p.light)) {
-    s += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
-      'הקלד שם או מספר אישי בשורת החיפוש.</p>';
-  }
-  s += '</div>';
-  return s;
+  return _dashboardSearchTabHtml(user, sid, p);
 }
 
 function _dashboardTabsShell(user, sid, activeTab, p) {
   const highlightUserId = _dashboardHighlightUserId(p, user);
-  const baseParams = {};
-  if (highlightUserId) baseParams.searchUserId = highlightUserId;
-  if (activeTab === 'search') {
-    const searchUserId = _dashboardResolveSearchUserId(p, user, 'search');
-    if (searchUserId) baseParams.searchUserId = searchUserId;
-  }
+  const moduleParams = {};
+  if (highlightUserId) moduleParams.searchUserId = highlightUserId;
   const items = _dashboardTabItems(user);
-  let s = _spaTabsBar('dashboard', baseParams, items, activeTab);
-  s += '<div class="dashboard-shell">';
-  s += '<div class="spa-tab-panel dashboard-tab-panel">' +
-    _dashboardTabPanelHtml(user, sid, activeTab, p) + '</div>';
-  s += '</div>';
-  return s;
+
+  let bar = '<nav class="spa-tabs-bar tabs dashboard-local-tabs" aria-label="לשוניות">';
+  items.forEach(function(item) {
+    const isActive = item.id === activeTab;
+    bar += '<a href="#" class="tab-link' + (isActive ? ' active' : '') +
+      '" data-dash-tab="' + _esc(item.id) + '">' + item.label + '</a>';
+  });
+  bar += '</nav>';
+
+  let panels = '<div class="dashboard-shell">';
+  items.forEach(function(item) {
+    const isActive = item.id === activeTab;
+    const hiddenAttr = isActive ? '' : ' hidden';
+    if (item.id === 'search') {
+      panels += '<div class="lazy-tab-panel dashboard-tab-panel"' + hiddenAttr +
+        ' data-dash-tab-panel="search">' +
+        _dashboardSearchTabHtml(user, sid, p) + '</div>';
+    } else {
+      const modId = 'dashboard.tab.' + item.id;
+      panels += '<div class="lazy-tab-panel dashboard-tab-panel"' + hiddenAttr +
+        ' data-dash-tab-panel="' + _esc(item.id) + '">' +
+        '<div data-spa-module="' + _esc(modId) + '"' + _spaParamsAttr(moduleParams) +
+        ' data-spa-module-loaded="0"></div></div>';
+    }
+  });
+  panels += '</div>';
+  return bar + panels;
 }
 
 function _dashboardTabContent(user, sid, tab, p) {

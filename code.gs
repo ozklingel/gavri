@@ -50,6 +50,28 @@ var DB_HTML_GEN_KEY = 'htmlgen';
 // כל הגיליונות למעט Credentials — נטען בכניסה (עלייה איטית, ניווט מהיר)
 var DB_FULL_CACHE_SHEETS = DB_SHEET_NAMES.filter(function(n) { return n !== 'Credentials'; });
 
+/** דחיית _htmlCacheBump במהלך כתיבות אצווה (ייבוא, שמירת לוח…) */
+var _cacheBatchDepth = 0;
+
+function _cacheBeginBatch() {
+  _cacheBatchDepth++;
+}
+
+function _cacheEndBatch() {
+  if (_cacheBatchDepth > 0) _cacheBatchDepth--;
+  if (_cacheBatchDepth <= 0) {
+    _cacheBatchDepth = 0;
+    Object.keys(_rowsCache).forEach(function(name) {
+      if (_rowsCache[name]) _putScriptCacheRows(name, _rowsCache[name]);
+    });
+    _htmlCacheBump();
+  }
+}
+
+function _cacheMaybeBumpHtml() {
+  if (_cacheBatchDepth <= 0) _htmlCacheBump();
+}
+
 function _dbCacheKey(name, part) {
   return DB_CACHE_PREFIX + name + (part == null ? '' : ':' + part);
 }
@@ -468,7 +490,7 @@ function _cacheInvalidate(name, options) {
   cache.remove(_dbCacheKey(name));
   cache.remove(_dbCacheKey(name, 'parts'));
   for (let i = 0; i < 30; i++) cache.remove(_dbCacheKey(name, 'c' + i));
-  _htmlCacheBump();
+  _cacheMaybeBumpHtml();
   if (options.skipRewarm) {
     _cacheClearWarmFlag();
     return;
@@ -489,7 +511,7 @@ function _colIndex(sheetName, columnName) {
 
 function _cachePatchAppend(name, rows) {
   if (!rows || !rows.length) {
-    _htmlCacheBump();
+    _cacheMaybeBumpHtml();
     return;
   }
   let cur = _rowsCache[name];
@@ -497,9 +519,9 @@ function _cachePatchAppend(name, rows) {
   if (cur && cur.data) {
     for (let i = 0; i < rows.length; i++) cur.data.push(rows[i]);
     _rowsCache[name] = cur;
-    _putScriptCacheRows(name, cur);
+    if (_cacheBatchDepth <= 0) _putScriptCacheRows(name, cur);
     _cacheNotifyDerived(name);
-    _htmlCacheBump();
+    _cacheMaybeBumpHtml();
     return;
   }
   _cacheInvalidate(name);
@@ -529,9 +551,9 @@ function _cachePatchRow(name, sheetRow, updates) {
   });
   cur.data[idx] = row;
   _rowsCache[name] = cur;
-  _putScriptCacheRows(name, cur);
+  if (_cacheBatchDepth <= 0) _putScriptCacheRows(name, cur);
   _cacheNotifyDerived(name);
-  _htmlCacheBump();
+  _cacheMaybeBumpHtml();
 }
 
 /** מחיקת שורה מהקאש אחרי deleteRow — בלי קריאת Sheets מחדש */
@@ -549,9 +571,9 @@ function _cachePatchDeleteRow(name, sheetRow) {
   }
   cur.data.splice(idx, 1);
   _rowsCache[name] = cur;
-  _putScriptCacheRows(name, cur);
+  if (_cacheBatchDepth <= 0) _putScriptCacheRows(name, cur);
   _cacheNotifyDerived(name);
-  _htmlCacheBump();
+  _cacheMaybeBumpHtml();
 }
 
 function _append(name, row) {
