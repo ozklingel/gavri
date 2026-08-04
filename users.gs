@@ -183,7 +183,7 @@ function Users_delete(p) {
   if (targetId === p.sid) throw new Error('לא ניתן למחוק את המשתמש המחובר.');
   const r = Users_deleteCore_([targetId], p.sid);
   if (!r.deleted) throw new Error('המשתמש לא נמצא.');
-  return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש נמחק יחד עם כל ההקצאות שלו.' });
+  return { ok: true, info: 'המשתמש נמחק יחד עם כל ההקצאות שלו.', page: 'users', tab: 'users' };
 }
 
 function Users_deleteBulk(p) {
@@ -193,11 +193,12 @@ function Users_deleteBulk(p) {
   if (!ids.length) throw new Error('לא נבחרו משתמשים למחיקה.');
   const r = Users_deleteCore_(ids, p.sid);
   if (!r.deleted) throw new Error('לא נמצאו משתמשים למחיקה (ייתכן שניסית למחוק את עצמך).');
-  return Views_users({
-    sid: p.sid,
-    tab: 'users',
-    info: 'נמחקו ' + r.deleted + ' משתמשים יחד עם ההקצאות שלהם.'
-  });
+  return {
+    ok: true,
+    info: 'נמחקו ' + r.deleted + ' משתמשים יחד עם ההקצאות שלהם.',
+    page: 'users',
+    tab: 'users'
+  };
 }
 
 // Update role only (from users tab)

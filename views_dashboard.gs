@@ -536,13 +536,14 @@ function _dashPhoneCell(phone) {
   return _whatsappLink(phone);
 }
 
-function _commanderTraineeExercisesHtml(assigns) {
+function _commanderTraineeExercisesHtml(assigns, exById) {
+  exById = exById || Exercises_byIdMap();
   if (!assigns.length) {
     return '<span style="color:var(--muted)">אין תרגילים</span>';
   }
   let html = '<ul style="margin:0;padding:0 18px 0 0;list-style:disc;min-width:140px">';
   assigns.forEach(function(a) {
-    const ex = Exercises_get(a.exercise_id);
+    const ex = exById[a.exercise_id];
     html += '<li style="margin:5px 0;line-height:1.4">' +
       (ex ? _exerciseLink(ex.id, ex.title) : _esc(a.exercise_id)) +
       (ex ? '<div style="font-size:11px;margin-top:2px;color:var(--muted)">' +
@@ -557,6 +558,13 @@ function _commanderTraineeExercisesHtml(assigns) {
 // ── Commander Dashboard ──
 function _commanderDashboardPanels(user, sid) {
   const trainees = Users_traineesOfCommander(user.id);
+  const exById = Exercises_byIdMap();
+  const assignsByUser = {};
+  Assignments_all().forEach(function(a) {
+    const uid = String(a.user_id);
+    if (!assignsByUser[uid]) assignsByUser[uid] = [];
+    assignsByUser[uid].push(a);
+  });
 
   let s = '<div class="drawer-section-title">מסך הבית — ' + Roles_label(user.role) + '</div>';
 
@@ -566,7 +574,7 @@ function _commanderDashboardPanels(user, sid) {
 
   let totalAssigns = 0;
   trainees.forEach(function(t) {
-    totalAssigns += Assignments_byUser(t.id).length;
+    totalAssigns += (assignsByUser[String(t.id)] || []).length;
   });
 
   s += '<div class="grid-2" style="margin-bottom:12px">' +
@@ -587,7 +595,7 @@ function _commanderDashboardPanels(user, sid) {
     '</tr></thead><tbody>';
 
   trainees.forEach(function(t) {
-    const assigns = Assignments_byUser(t.id);
+    const assigns = assignsByUser[String(t.id)] || [];
     const unitDetail = t.unit_affiliation || t.unit_classification || '';
     s += '<tr>' +
       '<td>' + _dashCell(t.military_affiliation) + '</td>' +
@@ -596,7 +604,7 @@ function _commanderDashboardPanels(user, sid) {
       '<td class="mono" style="font-size:12px">' + _dashPhoneCell(t.phone) + '</td>' +
       '<td>' + _dashCell(unitDetail) + '</td>' +
       '<td>' + _dashCell(t.target_role) + '</td>' +
-      '<td>' + _commanderTraineeExercisesHtml(assigns) + '</td>' +
+      '<td>' + _commanderTraineeExercisesHtml(assigns, exById) + '</td>' +
       '</tr>';
   });
 
@@ -607,10 +615,12 @@ function _commanderDashboardPanels(user, sid) {
 // ── Tutor Dashboard ──
 function _tutorDashboardPanels(user, sid) {
   const myAssigns = Assignments_byTutor(user.id);
+  const exById = Exercises_byIdMap();
+  const usersById = Users_byIdMap();
   const exMap = {};
 
   myAssigns.forEach(function(a) {
-    const u = Users_get(a.user_id);
+    const u = usersById[String(a.user_id)];
     if (!u || !Roles_isTrainee(u.role)) return;
     if (!exMap[a.exercise_id]) exMap[a.exercise_id] = [];
     exMap[a.exercise_id].push({ assign: a, trainee: u });
@@ -624,8 +634,8 @@ function _tutorDashboardPanels(user, sid) {
   }
 
   exIds.sort(function(a, b) {
-    const ea = Exercises_get(a);
-    const eb = Exercises_get(b);
+    const ea = exById[a];
+    const eb = exById[b];
     const da = ea && ea.start_date ? ea.start_date : a;
     const db = eb && eb.start_date ? eb.start_date : b;
     return String(da).localeCompare(String(db));
@@ -635,7 +645,7 @@ function _tutorDashboardPanels(user, sid) {
     'תרגילים שבהם משובצים חניכים שהוקצו לך כחונך — ניתן לתת ציון ומשוב לחניכים שלך בלבד.</p>';
 
   exIds.forEach(function(exId) {
-    const ex = Exercises_get(exId);
+    const ex = exById[exId];
     const title = ex ? ex.title : exId;
     const rows = exMap[exId];
 

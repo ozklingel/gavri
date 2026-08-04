@@ -170,7 +170,8 @@ function getDashboardData(sid) {
     pages: [page],
     dashboard: page,
     data: data,
-    profile: profile
+    profile: profile,
+    modules: ['drawer.panels']
   };
 }
 
@@ -229,7 +230,7 @@ function getExercisesData(sid) {
     pushPage('users', { tab: 'teams' });
   }
 
-  const modules = ['drawer.panels', 'dashboard.tab.exercise'];
+  const modules = ['dashboard.tab.exercise'];
   if (typeof _teamMatrixAllowedTeams === 'function' && _teamMatrixAllowedTeams(user).length) {
     modules.push('dashboard.tab.team');
   }
@@ -308,8 +309,7 @@ function getRemainingAppData(sid) {
     ok: true,
     stage: 'remaining',
     sheets: rest.length,
-    pages: pages,
-    modules: ['drawer.panels']
+    pages: pages
   };
 }
 

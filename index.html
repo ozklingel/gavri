@@ -3519,6 +3519,11 @@ body {
       return '<div class="panel-inline-loader">// LOADING...</div>';
     }
 
+    function showSlotLoading(slot) {
+      if (!slot) return;
+      slot.innerHTML = moduleLoaderHtml();
+    }
+
     function fillSlot(slot, html) {
       slot.innerHTML = html;
       if (window.MapimSpa) {
@@ -3530,17 +3535,24 @@ body {
 
     function loadSlot(slot, opts) {
       opts = opts || {};
-      if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return false;
+      if (!slot) return false;
+      var loaded = slot.getAttribute('data-spa-module-loaded');
+      if (!opts.force && loaded === '1') return false;
       var moduleId = slot.getAttribute('data-spa-module');
       if (!moduleId) return false;
       var params = window.MapimSpa && MapimSpa.parseSpaParams
         ? MapimSpa.parseSpaParams(slot) : {};
+      if (!opts.skipLoader) showSlotLoading(slot);
       var cached = get(moduleId, params);
-      if (cached != null) {
+      if (cached != null && !opts.force) {
+        if (opts.deferCacheFill) {
+          slot.setAttribute('data-spa-module-loaded', 'pending');
+          requestAnimationFrame(function() { fillSlot(slot, cached); });
+          return false;
+        }
         fillSlot(slot, cached);
         return false;
       }
-      if (!opts.skipLoader) slot.innerHTML = moduleLoaderHtml();
       slot.setAttribute('data-spa-module-loaded', 'pending');
       google.script.run
         .withSuccessHandler(function(res) {
@@ -3561,6 +3573,19 @@ body {
         .apiLoadModule(window.MapimSpa ? MapimSpa.getSid() : '', moduleId, JSON.stringify(params || {}));
       return true;
     }
+
+    /** LOADING מיידי + טעינת מודול (קאש או שרת) */
+    function activateSlot(slot, opts) {
+      if (!slot) return false;
+      opts = opts || {};
+      showSlotLoading(slot);
+      slot.setAttribute('data-spa-module-loaded', '0');
+      return loadSlot(slot, {
+        skipLoader: true,
+        deferCacheFill: !opts.force,
+        force: !!opts.force
+      });
+    }
     function load(root) {
       root = root || document.getElementById('app-content');
       if (!root) return;
@@ -3570,10 +3595,14 @@ body {
         if (tabPanel && tabPanel.hidden) return;
         var coll = slot.closest('.collapsible-content');
         if (coll && !coll.classList.contains('open')) return;
-        loadSlot(slot);
+        activateSlot(slot);
       });
     }
-    return { load: load, loadSlot: loadSlot, store: store, get: get, invalidate: invalidate, invalidateModule: invalidateModule };
+    return {
+      load: load, loadSlot: loadSlot, activateSlot: activateSlot,
+      showSlotLoading: showSlotLoading, moduleLoaderHtml: moduleLoaderHtml,
+      store: store, get: get, invalidate: invalidate, invalidateModule: invalidateModule
+    };
   })();
 
   // ══ SPA router — fixed URL, no full page reloads ══
@@ -3749,6 +3778,36 @@ body {
         .apiGetUsersIndex(getSid());
     }
 
+    function activateTabModuleSlot(slot, opts) {
+      if (!slot || !window.MapimModules) return;
+      if (MapimModules.activateSlot) {
+        MapimModules.activateSlot(slot, opts || {});
+      } else {
+        MapimModules.showSlotLoading(slot);
+        slot.setAttribute('data-spa-module-loaded', '0');
+        MapimModules.loadSlot(slot, { skipLoader: true });
+      }
+    }
+
+    function refreshUsersPageAfterWrite(result, tabId) {
+      tabId = tabId || 'users';
+      if (window.MapimModules && MapimModules.invalidateModule) {
+        MapimModules.invalidateModule('users.tab.users');
+        MapimModules.invalidateModule('users.tab.teams');
+      }
+      if (currentRoute && currentRoute.page === 'users') {
+        if (result && result.info) showUsersPageFlash(result.info);
+        reloadUsersTabModule(tabId, { force: true });
+        finishBootUi();
+        loading = false;
+        return true;
+      }
+      finishBootUi();
+      loading = false;
+      navigate('users', { tab: tabId });
+      return true;
+    }
+
     function switchDashboardTab(tabId) {
       var page = document.querySelector('.page-dashboard');
       if (!page) return;
@@ -3761,16 +3820,7 @@ body {
         panel.hidden = !show;
         if (show) {
           var slot = panel.querySelector('[data-spa-module]');
-          if (slot) {
-            var needsLoad = slot.getAttribute('data-spa-module-loaded') !== '1';
-            if (needsLoad && window.MapimModules) {
-              var params = MapimSpa.parseSpaParams ? MapimSpa.parseSpaParams(slot) : {};
-              var modId = slot.getAttribute('data-spa-module');
-              var cached = MapimModules.get && modId ? MapimModules.get(modId, params) : null;
-              if (cached == null) slot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
-            }
-            if (window.MapimModules) MapimModules.loadSlot(slot);
-          }
+          if (slot) activateTabModuleSlot(slot);
           if (tabId === 'search' && typeof initDashboardUserSearch === 'function') {
             initDashboardUserSearch();
           }
@@ -3808,16 +3858,7 @@ body {
         panel.hidden = !show;
         if (show) {
           var slot = panel.querySelector('[data-spa-module]');
-          if (slot) {
-            var needsLoad = slot.getAttribute('data-spa-module-loaded') !== '1';
-            if (needsLoad && window.MapimModules) {
-              var params = MapimSpa.parseSpaParams ? MapimSpa.parseSpaParams(slot) : {};
-              var modId = slot.getAttribute('data-spa-module');
-              var cached = MapimModules.get && modId ? MapimModules.get(modId, params) : null;
-              if (cached == null) slot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
-            }
-            if (window.MapimModules) MapimModules.loadSlot(slot);
-          }
+          if (slot) activateTabModuleSlot(slot);
         }
       });
       if (currentRoute && currentRoute.page === 'users') {
@@ -3840,16 +3881,36 @@ body {
       });
     }
 
-    function reloadUsersTabModule(tabId) {
+    function initConflictsTabs() {
+      document.querySelectorAll('.conflicts-local-tabs:not([data-conflicts-inited])').forEach(function(bar) {
+        bar.setAttribute('data-conflicts-inited', '1');
+        bar.addEventListener('click', function(e) {
+          var link = e.target.closest('[data-conflicts-tab]');
+          if (!link) return;
+          e.preventDefault();
+          e.stopPropagation();
+          var tabId = link.getAttribute('data-conflicts-tab');
+          var root = bar.closest('.conflicts-page');
+          if (!root) return;
+          root.querySelectorAll('.conflicts-local-tabs .tab-link').forEach(function(a) {
+            a.classList.toggle('active', a.getAttribute('data-conflicts-tab') === tabId);
+          });
+          root.querySelectorAll('[data-conflicts-tab-panel]').forEach(function(panel) {
+            panel.hidden = panel.getAttribute('data-conflicts-tab-panel') !== tabId;
+          });
+        });
+      });
+    }
+
+    function reloadUsersTabModule(tabId, opts) {
+      opts = opts || {};
       var panel = document.querySelector('[data-users-tab-panel="' + tabId + '"]');
       if (!panel) return;
       var slot = panel.querySelector('[data-spa-module]');
       if (!slot || !window.MapimModules) return;
       var modId = slot.getAttribute('data-spa-module');
       if (MapimModules.invalidateModule && modId) MapimModules.invalidateModule(modId);
-      slot.setAttribute('data-spa-module-loaded', '0');
-      slot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
-      MapimModules.loadSlot(slot);
+      activateTabModuleSlot(slot, { force: true });
     }
 
     function showUsersPageFlash(msg) {
@@ -3997,21 +4058,7 @@ body {
 
     var drawerPrefetchStarted = false;
     function prefetchDrawerModule() {
-      if (drawerPrefetchStarted || !getSid()) return;
-      var slot = document.querySelector('#appDrawerPanels [data-spa-module="drawer.panels"]');
-      if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return;
-      drawerPrefetchStarted = true;
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res && res.html != null && window.MapimModules) {
-            MapimModules.store('drawer.panels', {}, res.html);
-            if (slot.getAttribute('data-spa-module-loaded') === 'pending') {
-              MapimModules.loadSlot(slot);
-            }
-          }
-        })
-        .withFailureHandler(function() { drawerPrefetchStarted = false; })
-        .apiLoadModule(getSid(), 'drawer.panels', '{}');
+      prefetchDrawerModuleEarly();
     }
 
     // ── Staged load: dashboard → exercises → remaining ──
@@ -4078,11 +4125,46 @@ body {
     }
 
     function storeModulesList(list) {
+      var gotDrawer = false;
       (list || []).forEach(function(item) {
         if (item && item.html != null && window.MapimModules && MapimModules.store) {
           MapimModules.store(item.moduleId, item.params || {}, item.html);
+          if (item.moduleId === 'drawer.panels') gotDrawer = true;
         }
       });
+      if (gotDrawer) prefillDrawerModuleSlot();
+    }
+
+    function prefillDrawerModuleSlot() {
+      if (!window.MapimModules || !MapimModules.loadSlot) return;
+      var slot = document.querySelector('#appDrawerPanels [data-spa-module="drawer.panels"]');
+      if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return;
+      if (MapimModules.get('drawer.panels', {}) == null) return;
+      MapimModules.loadSlot(slot, { skipLoader: true });
+    }
+
+    function prefetchDrawerModuleEarly() {
+      if (!getSid() || !window.MapimModules) return;
+      var slot = document.querySelector('#appDrawerPanels [data-spa-module="drawer.panels"]');
+      if (!slot) return;
+      if (slot.getAttribute('data-spa-module-loaded') === '1') return;
+      if (MapimModules.get('drawer.panels', {}) != null) {
+        prefillDrawerModuleSlot();
+        return;
+      }
+      if (drawerPrefetchStarted) return;
+      drawerPrefetchStarted = true;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.html != null && window.MapimModules) {
+            MapimModules.store('drawer.panels', {}, res.html);
+            prefillDrawerModuleSlot();
+          } else {
+            drawerPrefetchStarted = false;
+          }
+        })
+        .withFailureHandler(function() { drawerPrefetchStarted = false; })
+        .apiLoadModule(getSid(), 'drawer.panels', '{}');
     }
 
     /**
@@ -4113,25 +4195,25 @@ body {
         .catch(function() {
           return gsCall('apiReadyDashboard', getSid());
         })
-        .then(function(res) {
+        .then(function(dashRes) {
           console.timeEnd('client:getDashboardData');
           var rpcMs = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - tDashRpc;
-          if (res && res.profile) {
-            console.log('[mapim profile] server getDashboardData', res.profile);
-            console.log('[mapim profile] unified data', res.data || null);
+          if (dashRes && dashRes.profile) {
+            console.log('[mapim profile] server getDashboardData', dashRes.profile);
+            console.log('[mapim profile] unified data', dashRes.data || null);
           }
           console.log('[mapim profile] client RPC+transfer getDashboardData ms=', Math.round(rpcMs));
 
           console.time('client:paintDashboard');
-          if (res && res.ok !== false) {
-            storePagesList(res.pages);
-            if (res.data && res.data.usersIndex) {
-              storeUsersIndex(res.data.usersIndex);
+          if (dashRes && dashRes.ok !== false) {
+            storePagesList(dashRes.pages);
+            if (dashRes.data && dashRes.data.usersIndex) {
+              storeUsersIndex(dashRes.data.usersIndex);
             }
-            if (res.dashboard && res.dashboard.body) {
+            if (dashRes.dashboard && dashRes.dashboard.body) {
               storeClientPage(
                 normalizeRoute('dashboard', { tab: 'search' }),
-                { body: res.dashboard.body, title: res.dashboard.title || 'מסך הבית' }
+                { body: dashRes.dashboard.body, title: dashRes.dashboard.title || 'מסך הבית' }
               );
             }
           }
@@ -4145,14 +4227,23 @@ body {
                 } else {
                   finishPriming({});
                 }
+                return dashRes;
               });
           }
+          return dashRes;
         })
-        .then(function() {
+        .then(function(dashRes) {
           console.timeEnd('client:paintDashboard');
           notifyStage('dashboard');
           appPrimed = true;
           primingInProgress = false;
+          if (dashRes && dashRes.modules && dashRes.modules.length) {
+            gsCall('apiPrefetchModules', getSid(), JSON.stringify(dashRes.modules))
+              .then(function(modRes) { storeModulesList(modRes && modRes.modules); })
+              .catch(function() {});
+          } else {
+            prefetchDrawerModuleEarly();
+          }
           // Step 3 — background, no full-screen loader
           console.time('client:getExercisesData');
           return gsCall('getExercisesData', getSid());
@@ -4303,6 +4394,7 @@ body {
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
       if (typeof initDashboardTabs === 'function') initDashboardTabs();
       if (typeof initUsersTabs === 'function') initUsersTabs();
+      if (typeof initConflictsTabs === 'function') initConflictsTabs();
       if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
       if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
@@ -4335,7 +4427,18 @@ body {
         });
         document.body.classList.add('drawer-open');
         var panelsSlot = document.querySelector('#appDrawerPanels [data-spa-module="drawer.panels"]');
-        if (panelsSlot && window.MapimModules) MapimModules.loadSlot(panelsSlot);
+        if (panelsSlot && window.MapimModules) {
+          var cached = MapimModules.get && MapimModules.get('drawer.panels', {}) != null;
+          if (cached) {
+            MapimModules.loadSlot(panelsSlot, { skipLoader: true });
+          } else {
+            if (panelsSlot.getAttribute('data-spa-module-loaded') !== '1') {
+              panelsSlot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
+            }
+            MapimModules.loadSlot(panelsSlot);
+            prefetchDrawerModuleEarly();
+          }
+        }
       }
 
       function closeDrawer() {
@@ -4445,6 +4548,8 @@ body {
       if (!options.fromBack && !options.fromForward) forwardStack = [];
       var prevRoute = currentRoute;
       var nextRoute = normalizeRoute(page, params);
+      var isSamePageTab = prevRoute && prevRoute.page === page &&
+        routeKey(prevRoute) !== routeKey(nextRoute);
 
       function commitNav(result, fromCache) {
         if (!options.fromBack && !options.fromForward && !options.replace && prevRoute) {
@@ -4455,11 +4560,19 @@ body {
         applyResult(result, fromCache ? { fromClientCache: true, skipPrime: true } : { skipPrime: true });
       }
 
+      if (isSamePageTab && !options.fromBack && !options.fromForward && page !== 'login') {
+        showLocalPageLoader('// LOADING...');
+      }
+
       // קאש לקוח — מיידי
       if (!options.force && !options.skipCache && page !== 'login') {
         var cached = getClientPage(nextRoute);
         if (cached) {
-          commitNav(cached, true);
+          if (isSamePageTab) {
+            requestAnimationFrame(function() { commitNav(cached, true); });
+          } else {
+            commitNav(cached, true);
+          }
           return;
         }
       }
@@ -4585,7 +4698,7 @@ body {
             }
             if (currentRoute && currentRoute.page === 'users') {
               showUsersPageFlash(result.info || 'ייבוא הושלם');
-              reloadUsersTabModule('users');
+              reloadUsersTabModule('users', { force: true });
               resetXlsxImportBtn();
               finishBootUi();
               loading = false;
@@ -4594,6 +4707,10 @@ body {
             finishBootUi();
             loading = false;
             navigate('users', { tab: 'users' });
+            return;
+          }
+          if ((action === 'deleteUser' || action === 'deleteUsersBulk') && result.ok && !result.body) {
+            refreshUsersPageAfterWrite(result, 'users');
             return;
           }
           if (action === 'deleteExercisesBulk') {
@@ -4680,7 +4797,8 @@ body {
           el.closest('.expandable-closed') ||
           el.closest('.ex-matrix-tier-toggle') ||
           el.closest('[data-dash-tab]') ||
-          el.closest('[data-users-tab]')) return true;
+          el.closest('[data-users-tab]') ||
+          el.closest('[data-conflicts-tab]')) return true;
       if (el.closest('[data-spa-page]') || el.closest('[data-spa-action]')) return false;
       return el.closest('.dp-tab') ||
         el.closest('.dp-wrap') ||
@@ -4782,6 +4900,8 @@ body {
       switchDashboardTab: switchDashboardTab,
       switchUsersTab: switchUsersTab,
       reloadUsersTabModule: reloadUsersTabModule,
+      activateTabModuleSlot: activateTabModuleSlot,
+      refreshUsersPageAfterWrite: refreshUsersPageAfterWrite,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();
@@ -5711,7 +5831,15 @@ body {
     if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
     if (isOpen && window.MapimModules) {
       content.querySelectorAll('[data-spa-module]').forEach(function(slot) {
-        MapimModules.loadSlot(slot);
+        if (window.MapimSpa && MapimSpa.activateTabModuleSlot) {
+          MapimSpa.activateTabModuleSlot(slot);
+        } else if (MapimModules.activateSlot) {
+          MapimModules.activateSlot(slot);
+        } else {
+          MapimModules.showSlotLoading(slot);
+          slot.setAttribute('data-spa-module-loaded', '0');
+          MapimModules.loadSlot(slot, { skipLoader: true });
+        }
       });
     }
   });
