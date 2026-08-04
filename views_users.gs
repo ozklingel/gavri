@@ -133,6 +133,7 @@ function _teamsAutoSplitForm(unassignedTrainees, freeCommanders, previewTeams) {
 function _teamsTab(sid, openSet) {
   const allUsers = Users_all();
   const teams = Teams_all();
+  const userById = Users_byIdMap();
   const membersByTeam = {};
   const unassigned = [];
   allUsers.forEach(function(u) {
@@ -155,7 +156,7 @@ function _teamsTab(sid, openSet) {
   } else {
     teams.forEach(function(t) {
       const members = membersByTeam[t.id] || [];
-      const cmd = t.commander_id ? Users_get(t.commander_id) : null;
+      const cmd = t.commander_id ? userById[t.commander_id] : null;
       s += '<div class="card" style="margin:10px;border:1px solid var(--border)"><div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +
         '<b>' + _esc(t.name) + '</b> <span class="mono" style="font-size:11px;color:var(--muted)">' + t.id + '</span>' +
@@ -192,17 +193,21 @@ function _teamsTab(sid, openSet) {
         });
         s += '</ul>';
       }
-
-      if (unassigned.length) {
-        const addOpts = unassigned.map(function(u) { return [u.id, u.id + ' — ' + u.name]; });
-        s += '<div style="margin-top:8px">' + _formOpen('form-inline') +
-          '<input type="hidden" name="action" value="addMember">' +
-          '<input type="hidden" name="teamId" value="' + _esc(t.id) + '">' +
-          _select('userId', addOpts) +
-          _submitBtn('הוסף חבר', 'btn btn-primary btn-sm') + '</form></div>';
-      }
       s += '</div></div>';
     });
+
+    if (unassigned.length) {
+      const teamOpts = teams.map(function(t) { return [t.id, t.name + ' (' + t.id + ')']; });
+      const userOpts = unassigned.map(function(u) { return [u.id, u.id + ' — ' + u.name]; });
+      s += '<div class="card" style="margin:10px;border:1px dashed var(--border)"><div class="card-body">' +
+        '<div style="font-size:13px;font-weight:600;margin-bottom:8px">➕ הוספת חבר לצוות</div>' +
+        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px">חברים ללא שיוך: <b>' + unassigned.length + '</b></p>' +
+        _formOpen('form-inline') +
+        '<input type="hidden" name="action" value="addMember">' +
+        _select('teamId', teamOpts) +
+        _select('userId', userOpts) +
+        _submitBtn('הוסף', 'btn btn-primary btn-sm') + '</form></div></div>';
+    }
   }
   s += '</div>';
 

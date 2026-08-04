@@ -3656,6 +3656,9 @@ body {
       // מפתח קאש יציב לטאבי דשבורד — בלי searchUserId וכו'
       if (page === 'dashboard') {
         out.tab = String(src.tab || 'search').trim() || 'search';
+        if (src.searchUserId != null && String(src.searchUserId).trim()) {
+          out.searchUserId = String(src.searchUserId).trim();
+        }
       } else if (page === 'exercises') {
         out.tab = String(src.tab || 'list').trim() || 'list';
       } else if (page === 'users') {
@@ -3764,29 +3767,23 @@ body {
       return false;
     }
 
-    var dashboardHydrateReq = 0;
-    function scheduleDashboardHydrate() {
-      var app = document.getElementById('app-content');
-      if (!app || !app.querySelector('[data-dashboard-light="1"]')) return;
-      if (!getSid()) return;
-      var req = ++dashboardHydrateReq;
-      var sid = getSid();
+    var drawerPrefetchStarted = false;
+    function prefetchDrawerModule() {
+      if (drawerPrefetchStarted || !getSid()) return;
+      var slot = document.querySelector('#appDrawerPanels [data-spa-module="drawer.panels"]');
+      if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return;
+      drawerPrefetchStarted = true;
       google.script.run
-        .withSuccessHandler(function(result) {
-          if (req !== dashboardHydrateReq) return;
-          if (!result || !result.body) return;
-          var route = normalizeRoute('dashboard', { tab: 'search', searchUserId: sid });
-          storeClientPage(route, result);
-          if (!currentRoute || currentRoute.page !== 'dashboard') return;
-          if (String((currentRoute.params && currentRoute.params.tab) || 'search') !== 'search') return;
-          var app2 = document.getElementById('app-content');
-          if (!app2 || !app2.querySelector('[data-dashboard-light="1"]')) return;
-          app2.innerHTML = result.body;
-          runScripts(app2);
-          afterRender();
+        .withSuccessHandler(function(res) {
+          if (res && res.html != null && window.MapimModules) {
+            MapimModules.store('drawer.panels', {}, res.html);
+            if (slot.getAttribute('data-spa-module-loaded') === 'pending') {
+              MapimModules.loadSlot(slot);
+            }
+          }
         })
-        .withFailureHandler(function() {})
-        .apiRenderPage(sid, 'dashboard', JSON.stringify({ tab: 'search', searchUserId: sid }));
+        .withFailureHandler(function() { drawerPrefetchStarted = false; })
+        .apiLoadModule(getSid(), 'drawer.panels', '{}');
     }
 
     // ── Staged load: dashboard → exercises → remaining ──
@@ -4074,7 +4071,7 @@ body {
       if (typeof initExerciseEditShiftPrompt === 'function') initExerciseEditShiftPrompt();
       if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
       if (typeof initBulkSelectTables === 'function') initBulkSelectTables();
-      scheduleDashboardHydrate();
+      prefetchDrawerModule();
       if (window.MapimModules && MapimModules.load) MapimModules.load();
       var openPanel = document.querySelector('.collapsible.open[id^="panel-"]');
       if (openPanel) {
@@ -4597,10 +4594,12 @@ body {
     if (!input || !results) return;
 
     var users = [];
-    try {
-      users = JSON.parse(input.getAttribute('data-users') || '[]');
-    } catch (e) {
-      users = [];
+    var dataEl = document.getElementById('dashboardUsersData');
+    if (dataEl) {
+      try { users = JSON.parse(dataEl.textContent || '[]'); } catch (e1) { users = []; }
+    }
+    if (!users.length) {
+      try { users = JSON.parse(input.getAttribute('data-users') || '[]'); } catch (e2) { users = []; }
     }
 
     var selectedId = input.getAttribute('data-selected-id') || '';
@@ -4612,6 +4611,10 @@ body {
       results.hidden = true;
       results.innerHTML = '';
       activeIdx = -1;
+    }
+
+    function resultsPanel() {
+      return document.getElementById('dashboardSearchResultsPanel');
     }
 
     function selectUser(id, label) {
@@ -4639,14 +4642,39 @@ body {
       return '';
     }
 
+    function loadSearchResults(userId) {
+      var panel = resultsPanel();
+      if (!panel || !window.MapimSpa) return;
+      panel.innerHTML = '<div class="page-local-loader" style="padding:20px;text-align:center;color:var(--muted)">// LOADING...</div>';
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!panel) return;
+          if (res && res.html != null) {
+            panel.innerHTML = res.html;
+            if (MapimSpa.runScripts) MapimSpa.runScripts(panel);
+            if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
+            if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
+          } else {
+            panel.innerHTML = '<div class="flash flash-error">' +
+              (res && res.error ? res.error : 'שגיאה בטעינת תוצאות') + '</div>';
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (panel) {
+            panel.innerHTML = '<div class="flash flash-error">' +
+              (err && err.message ? err.message : String(err)) + '</div>';
+          }
+        })
+        .apiLoadModule(MapimSpa.getSid(), 'dashboard.tab.search', JSON.stringify({ searchUserId: userId }));
+    }
+
     function runUserExerciseSearch() {
       var userId = resolveUserId();
       if (!userId) {
         alert('בחר משתמש מהרשימה או הזן שם / מספר אישי מדויק');
         return;
       }
-      if (!window.MapimSpa) return;
-      MapimSpa.navigate('dashboard', { searchUserId: userId });
+      loadSearchResults(userId);
     }
 
     function renderMatches(q) {
@@ -4706,10 +4734,14 @@ body {
         } else if (e.key === 'Enter') {
           if (!results.hidden && activeIdx >= 0 && items[activeIdx]) {
             e.preventDefault();
-            selectUser(items[activeIdx].getAttribute('data-user-id'), items[activeIdx].getAttribute('data-user-label'));
+            var uid = items[activeIdx].getAttribute('data-user-id');
+            var lbl = items[activeIdx].getAttribute('data-user-label');
+            selectUser(uid, lbl);
+            loadSearchResults(uid);
           } else if (!results.hidden && items.length === 1) {
             e.preventDefault();
             selectUser(items[0].getAttribute('data-user-id'), items[0].getAttribute('data-user-label'));
+            loadSearchResults(items[0].getAttribute('data-user-id'));
           } else {
             e.preventDefault();
             runUserExerciseSearch();
@@ -4726,6 +4758,10 @@ body {
     if (btn && !btn._searchBound) {
       btn._searchBound = true;
       btn.addEventListener('click', runUserExerciseSearch);
+    }
+
+    if (selectedId && resultsPanel() && !resultsPanel().innerHTML.trim()) {
+      loadSearchResults(selectedId);
     }
   }
   window.initDashboardUserSearch = initDashboardUserSearch;

@@ -112,15 +112,13 @@ function getDashboardData(sid) {
   // One SS.open + one getValues() per missing sheet — never force-reload all every entry.
   const tBatch = Date.now();
   console.time('getDashboardData:sheets');
-  const batch = _readSheetsBatch(dashSheets, { force: false });
+  _cacheWarmSheetsIfNeeded(dashSheets);
   console.timeEnd('getDashboardData:sheets');
   profile.marks.sheetsMs = Date.now() - tBatch;
-  profile.sheets = batch.profile;
 
   // Unified JSON for client profiling / future client-side paint (no raw row dumps — sizes only + ids).
   const data = {
     userId: user.id,
-    sheets: batch.sheets,
     counts: {}
   };
   dashSheets.forEach(function(name) {
@@ -387,7 +385,7 @@ function apiPrefetchPages(sid, pagesJson) {
     return { ok: false, pages: [] };
   }
 
-  _cacheEnsureFullWarm();
+  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
 
   let list = [];
   try {
@@ -434,7 +432,7 @@ function apiPrefetchModules(sid, modulesJson) {
   } catch (e1) {
     return { ok: false, modules: [] };
   }
-  _cacheEnsureFullWarm();
+  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
 
   let list = [];
   try {
@@ -477,11 +475,6 @@ function _spaMergeParams(sid, paramsJson) {
 function _spaEnsureWrap(result) {
   if (result && (result.body != null || result.ok === true)) return result;
   throw new Error('תגובת שרת לא תקינה');
-}
-
-function _cacheWarmForPage(page, p) {
-  if (String(page || 'login').trim() === 'login') return;
-  _cacheEnsureFullWarm();
 }
 
 function _spaDispatchPage(page, p) {

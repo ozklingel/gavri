@@ -105,18 +105,25 @@ function _dashboardTabSearchModule(user, p) {
 function _cacheWarmForModule(moduleId, p) {
   const id = String(moduleId || '').trim();
   if (!id) return;
-  // Prefer batch warm of only the sheets this module needs — never full force-reload.
+  if (id === 'drawer.panels') {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'HomeConstraints']);
+    return;
+  }
+  if (id.indexOf('users.tab.') === 0) {
+    _cacheWarmSheetsIfNeeded(['Users', 'Teams', 'UserFieldDefs', 'UserFieldValues']);
+    return;
+  }
   if (id.indexOf('dashboard.') === 0 || id.indexOf('exercises.') === 0 ||
       id === 'assign.main' || id.indexOf('assign.section.') === 0) {
     const dash = (typeof DB_DASHBOARD_SHEETS !== 'undefined' && DB_DASHBOARD_SHEETS.length)
       ? DB_DASHBOARD_SHEETS
       : ['Users', 'Teams', 'Exercises', 'ExerciseDetails', 'Assignments', 'Series'];
-    _readSheetsBatch(dash.concat(['HomeConstraints', 'SystemLog']), { force: false });
+    _cacheWarmSheetsIfNeeded(dash);
     return;
   }
   if (id === 'timeline.main' && typeof DB_TIMELINE_SHEETS !== 'undefined') {
-    _readSheetsBatch(DB_TIMELINE_SHEETS, { force: false });
+    _cacheWarmSheetsIfNeeded(DB_TIMELINE_SHEETS);
     return;
   }
-  _cacheEnsureFullWarm();
+  _cacheWarmSheetsIfNeeded(DB_SESSION_SHEETS);
 }

@@ -251,13 +251,14 @@ function _readSheetsBatch(names, options) {
       return;
     }
     if (!force) {
-      const cached = _getScriptCacheRows(name);
-      if (cached && cached.data) {
-        _rowsCache[name] = cached;
-        out[name] = { header: cached.header, rows: cached.data.length, source: 'scriptCache' };
-        profile[name] = { ms: Date.now() - t0, source: 'scriptCache', rows: out[name].rows };
-        return;
-      }
+      try {
+        const viaRows = _rows(name);
+        if (viaRows && viaRows.data) {
+          out[name] = { header: viaRows.header, rows: viaRows.data.length, source: 'rows' };
+          profile[name] = { ms: Date.now() - t0, source: 'rows', rows: out[name].rows };
+          return;
+        }
+      } catch (eRows) {}
     }
     try {
       console.time('sheet:' + name);
@@ -344,21 +345,9 @@ function _cacheWarmSheet(name) {
 }
 
 function _cacheWarmSheetsIfNeeded(names) {
-  const list = names || [];
-  const missing = [];
-  list.forEach(function(name) {
-    if (_rowsCache[name]) return;
-    if (_scriptCacheHas(name)) {
-      const cached = _getScriptCacheRows(name);
-      if (cached && cached.data) {
-        _rowsCache[name] = cached;
-        return;
-      }
-      _cacheInvalidate(name, { skipRewarm: true });
-    }
-    missing.push(name);
+  (names || []).forEach(function(name) {
+    _rows(name);
   });
-  if (missing.length) _readSheetsBatch(missing, { force: true });
 }
 
 function _cacheWarmFullIfNeeded() {
@@ -435,9 +424,9 @@ function apiWarmPageCache(sid, page) {
   } catch (e) {
     return { ok: true, sheets: 0, page: pg };
   }
-  // אחרי חימום מלא — מספיק לוודא שהקאש חם; אין קריאות Sheets
-  _cacheEnsureFullWarm();
-  return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length, page: pg };
+  // אחרי חימום — מספיק גיליונות לדף; ללא טעינת כל ה-DB
+  _cacheWarmForPage(pg);
+  return { ok: true, sheets: DB_SESSION_SHEETS.length, page: pg };
 }
 
 function _cacheFlush() {

@@ -433,13 +433,20 @@ function _dashboardUserSearchBar(selectedUserId) {
     return { id: u.id, name: u.name, role: Roles_label(u.role) };
   });
   const json = JSON.stringify(users).replace(/</g, '\\u003c');
+  const selected = String(selectedUserId || '').trim();
+  let selectedLabel = '';
+  if (selected) {
+    const hit = users.find(function(u) { return u.id === selected; });
+    if (hit) selectedLabel = hit.name + ' (' + hit.id + ')';
+  }
   return '<div class="dashboard-search-panel">' +
+    '<script id="dashboardUsersData" type="application/json">' + json + '</script>' +
     '<label class="form-label dashboard-search-label">🔍 חיפוש משתמש</label>' +
     '<div class="dashboard-search-row">' +
     '<div class="user-search-wrap">' +
     '<input type="text" id="dashboardUserSearch" class="form-input dashboard-search-input" ' +
     'placeholder="הקלד שם או מספר אישי..." autocomplete="off" ' +
-    'data-users="' + json.replace(/"/g, '&quot;') + '">' +
+    'value="' + _esc(selectedLabel) + '" data-selected-id="' + _esc(selected) + '">' +
     '</div>' +
     '<button type="button" id="dashboardUserSearchBtn" class="btn btn-primary dashboard-search-btn">חפש</button>' +
     '</div>' +
@@ -719,12 +726,14 @@ function _dashboardTabPanelHtml(user, sid, tab, p) {
   }
   const searchUserId = _dashboardResolveSearchUserId(p, user, tab);
   let s = _dashboardUserSearchBar(searchUserId);
+  s += '<div id="dashboardSearchResultsPanel" class="dashboard-search-results-panel">';
   if (searchUserId) {
     s += _dashboardUserExerciseResults(user, searchUserId);
-  } else {
+  } else if (!p || !_parseBool(p.light)) {
     s += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">' +
       'הקלד שם או מספר אישי בשורת החיפוש.</p>';
   }
+  s += '</div>';
   return s;
 }
 
