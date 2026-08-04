@@ -84,9 +84,16 @@ function _bulkSelectCell(id, disabled) {
 }
 
 function _bulkDeleteBar(action, idsParam, msg) {
-  return '<div class="bulk-actions-bar" style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+  return '<div class="bulk-actions-bar">' +
     '<button type="button" class="btn btn-danger btn-sm bulk-delete-btn" data-bulk-action="' + _esc(action) + '" data-bulk-param="' + _esc(idsParam) + '" data-bulk-msg="' + _esc(msg) + '">🗑 מחק נבחרים</button>' +
-    '<span class="bulk-select-count" style="font-size:12px;color:var(--muted)"></span></div>';
+    '<span class="bulk-select-count"></span></div>';
+}
+
+/** מכלית גלילה — סרגל פעולות קבוע + גוף רשימה גולל */
+function _listScrollWrap(toolbarHtml, innerHtml) {
+  return '<div class="list-scroll-container">' +
+    (toolbarHtml ? '<div class="list-scroll-toolbar">' + toolbarHtml + '</div>' : '') +
+    '<div class="list-scroll-body">' + (innerHtml || '') + '</div></div>';
 }
 
 function _confirmAction(query, label, msg, cls, title) {

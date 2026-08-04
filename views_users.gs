@@ -72,14 +72,13 @@ function _usersTab(sid, openSet) {
   if (!users.length) {
     s += '<div class="empty">אין משתמשים</div>';
   } else {
-    s += _bulkDeleteBar('deleteUsersBulk', 'idsJson', 'למחוק {n} משתמשים? פעולה זו לא ניתנת לביטול.') +
-      '<div class="card-body" style="padding:0"><table class="tbl bulk-select-table"><thead><tr>' +
+    let tableHtml = '<table class="tbl bulk-select-table"><thead><tr>' +
       _bulkSelectHeader() +
       '<th>שיוך חיילי</th><th>שם</th><th>תפקיד</th><th>צוות</th><th>פעולות</th></tr></thead><tbody>';
     users.forEach(function(u) {
       const team = u.team_id ? teamById[u.team_id] : null;
       const isSelf = u.id === sid;
-      s += '<tr>' +
+      tableHtml += '<tr>' +
         _bulkSelectCell(u.id, isSelf) +
         '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td>' + _userLink(u.id, u.name, '') + '</td>' +
@@ -90,7 +89,10 @@ function _usersTab(sid, openSet) {
         (isSelf ? '' : _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?')) +
         '</td></tr>';
     });
-    s += '</tbody></table></div>';
+    s += _listScrollWrap(
+      _bulkDeleteBar('deleteUsersBulk', 'idsJson', 'למחוק {n} משתמשים? פעולה זו לא ניתנת לביטול.'),
+      tableHtml + '</tbody></table>'
+    );
   }
   s += '</div>';
 

@@ -90,17 +90,14 @@ function _exercisesListModuleHtml(user, sid, exs) {
   if (!exs.length) {
     s += '<div class="empty">אין תרגילים במערכת</div>';
   } else {
-    if (isAdmin) {
-      s += _bulkDeleteBar('deleteExercisesBulk', 'idsJson', 'למחוק {n} תרגילים? כל השיבוצים וציר הזמן יימחקו.');
-    }
-    s += '<table class="tbl bulk-select-table"><thead><tr>' +
+    let tableHtml = '<table class="tbl bulk-select-table"><thead><tr>' +
       (isAdmin ? _bulkSelectHeader() : '') +
       '<th>שם</th><th>סוג</th><th>מפים</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
       '</tr></thead><tbody>';
 
     exs.forEach(function(e) {
       const mpN = mpCounts[e.id] || 0;
-      s += '<tr>' +
+      tableHtml += '<tr>' +
         (isAdmin ? _bulkSelectCell(e.id) : '') +
         '<td>' +
           '<div class="ex-title">' + _exerciseLink(e.id, e.title) + '</div>' +
@@ -116,15 +113,19 @@ function _exercisesListModuleHtml(user, sid, exs) {
           _a('page=exercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
              isAdmin ? '✎ ערוך' : '👁 צפה', isAdmin ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm');
       if (isAdmin) {
-        s += ' ' + _confirmDelete(
+        tableHtml += ' ' + _confirmDelete(
           'action=deleteExercise&id=' + encodeURIComponent(e.id) + '&sid=' + sidQ,
           'למחוק את התרגיל "' + e.title + '"?'
         );
       }
-      s += '</td></tr>';
+      tableHtml += '</td></tr>';
     });
 
-    s += '</tbody></table>';
+    tableHtml += '</tbody></table>';
+    s += _listScrollWrap(
+      isAdmin ? _bulkDeleteBar('deleteExercisesBulk', 'idsJson', 'למחוק {n} תרגילים? כל השיבוצים וציר הזמן יימחקו.') : '',
+      tableHtml
+    );
   }
 
   s += '</div>';
@@ -666,40 +667,7 @@ function _tutorDashboardPanels(user, sid) {
 
 // ── Trainee Dashboard ──
 function _traineeDashboardPanels(user, sid) {
-  const sidQ = encodeURIComponent(sid);
-  const assigns = Assignments_byUser(user.id);
-
-  let s = '<div class="drawer-section-title">התרגילים שלי</div>';
-
-  if (!assigns.length) {
-    return s + '<div class="card"><div class="empty">אין תרגילים מוקצים עדיין</div></div>';
-  }
-
-  const done = assigns.filter(function(a){ return a.status === 'completed'; }).length;
-  s += '<div class="grid-2" style="margin-bottom:16px">' +
-    '<div class="stat-box"><div class="stat-num">' + assigns.length + '</div><div class="stat-label">סה״כ תרגילים</div></div>' +
-    '<div class="stat-box"><div class="stat-num">' + done + '</div><div class="stat-label">הושלמו</div></div>' +
-    '</div>';
-
-  s += '<div class="card"><div class="card-body" style="padding:0">' +
-    '<table class="tbl"><thead><tr>' +
-    '<th>תרגיל</th><th>זמן</th><th>תפקיד</th><th>סטטוס</th><th>ציון</th>' +
-    '</tr></thead><tbody>';
-
-  assigns.forEach(function(a) {
-    const ex = Exercises_get(a.exercise_id);
-    const exTitle = ex ? ex.title : a.exercise_id;
-    s += '<tr>' +
-      '<td>' + (ex ? _exerciseLink(ex.id, exTitle) : _esc(exTitle)) + '</td>' +
-      '<td style="font-size:12px;white-space:nowrap">' + _dashCell(_fmtExerciseScheduleRange(ex)) + '</td>' +
-      '<td>' + _esc(a.responsibility) + '</td>' +
-      '<td>' + _statusBadge(a.status) + '</td>' +
-      '<td>' + (a.score ? _badge(a.score, 'green') : '—') + '</td>' +
-      '</tr>';
-  });
-
-  s += '</tbody></table></div></div>';
-  return s;
+  return '';
 }
 
 // ─────────── EXERCISE PAGE ───────────

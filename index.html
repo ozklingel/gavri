@@ -2743,6 +2743,62 @@ body {
       width: 100%;
       min-height: 50vh;
     }
+    .panel-inline-loader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px;
+      min-height: 120px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Scrollable list + sticky toolbar (users / exercises) ── */
+    .list-scroll-container {
+      display: flex;
+      flex-direction: column;
+      max-height: min(68vh, calc(100dvh - 240px));
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+    }
+    .list-scroll-toolbar {
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: var(--surface, #fff);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    .bulk-actions-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 8px 12px;
+    }
+    .bulk-select-count {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .list-scroll-body {
+      overflow: auto;
+      flex: 1;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .list-scroll-body .tbl {
+      margin: 0;
+    }
+    .list-scroll-body .tbl thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--surface, #fff);
+      box-shadow: 0 1px 0 var(--border);
+    }
 
     /* ── STATISTICS PAGE ── */
     .stats-page { display: flex; flex-direction: column; gap: 16px; }
@@ -3453,6 +3509,10 @@ body {
       return hit.html;
     }
 
+    function moduleLoaderHtml() {
+      return '<div class="panel-inline-loader">// LOADING...</div>';
+    }
+
     function fillSlot(slot, html) {
       slot.innerHTML = html;
       if (window.MapimSpa) {
@@ -3462,17 +3522,19 @@ body {
       slot.setAttribute('data-spa-module-loaded', '1');
     }
 
-    function loadSlot(slot) {
-      if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return;
+    function loadSlot(slot, opts) {
+      opts = opts || {};
+      if (!slot || slot.getAttribute('data-spa-module-loaded') === '1') return false;
       var moduleId = slot.getAttribute('data-spa-module');
-      if (!moduleId) return;
+      if (!moduleId) return false;
       var params = window.MapimSpa && MapimSpa.parseSpaParams
         ? MapimSpa.parseSpaParams(slot) : {};
       var cached = get(moduleId, params);
       if (cached != null) {
         fillSlot(slot, cached);
-        return;
+        return false;
       }
+      if (!opts.skipLoader) slot.innerHTML = moduleLoaderHtml();
       slot.setAttribute('data-spa-module-loaded', 'pending');
       google.script.run
         .withSuccessHandler(function(res) {
@@ -3491,6 +3553,7 @@ body {
           slot.setAttribute('data-spa-module-loaded', '1');
         })
         .apiLoadModule(window.MapimSpa ? MapimSpa.getSid() : '', moduleId, JSON.stringify(params || {}));
+      return true;
     }
     function load(root) {
       root = root || document.getElementById('app-content');
@@ -3502,7 +3565,7 @@ body {
         loadSlot(slot);
       });
     }
-    return { load: load, loadSlot: loadSlot, store: store, invalidate: invalidate };
+    return { load: load, loadSlot: loadSlot, store: store, get: get, invalidate: invalidate };
   })();
 
   // ══ SPA router — fixed URL, no full page reloads ══
@@ -3690,7 +3753,16 @@ body {
         panel.hidden = !show;
         if (show) {
           var slot = panel.querySelector('[data-spa-module]');
-          if (slot && window.MapimModules) MapimModules.loadSlot(slot);
+          if (slot) {
+            var needsLoad = slot.getAttribute('data-spa-module-loaded') !== '1';
+            if (needsLoad && window.MapimModules) {
+              var params = MapimSpa.parseSpaParams ? MapimSpa.parseSpaParams(slot) : {};
+              var modId = slot.getAttribute('data-spa-module');
+              var cached = MapimModules.get && modId ? MapimModules.get(modId, params) : null;
+              if (cached == null) slot.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
+            }
+            if (window.MapimModules) MapimModules.loadSlot(slot);
+          }
           if (tabId === 'search' && typeof initDashboardUserSearch === 'function') {
             initDashboardUserSearch();
           }
@@ -4728,7 +4800,7 @@ body {
     function loadSearchResults(userId) {
       var panel = resultsPanel();
       if (!panel || !window.MapimSpa) return;
-      panel.innerHTML = '<div class="page-local-loader" style="padding:20px;text-align:center;color:var(--muted)">// LOADING...</div>';
+      panel.innerHTML = '<div class="panel-inline-loader">// LOADING...</div>';
       google.script.run
         .withSuccessHandler(function(res) {
           if (!panel) return;
