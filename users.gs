@@ -123,7 +123,24 @@ function Users_create(p) {
   return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש ' + name + ' (' + newId + ') נוצר בהצלחה.' });
 }
 
-/** מחיקת משתמשים (אחד או יותר) — מחיקת שורות מלמטה למעלה + invalidate פעם אחת */
+/** תשובה קלה אחרי כתיבה — HTML מעודכן של שני טאבי המשתמשים */
+function _usersWriteLightResponse_(sid, info) {
+  return {
+    ok: true,
+    info: info,
+    page: 'users',
+    tab: 'users',
+    modules: [
+      { moduleId: 'users.tab.users', params: {}, html: _usersTab(sid) },
+      { moduleId: 'users.tab.teams', params: {}, html: _teamsTab(sid) }
+    ],
+    usersIndex: Users_all().map(function(u) {
+      return { id: u.id, name: u.name, role: Roles_label(u.role) };
+    })
+  };
+}
+
+/** מחיקת משתמשים (אחד או יותר) — מחיקת שורות מלמטה למעלה + עדכון קאש */
 function Users_deleteCore_(targetIds, sid) {
   const idSet = {};
   (targetIds || []).forEach(function(id) {
@@ -140,7 +157,10 @@ function Users_deleteCore_(targetIds, sid) {
     if (idSet[String(r[0])]) userRows.push(i + 2);
   });
   userRows.sort(function(a, b) { return b - a; });
-  userRows.forEach(function(row) { usersSh.deleteRow(row); });
+  userRows.forEach(function(row) {
+    usersSh.deleteRow(row);
+    _cachePatchDeleteRow('Users', row);
+  });
 
   const credSh = _sheet('Credentials');
   const credData = _rows('Credentials').data;
@@ -149,7 +169,10 @@ function Users_deleteCore_(targetIds, sid) {
     if (idSet[String(r[0])]) credRows.push(i + 2);
   });
   credRows.sort(function(a, b) { return b - a; });
-  credRows.forEach(function(row) { credSh.deleteRow(row); });
+  credRows.forEach(function(row) {
+    credSh.deleteRow(row);
+    _cachePatchDeleteRow('Credentials', row);
+  });
 
   const assignSh = _sheet('Assignments');
   const assignData = _rows('Assignments').data;
@@ -158,18 +181,20 @@ function Users_deleteCore_(targetIds, sid) {
     if (idSet[String(r[2])]) assignRows.push(i + 2);
   });
   assignRows.sort(function(a, b) { return b - a; });
-  assignRows.forEach(function(row) { assignSh.deleteRow(row); });
+  assignRows.forEach(function(row) {
+    assignSh.deleteRow(row);
+    _cachePatchDeleteRow('Assignments', row);
+  });
 
   const teamsSh = _sheet('Teams');
   const teamsData = _rows('Teams').data;
   teamsData.forEach(function(r, i) {
-    if (idSet[String(r[2])]) teamsSh.getRange(i + 2, 3).setValue('');
+    if (idSet[String(r[2])]) {
+      teamsSh.getRange(i + 2, 3).setValue('');
+      _cachePatchRow('Teams', i + 2, { 3: '' });
+    }
   });
 
-  _cacheInvalidate('Users');
-  _cacheInvalidate('Credentials');
-  _cacheInvalidate('Assignments');
-  _cacheInvalidate('Teams');
   SpreadsheetApp.flush();
 
   return { deleted: userRows.length };
@@ -183,7 +208,7 @@ function Users_delete(p) {
   if (targetId === p.sid) throw new Error('לא ניתן למחוק את המשתמש המחובר.');
   const r = Users_deleteCore_([targetId], p.sid);
   if (!r.deleted) throw new Error('המשתמש לא נמצא.');
-  return { ok: true, info: 'המשתמש נמחק יחד עם כל ההקצאות שלו.', page: 'users', tab: 'users' };
+  return _usersWriteLightResponse_(p.sid, 'המשתמש נמחק יחד עם כל ההקצאות שלו.');
 }
 
 function Users_deleteBulk(p) {
@@ -193,12 +218,7 @@ function Users_deleteBulk(p) {
   if (!ids.length) throw new Error('לא נבחרו משתמשים למחיקה.');
   const r = Users_deleteCore_(ids, p.sid);
   if (!r.deleted) throw new Error('לא נמצאו משתמשים למחיקה (ייתכן שניסית למחוק את עצמך).');
-  return {
-    ok: true,
-    info: 'נמחקו ' + r.deleted + ' משתמשים יחד עם ההקצאות שלהם.',
-    page: 'users',
-    tab: 'users'
-  };
+  return _usersWriteLightResponse_(p.sid, 'נמחקו ' + r.deleted + ' משתמשים יחד עם ההקצאות שלהם.');
 }
 
 // Update role only (from users tab)
