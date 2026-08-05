@@ -8,21 +8,59 @@
 // מחיקה (אם צריך להריץ שוב):
 //   deleteMalaImportedExercises()
 
-var MALA_IMPORT_YEAR = 2025;
-var MALA_IMPORT_PREFIX = 'MALA-2025';
+var MALA_IMPORT_YEAR = 2026;
+var MALA_IMPORT_PREFIX = 'MALA-2026';
+var MALA_IMPORT_TZ = 'Asia/Jerusalem';
 
-/** 8 תרגילים — אקט, סוג, ומועד התרגיל העיקרי (מ"זמן תרגיל") */
-function MalaImport_exerciseDefs_() {
+/** שורת «זמן תרגיל» מהטבלה — מקור אמת לתאריכי התרגילים */
+function MalaImport_zmanTargilTimes_() {
   return [
-    { act: 'א\'', type: 'מאל"א מערב', start: '2025-08-16', end: '2025-08-17', startTime: '17:00', endTime: '03:00' },
-    { act: 'ב\'', type: 'מאל"א מערב', start: '2025-08-16', end: '2025-08-17', startTime: '17:00', endTime: '03:00' },
-    { act: 'א\'', type: 'מאל"א צפון', start: '2025-08-16', end: '2025-08-17', startTime: '17:00', endTime: '03:00' },
-    { act: 'ב\'', type: 'מאל"א צפון', start: '2025-08-16', end: '2025-08-17', startTime: '17:00', endTime: '03:00' },
-    { act: 'א\'', type: 'מאל"א מערב', start: '2025-08-17', end: '2025-08-18', startTime: '17:00', endTime: '03:00' },
-    { act: 'ב\'', type: 'מאל"א מערב', start: '2025-08-17', end: '2025-08-18', startTime: '17:00', endTime: '03:00' },
-    { act: 'א\'', type: 'מאל"א צפון', start: '2025-08-18', end: '2025-08-19', startTime: '17:00', endTime: '03:00' },
-    { act: 'ב\'', type: 'מאל"א צפון', start: '2025-08-19', end: '2025-08-20', startTime: '17:00', endTime: '03:00' }
+    '16.8|17:00-21:00', '16.8|23:00-03:00', '16.8|17:00-21:00', '16.8|23:00-03:00',
+    '17.8|17:00-21:00', '17.8|23:00-03:00', '18.8|17:00-21:00', '18.8|23:00-03:00'
   ];
+}
+
+/** מפרק תא «DD.M|HH:MM-HH:MM» לחלון תרגיל */
+function MalaImport_parseExerciseWindow_(raw) {
+  const s = String(raw || '').trim();
+  const range = s.match(/^(\d{1,2}\.\d{1,2})\s*\|\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+  if (!range) return null;
+  const start = MalaImport_parseDayMonth_(range[1]);
+  const startTime = range[2];
+  const endTime = range[3];
+  let end = start;
+  if (parseInt(endTime.split(':')[0], 10) < parseInt(startTime.split(':')[0], 10)) {
+    end = MalaImport_addDaysYmd_(start, 1);
+  }
+  return { start: start, end: end, startTime: startTime, endTime: endTime };
+}
+
+/** 8 תרגילים — אקט, סוג, ומועד מהשורה «זמן תרגיל» */
+function MalaImport_exerciseDefs_() {
+  const meta = [
+    { act: 'א\'', type: 'מאל"א מערב' },
+    { act: 'ב\'', type: 'מאל"א מערב' },
+    { act: 'א\'', type: 'מאל"א צפון' },
+    { act: 'ב\'', type: 'מאל"א צפון' },
+    { act: 'א\'', type: 'מאל"א מערב' },
+    { act: 'ב\'', type: 'מאל"א מערב' },
+    { act: 'א\'', type: 'מאל"א צפון' },
+    { act: 'ב\'', type: 'מאל"א צפון' }
+  ];
+  const zman = MalaImport_zmanTargilTimes_();
+  return meta.map(function(m, i) {
+    const win = MalaImport_parseExerciseWindow_(zman[i]);
+    if (!win) throw new Error('תא זמן תרגיל לא תקין: ' + zman[i]);
+    return {
+      act: m.act,
+      type: m.type,
+      start: win.start,
+      end: win.end,
+      startTime: win.startTime,
+      endTime: win.endTime,
+      zmanRaw: zman[i]
+    };
+  });
 }
 
 /**
@@ -123,7 +161,8 @@ function MalaImport_procedureRows_() {
       location: 'מרחב התרגיל',
       title: 'זמן תרגיל (כולל שלדי מפקדים יום ע"פ צורך)',
       participants: 'כלל הכוחות המתורגלים',
-      times: ['', '', '', '', '', '', '', '']
+      times: MalaImport_zmanTargilTimes_(),
+      skipDetail: true
     },
     {
       duration: '30 דק\'',
@@ -170,10 +209,23 @@ function MalaImport_parseDayMonth_(token, year) {
 function MalaImport_addDaysYmd_(ymd, days) {
   if (!ymd) return ymd;
   const p = String(ymd).split('-').map(Number);
-  const d = new Date(p[0], p[1] - 1, p[2] + days);
+  const d = new Date(p[0], p[1] - 1, p[2] + days, 12, 0, 0, 0);
   return d.getFullYear() + '-' +
     String(d.getMonth() + 1).padStart(2, '0') + '-' +
     String(d.getDate()).padStart(2, '0');
+}
+
+/** תאריך לגיליון — צהריים מקומיים, מונע היסט UTC (16.8 → 15.8 שבת) */
+function MalaImport_sheetDate_(ymd) {
+  if (!ymd) return '';
+  const p = String(ymd).split('-').map(Number);
+  return new Date(p[0], p[1] - 1, p[2], 12, 0, 0, 0);
+}
+
+function MalaImport_weekdayHe_(ymd) {
+  const d = MalaImport_sheetDate_(ymd);
+  const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+  return days[d.getDay()];
 }
 
 /** ממיר תא זמן מהטבלה לשדה time ב-ExerciseDetails */
@@ -269,10 +321,12 @@ function importMalaExercisesOnce(dryRun) {
       act: def.act,
       type: def.type,
       startTime: def.startTime,
-      endTime: def.endTime
+      endTime: def.endTime,
+      zmanRaw: def.zmanRaw
     });
 
     procRows.forEach(function(prow, pIdx) {
+      if (prow.skipDetail) return;
       const rawTime = (prow.times && prow.times[idx]) || '';
       const timeCell = MalaImport_formatTimeCell_(rawTime);
       if (!timeCell) return;
@@ -290,7 +344,8 @@ function importMalaExercisesOnce(dryRun) {
   Logger.log('Exercises: ' + plan.exercises.length);
   Logger.log('Details:   ' + plan.details.length);
   plan.exercises.forEach(function(ex) {
-    Logger.log('  ' + ex.id + ' | ' + ex.title + ' | ' + ex.start + ' ' + ex.startTime + ' — ' + ex.end + ' ' + ex.endTime);
+    Logger.log('  ' + ex.id + ' | ' + ex.title + ' | ' + ex.start + ' (' + MalaImport_weekdayHe_(ex.start) + ') ' +
+      ex.startTime + ' — ' + ex.end + ' ' + ex.endTime + ' | מקור: ' + ex.zmanRaw);
   });
 
   if (dryRun) {
@@ -303,11 +358,23 @@ function importMalaExercisesOnce(dryRun) {
     const exSheetRows = plan.exercises.map(function(ex) {
       return [
         ex.id, ex.title, ex.description, ex.createdBy,
-        ex.start, ex.end, ex.act, ex.type, '', '', '',
+        MalaImport_sheetDate_(ex.start), MalaImport_sheetDate_(ex.end),
+        ex.act, ex.type, '', '', '',
         ex.startTime, ex.endTime
       ];
     });
     _appendBatch('Exercises', exSheetRows);
+
+    const exSh = _sheet('Exercises');
+    const startRow = exSh.getLastRow() - exSheetRows.length + 1;
+    if (exSheetRows.length > 0) {
+      exSh.getRange(startRow, 12, exSheetRows.length, 2).setNumberFormat('@STRING@');
+      exSh.getRange(startRow, 12, exSheetRows.length, 2).setValues(
+        plan.exercises.map(function(ex) {
+          return [String(ex.startTime || ''), String(ex.endTime || '')];
+        })
+      );
+    }
 
     const detailSheetRows = plan.details.map(function(d) {
       return [d.id, d.exerciseId, d.time, d.location, d.description];

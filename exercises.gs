@@ -31,7 +31,7 @@ function _fmtDateTime(dateVal) {
 // Format date + time → "יום שלישי, 15 באפריל 2025 · 08:00"
 function _fmtDateTimeFull(dateVal, timeVal) {
   const datePart = dateVal ? _fmtDate(dateVal) : '';
-  const timePart = timeVal != null && timeVal !== '' ? _rawTime(timeVal) : '';
+  const timePart = _rawTime(timeVal);
   if (datePart && timePart) return datePart + ' · ' + timePart;
   return datePart || timePart || '';
 }
@@ -66,6 +66,10 @@ function _fmtDetailTime(val) {
 
   const d = new Date(s);
   if (!isNaN(d.getTime()) && (/[-/T]/.test(s) || s.length > 10)) {
+    if (d.getFullYear() < 1900) {
+      const tp = _rawTime(s);
+      return tp || '—';
+    }
     return _fmtDateTimeFull(d, d);
   }
   const tp = _rawTime(s);
@@ -238,14 +242,12 @@ function Exercises_shiftDetailsForScheduleChange(exerciseId, oldEx, p) {
   return Exercises_shiftAllDetails(exerciseId, deltaMs);
 }
 
-// Returns "HH:MM" from a time string or empty
+// Returns "HH:MM" from a time string, Date, Sheets serial, or ISO time-only value
 function _rawTime(val) {
   if (val == null || val === '') return '';
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return '';
-    const h = String(val.getHours()).padStart(2, '0');
-    const m = String(val.getMinutes()).padStart(2, '0');
-    return h + ':' + m;
+    return String(val.getHours()).padStart(2, '0') + ':' + String(val.getMinutes()).padStart(2, '0');
   }
   if (typeof val === 'number' && !isNaN(val)) {
     if (val >= 0 && val < 1) {
@@ -258,10 +260,28 @@ function _rawTime(val) {
   }
   const s = String(val).trim();
   if (!s) return '';
-  if (/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5, '0');
+
+  const hmOnly = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (hmOnly) {
+    return String(+hmOnly[1]).padStart(2, '0') + ':' + hmOnly[2];
+  }
+
+  // Google Sheets time-only → JSON cache → "1899-12-30T17:00:00.000Z"
+  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+    const isoHm = s.match(/[T ](\d{1,2}):(\d{2})/);
+    if (isoHm) {
+      return String(+isoHm[1]).padStart(2, '0') + ':' + isoHm[2];
+    }
+    return '';
+  }
+
   const tp = s.match(/^(\d{1,2}):(\d{2})/);
   if (tp) return String(+tp[1]).padStart(2, '0') + ':' + tp[2];
-  return s;
+  return '';
 }
 
 function _ymdPlusDays(ymd, days) {
@@ -513,8 +533,8 @@ function Exercises_all(includeArchived) {
     title:       String(r[1]),
     description: String(r[2]),
     created_by:  String(r[3]),
-    start_date:    _fmtExerciseStartDisplay({ rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawStartTime: r[11] }),
-    end_date:      _fmtExerciseEndDisplay({ rawEndDate: _rawDate(r[5]), rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawEndTime: r[12] }),
+    start_date:    _fmtExerciseStartDisplay({ rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawStartTime: _rawTime(r[11]) }),
+    end_date:      _fmtExerciseEndDisplay({ rawEndDate: _rawDate(r[5]), rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawEndTime: _rawTime(r[12]) }),
     rawStartDate:  _rawDate(r[4]),
     rawEndDate:    _rawDate(r[5]),
     rawStartTime:  _rawTime(r[11]),
