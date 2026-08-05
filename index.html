@@ -1537,6 +1537,42 @@ body {
     .login-title { font-family: var(--mono); font-size: 18px; color: var(--green); margin-top: 6px; }
     .login-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: 2px; }
     .login-body { padding: 24px; }
+
+    .pwd-field-wrap {
+      position: relative;
+      display: flex;
+      align-items: stretch;
+    }
+    .pwd-field-wrap .pwd-field-input {
+      flex: 1;
+      padding-left: 52px;
+    }
+    .pwd-toggle-btn {
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text2);
+      font-size: 11px;
+      font-family: var(--mono);
+      padding: 4px 8px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      line-height: 1.2;
+    }
+    .pwd-toggle-btn:hover {
+      border-color: var(--border2);
+      background: var(--bg4);
+      color: var(--text);
+    }
+
+    .users-group-stack .collapsible-content.open {
+      max-height: min(70vh, 640px);
+      overflow: auto;
+    }
+
     .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 10px; }
     .demo-item {
       background: var(--bg3);
@@ -2091,8 +2127,9 @@ body {
     .dp-trigger .dp-placeholder { color: var(--muted); }
     .dp-popup {
       display: none; position: fixed;
-      z-index: 9999; background: var(--bg2); border: 1px solid var(--border2);
-      border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 272px; padding: 12px;
+      z-index: 20000; background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 272px;
+      max-width: none !important; padding: 12px;
     }
     .dp-popup.open { display: block; }
     .dp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -4170,6 +4207,8 @@ body {
       if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
       if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
+      if (typeof initDatePickers === 'function') initDatePickers();
+      if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
     }
 
     function afterRender() {
@@ -5928,11 +5967,28 @@ body {
         }
       });
     }
+    if (isOpen && typeof initDatePickers === 'function') initDatePickers();
+    if (isOpen && typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
   });
 
   function initCollapsibles() {
     // no-op — delegation למעלה מטפל בכל הלשוניות
   }
+
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.pwd-toggle-btn');
+    if (!btn) return;
+    e.preventDefault();
+    var wrap = btn.closest('.pwd-field-wrap');
+    var inp = wrap && wrap.querySelector('.pwd-field-input');
+    if (!inp) return;
+    var show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.textContent = show ? 'הסתר' : 'הצג';
+    btn.setAttribute('aria-label', show ? 'הסתר סיסמה' : 'הצג סיסמה');
+    btn.title = show ? 'הסתר' : 'הצג';
+  });
+
   initCollapsibles();
   if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
 
@@ -6217,23 +6273,59 @@ body {
   document.addEventListener('DOMContentLoaded', initTimeWheelPickers);
   if (document.readyState !== 'loading') initTimeWheelPickers();
 
+  function positionDpPopup(trigger, popup) {
+    var rect = trigger.getBoundingClientRect();
+    var popW = 272;
+    var popH = popup.offsetHeight || 320;
+    var top = rect.bottom + 4;
+    var left = rect.right - popW;
+    if (top + popH > window.innerHeight - 10) {
+      top = rect.top - popH - 4;
+    }
+    if (top < 8) top = 8;
+    if (left < 8) left = 8;
+    if (left + popW > window.innerWidth - 8) {
+      left = window.innerWidth - popW - 8;
+    }
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+    popup.style.width = popW + 'px';
+  }
+
+  function closeDpPopupInstance(wrap, trigger, popup) {
+    if (!popup) return;
+    popup.classList.remove('open');
+    if (trigger) trigger.classList.remove('open');
+    if (wrap && popup.parentNode === document.body) {
+      wrap.appendChild(popup);
+    }
+    popup.style.top = '';
+    popup.style.left = '';
+  }
+
   function initDatePickers() {
-    document.querySelectorAll('.dp-wrap').forEach(wrap => {
-      const hidden  = wrap.querySelector('input[type=hidden]');
-      const trigger = wrap.querySelector('.dp-trigger');
-      const popup   = wrap.querySelector('.dp-popup');
-      const valSpan = trigger.querySelector('.dp-val');
+    document.querySelectorAll('.dp-wrap').forEach(function(wrap) {
+      if (wrap._dpBound) return;
+      wrap._dpBound = true;
 
-      let cur = new Date();
+      var hidden = wrap.querySelector('input[type=hidden]');
+      var trigger = wrap.querySelector('.dp-trigger');
+      var popup = wrap.querySelector('.dp-popup');
+      if (!hidden || !trigger || !popup) return;
+      var valSpan = trigger.querySelector('.dp-val');
+
+      var cur = new Date();
       cur.setDate(1);
-      let selectedDate = null;
-      let yearMode = false;
+      var selectedDate = null;
+      var yearMode = false;
 
-      // Parse existing value
+      popup._dpWrap = wrap;
+      popup._dpTrigger = trigger;
+
       if (hidden.value) {
-        const parts = hidden.value.split('-');
+        var parts = hidden.value.split('-');
         if (parts.length === 3) {
-          selectedDate = new Date(+parts[0], +parts[1]-1, +parts[2]);
+          selectedDate = new Date(+parts[0], +parts[1] - 1, +parts[2]);
           cur = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
           updateTriggerLabel();
         }
@@ -6241,118 +6333,139 @@ body {
 
       function updateTriggerLabel() {
         if (selectedDate) {
-          const d = selectedDate;
-          const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+          var d = selectedDate;
+          var days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
           valSpan.innerHTML = '<span>' + days[d.getDay()] + ', ' + d.getDate() + ' ב' + HEB_MONTHS[d.getMonth()] + ' ' + d.getFullYear() + '</span>';
         } else {
           valSpan.innerHTML = '<span class="dp-placeholder">בחר תאריך...</span>';
         }
       }
 
+      function closePopup() {
+        closeDpPopupInstance(wrap, trigger, popup);
+      }
+
       function renderCalendar() {
         if (yearMode) { renderYearGrid(); return; }
-        const year = cur.getFullYear(), month = cur.getMonth();
-        const firstDay = new Date(year, month, 1).getDay();
-        const daysInMonth = new Date(year, month+1, 0).getDate();
-        const today = new Date();
+        var year = cur.getFullYear();
+        var month = cur.getMonth();
+        var firstDay = new Date(year, month, 1).getDay();
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+        var today = new Date();
 
-        let html = '<div class="dp-header">' +
+        var html = '<div class="dp-header">' +
           '<button type="button" class="dp-nav" data-action="prev">&#8250;</button>' +
           '<span class="dp-month-label" data-action="year-mode">' + HEB_MONTHS[month] + ' ' + year + '</span>' +
           '<button type="button" class="dp-nav" data-action="next">&#8249;</button>' +
           '</div><div class="dp-grid">';
-        HEB_DAYS_SHORT.forEach(d => { html += '<div class="dp-dow">' + d + '</div>'; });
-        // empty cells before first day
-        for (let i = 0; i < firstDay; i++) html += '<div class="dp-day empty"></div>';
-        for (let d = 1; d <= daysInMonth; d++) {
-          const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
-          const isSel = selectedDate && (d === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear());
-          html += '<div class="dp-day' + (isToday?' today':'') + (isSel?' selected':'') + '" data-day="' + d + '">' + d + '</div>';
+        HEB_DAYS_SHORT.forEach(function(d) { html += '<div class="dp-dow">' + d + '</div>'; });
+        for (var i = 0; i < firstDay; i++) html += '<div class="dp-day empty"></div>';
+        for (var d = 1; d <= daysInMonth; d++) {
+          var isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+          var isSel = selectedDate && (d === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear());
+          html += '<div class="dp-day' + (isToday ? ' today' : '') + (isSel ? ' selected' : '') + '" data-day="' + d + '">' + d + '</div>';
         }
         html += '</div>';
         popup.innerHTML = html;
-        popup.querySelectorAll('[data-action]').forEach(el => {
-          el.addEventListener('click', e => { e.stopPropagation(); handleNav(el.dataset.action); });
+        popup.querySelectorAll('[data-action]').forEach(function(el) {
+          el.addEventListener('click', function(e) { e.stopPropagation(); handleNav(el.dataset.action); });
         });
-        popup.querySelectorAll('[data-day]').forEach(el => {
-          el.addEventListener('click', e => { e.stopPropagation(); selectDay(+el.dataset.day); });
+        popup.querySelectorAll('[data-day]').forEach(function(el) {
+          el.addEventListener('click', function(e) { e.stopPropagation(); selectDay(+el.dataset.day); });
         });
+        if (popup.classList.contains('open')) {
+          positionDpPopup(trigger, popup);
+        }
       }
 
       function renderYearGrid() {
-        const selYear = cur.getFullYear();
-        const start = selYear - 6;
-        let html = '<div class="dp-header">' +
+        var selYear = cur.getFullYear();
+        var start = selYear - 6;
+        var html = '<div class="dp-header">' +
           '<button type="button" class="dp-nav" data-action="year-prev">&#8250;</button>' +
           '<span style="font-family:var(--mono);font-size:13px;color:var(--text2)">בחר שנה</span>' +
           '<button type="button" class="dp-nav" data-action="year-next">&#8249;</button>' +
           '</div><div class="dp-year-grid">';
-        for (let y = start; y < start+12; y++) {
-          html += '<div class="dp-year-btn' + (y===selYear?' selected':'') + '" data-year="'+y+'">'+y+'</div>';
+        for (var y = start; y < start + 12; y++) {
+          html += '<div class="dp-year-btn' + (y === selYear ? ' selected' : '') + '" data-year="' + y + '">' + y + '</div>';
         }
         html += '</div>';
         popup.innerHTML = html;
-        popup.querySelectorAll('[data-action]').forEach(el => {
-          el.addEventListener('click', e => { e.stopPropagation(); handleNav(el.dataset.action); });
+        popup.querySelectorAll('[data-action]').forEach(function(el) {
+          el.addEventListener('click', function(e) { e.stopPropagation(); handleNav(el.dataset.action); });
         });
-        popup.querySelectorAll('[data-year]').forEach(el => {
-          el.addEventListener('click', e => { e.stopPropagation(); cur.setFullYear(+el.dataset.year); yearMode=false; renderCalendar(); });
+        popup.querySelectorAll('[data-year]').forEach(function(el) {
+          el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            cur.setFullYear(+el.dataset.year);
+            yearMode = false;
+            renderCalendar();
+          });
         });
+        if (popup.classList.contains('open')) {
+          positionDpPopup(trigger, popup);
+        }
       }
 
       function handleNav(action) {
-        if (action === 'prev') { cur.setMonth(cur.getMonth()-1); renderCalendar(); }
-        else if (action === 'next') { cur.setMonth(cur.getMonth()+1); renderCalendar(); }
+        if (action === 'prev') { cur.setMonth(cur.getMonth() - 1); renderCalendar(); }
+        else if (action === 'next') { cur.setMonth(cur.getMonth() + 1); renderCalendar(); }
         else if (action === 'year-mode') { yearMode = true; renderCalendar(); }
-        else if (action === 'year-prev') { cur.setFullYear(cur.getFullYear()-12); renderCalendar(); }
-        else if (action === 'year-next') { cur.setFullYear(cur.getFullYear()+12); renderCalendar(); }
+        else if (action === 'year-prev') { cur.setFullYear(cur.getFullYear() - 12); renderCalendar(); }
+        else if (action === 'year-next') { cur.setFullYear(cur.getFullYear() + 12); renderCalendar(); }
       }
 
       function selectDay(day) {
         selectedDate = new Date(cur.getFullYear(), cur.getMonth(), day);
-        const y = selectedDate.getFullYear();
-        const m = String(selectedDate.getMonth()+1).padStart(2,'0');
-        const d = String(selectedDate.getDate()).padStart(2,'0');
-        hidden.value = y + '-' + m + '-' + d;
+        var y = selectedDate.getFullYear();
+        var m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        var dd = String(selectedDate.getDate()).padStart(2, '0');
+        hidden.value = y + '-' + m + '-' + dd;
         updateTriggerLabel();
-        popup.classList.remove('open');
-        trigger.classList.remove('open');
+        closePopup();
       }
 
-      trigger.addEventListener('click', e => {
+      trigger.addEventListener('click', function(e) {
         e.stopPropagation();
-        const isOpen = popup.classList.toggle('open');
-        trigger.classList.toggle('open', isOpen);
-        if (isOpen) {
-          yearMode = false;
-          renderCalendar();
-          // Smart positioning: place popup below trigger, flip if not enough room
-          const rect = trigger.getBoundingClientRect();
-          const popW = 272, popH = 280;
-          let top = rect.bottom + 4;
-          let left = rect.right - popW;
-          // Flip above if not enough room below
-          if (top + popH > window.innerHeight - 10) top = rect.top - popH - 4;
-          // Keep within left edge
-          if (left < 8) left = 8;
-          // Keep within right edge
-          if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-          popup.style.top = top + 'px';
-          popup.style.left = left + 'px';
+        var willOpen = !popup.classList.contains('open');
+        document.querySelectorAll('.dp-popup.open').forEach(function(other) {
+          closeDpPopupInstance(other._dpWrap, other._dpTrigger, other);
+        });
+        if (!willOpen) {
+          closePopup();
+          return;
         }
+        yearMode = false;
+        renderCalendar();
+        document.body.appendChild(popup);
+        popup.classList.add('open');
+        trigger.classList.add('open');
+        positionDpPopup(trigger, popup);
       });
 
-      document.addEventListener('click', () => {
-        popup.classList.remove('open');
-        trigger.classList.remove('open');
-      });
-      window.addEventListener('resize', () => {
-        popup.classList.remove('open');
-        trigger.classList.remove('open');
-      });
-      popup.addEventListener('click', e => e.stopPropagation());
+      popup.addEventListener('click', function(e) { e.stopPropagation(); });
     });
+
+    if (!window._dpGlobalBound) {
+      window._dpGlobalBound = true;
+      document.addEventListener('click', function() {
+        document.querySelectorAll('.dp-popup.open').forEach(function(popup) {
+          closeDpPopupInstance(popup._dpWrap, popup._dpTrigger, popup);
+        });
+      });
+      window.addEventListener('resize', function() {
+        document.querySelectorAll('.dp-popup.open').forEach(function(popup) {
+          if (popup._dpTrigger) positionDpPopup(popup._dpTrigger, popup);
+        });
+      });
+      window.addEventListener('scroll', function() {
+        document.querySelectorAll('.dp-popup.open').forEach(function(popup) {
+          if (popup._dpTrigger) positionDpPopup(popup._dpTrigger, popup);
+        });
+      }, true);
+    }
   }
+  window.initDatePickers = initDatePickers;
 
   document.addEventListener('DOMContentLoaded', initDatePickers);
   // Also run immediately in case DOMContentLoaded already fired

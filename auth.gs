@@ -17,18 +17,26 @@ var MFA_CODE_TTL_SEC = 600;
 var MFA_CACHE_PREFIX = 'mfa_';
 
 function Auth_login(p) {
-  const userId = (p.userId || '').trim();
-  const pass   = (p.password || '').trim();
+  const loginInput = (p.userId || '').trim();
+  const pass       = (p.password || '').trim();
 
-  if (!userId || !pass) {
-    return Views_login({ error: 'נא להזין מספר אישי וסיסמה.' });
+  if (!loginInput || !pass) {
+    return Views_login({ error: 'נא להזין מספר אישי / שם משתמש וסיסמה.' });
   }
 
-  if (!_authValidateCredentials(userId, pass)) {
-    return Views_login({ error: 'מספר אישי או סיסמה שגויים.' });
+  const resolved = _authResolveLoginId(loginInput);
+  if (resolved === null) {
+    return Views_login({ error: 'נמצאו כמה משתמשים עם שם זה. השתמש במספר אישי.' });
+  }
+  if (!resolved) {
+    return Views_login({ error: 'מספר אישי, שם משתמש או סיסמה שגויים.' });
   }
 
-  const user = Users_get(userId);
+  if (!_authValidateCredentials(resolved, pass)) {
+    return Views_login({ error: 'מספר אישי, שם משתמש או סיסמה שגויים.' });
+  }
+
+  const user = Users_get(resolved);
   if (!user) return Views_login({ error: 'המשתמש אינו רשום במערכת.' });
 
   if (!MFA_EMAIL_ENABLED) {
@@ -137,10 +145,26 @@ function Auth_requireRole(p, roles) {
   return u;
 }
 
+/** ממיר קלט כניסה (מספר אישי או שם) למזהה משתמש — null = שם לא חד-משמעי */
+function _authResolveLoginId(input) {
+  input = String(input || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!input) return '';
+
+  if (Users_get(input)) return input;
+
+  const lower = input.toLowerCase();
+  const matches = Users_all().filter(function(u) {
+    return String(u.name || '').replace(/\s+/g, ' ').trim().toLowerCase() === lower;
+  });
+  if (matches.length === 1) return matches[0].id;
+  if (matches.length > 1) return null;
+  return '';
+}
+
 function _authValidateCredentials(userId, pass) {
   const creds = _rows('Credentials').data;
   return creds.some(function(r) {
-    return String(r[0]).trim() === userId && String(r[1]).trim() === pass;
+    return String(r[0]).trim() === String(userId).trim() && String(r[1]).trim() === pass;
   });
 }
 

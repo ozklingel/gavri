@@ -411,8 +411,8 @@ function Exercise_msFromYmdHm(dateYmd, timeHm) {
   return new Date(parts[0], parts[1] - 1, parts[2], tp[0] || 0, tp[1] || 0, 0, 0).getTime();
 }
 
-/** 0 = ראשון — אסור לשבץ תרגילים ביום זה. */
-var EXERCISE_BLOCKED_WEEKDAYS = { 0: true };
+/** ימים חסומים לשיבוץ תרגילים (0=ראשון … 6=שבת) — ריק = ללא הגבלה. */
+var EXERCISE_BLOCKED_WEEKDAYS = {};
 
 function Exercise_msToYmd(ms) {
   const d = new Date(ms);
@@ -443,7 +443,7 @@ function Exercise_validateBlockedWeekdays(startMs, endMs) {
     if (EXERCISE_BLOCKED_WEEKDAYS[wd]) blocked = true;
   });
   if (blocked) {
-    return 'אסור לקבוע תרגיל ביום ראשון (כולל תרגיל שנמשך אליו).';
+    return 'אסור לקבוע תרגיל ביום זה (כולל תרגיל שנמשך אליו).';
   }
   return null;
 }

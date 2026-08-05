@@ -69,7 +69,7 @@ function _usersNewUserForm(sid, teams) {
     '<input type="hidden" name="action" value="createUser">' +
     '<div class="form-row"><label class="form-label">מספר אישי</label>' + _input('newUserId', 'U005', '', 'text', 'required') + '</div>' +
     '<div class="form-row"><label class="form-label">שם מלא</label>' + _input('newName', 'שם מלא', '', 'text', 'required') + '</div>' +
-    '<div class="form-row"><label class="form-label">סיסמה</label>' + _input('newPassword', '', '', 'password', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">סיסמה</label>' + _passwordInput('newPassword', '', '', 'required autocomplete="new-password"') + '</div>' +
     '<div class="form-row"><label class="form-label">דוא"ל (ל-MFA)</label>' +
     _input('email', 'user@example.com', '', 'email') + '</div>' +
     '<div class="form-grid">' +
@@ -98,35 +98,83 @@ function _usersImportCsvPanel() {
     '</div></div>';
 }
 
+function _usersAffiliationGroupKey(u) {
+  if (Roles_isAdmin(u.role)) return 'אג"מ מלפק';
+  const aff = String(u.military_affiliation || '').replace(/״/g, '"').trim();
+  return aff || 'ללא שיוך';
+}
+
+function _usersAffiliationGroupSort(a, b) {
+  function isPriority(label) {
+    const n = String(label || '').replace(/״/g, '"').replace(/\s+/g, ' ').trim();
+    return n === 'אג"מ מלפק' || n === 'אגמ מלפק';
+  }
+  const priA = isPriority(a) ? 0 : 1;
+  const priB = isPriority(b) ? 0 : 1;
+  if (priA !== priB) return priA - priB;
+  return String(a).localeCompare(String(b), 'he');
+}
+
+function _usersGroupSectionId(label, index) {
+  return 'ug-' + index + '-' + String(label || 'x').replace(/[^a-zA-Z0-9\u0590-\u05FF]+/g, '-').slice(0, 24);
+}
+
+function _usersTableBodyHtml(users, sid, teamById, showAffiliation) {
+  let rows = '';
+  users.forEach(function(u) {
+    const team = u.team_id ? teamById[u.team_id] : null;
+    const isSelf = u.id === sid;
+    rows += '<tr>' +
+      _bulkSelectCell(u.id, isSelf) +
+      (showAffiliation
+        ? ('<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>')
+        : '') +
+      '<td>' + _userLink(u.id, u.name, '') + '</td>' +
+      '<td>' + _badge(_roleHe(u.role), _roleBadgeType(u.role)) + '</td>' +
+      '<td>' + _esc(team ? team.name : '—') + '</td>' +
+      '<td class="actions" style="white-space:nowrap">' +
+      (isSelf ? '<span style="font-size:11px;color:var(--muted)">מחובר</span> ' : '') +
+      (isSelf ? '' : _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?')) +
+      '</td></tr>';
+  });
+  return rows;
+}
+
 function _usersTab(sid, openSet) {
   const users = Users_all();
   const teamById = Teams_byIdMap();
+  openSet = openSet || {};
 
   let s = '<div class="card card-list-scroll" style="margin-top:14px"><div class="card-header"><div class="card-title">📋 משתמשים (' + users.length + ')</div></div>';
   if (!users.length) {
     s += '<div class="empty">אין משתמשים</div>';
   } else {
-    let tableHtml = '<table class="tbl bulk-select-table"><thead><tr>' +
-      _bulkSelectHeader() +
-      '<th>שיוך חיילי</th><th>שם</th><th>תפקיד</th><th>צוות</th><th>פעולות</th></tr></thead><tbody>';
+    const groups = {};
     users.forEach(function(u) {
-      const team = u.team_id ? teamById[u.team_id] : null;
-      const isSelf = u.id === sid;
-      tableHtml += '<tr>' +
-        _bulkSelectCell(u.id, isSelf) +
-        '<td>' + (u.military_affiliation ? _esc(u.military_affiliation) : '<span style="color:var(--muted)">—</span>') + '</td>' +
-        '<td>' + _userLink(u.id, u.name, '') + '</td>' +
-        '<td>' + _badge(_roleHe(u.role), _roleBadgeType(u.role)) + '</td>' +
-        '<td>' + _esc(team ? team.name : '—') + '</td>' +
-        '<td class="actions" style="white-space:nowrap">' +
-        (isSelf ? '<span style="font-size:11px;color:var(--muted)">מחובר</span> ' : '') +
-        (isSelf ? '' : _confirmDelete('action=deleteUser&targetId=' + encodeURIComponent(u.id), 'למחוק את ' + u.name + '?')) +
-        '</td></tr>';
+      const key = _usersAffiliationGroupKey(u);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(u);
     });
-    s += _listScrollWrap(
-      _bulkDeleteBar('deleteUsersBulk', 'idsJson', 'למחוק {n} משתמשים? פעולה זו לא ניתנת לביטול.'),
-      tableHtml + '</tbody></table>'
-    );
+    const groupLabels = Object.keys(groups).sort(_usersAffiliationGroupSort);
+
+    s += _bulkDeleteBar('deleteUsersBulk', 'idsJson', 'למחוק {n} משתמשים? פעולה זו לא ניתנת לביטול.');
+    s += '<div class="expandable-stack users-group-stack" style="padding:8px 12px 12px;display:flex;flex-direction:column;gap:8px">';
+
+    groupLabels.forEach(function(label, idx) {
+      const members = groups[label].slice().sort(function(a, b) {
+        return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+      });
+      const sectionId = _usersGroupSectionId(label, idx);
+      const tableHtml = '<table class="tbl bulk-select-table"><thead><tr>' +
+        _bulkSelectHeader() +
+        '<th>שם</th><th>תפקיד</th><th>צוות</th><th>פעולות</th></tr></thead><tbody>' +
+        _usersTableBodyHtml(members, sid, teamById, false) +
+        '</tbody></table>';
+      s += _expandablePanel('users', { tab: 'users' }, sectionId,
+        _esc(label) + ' (' + members.length + ')', tableHtml, openSet);
+    });
+
+    s += '</div>';
   }
   s += '</div>';
 

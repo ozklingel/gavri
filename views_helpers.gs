@@ -141,6 +141,16 @@ function _input(name, placeholder, value, type, extra) {
   return '<input type="' + type + '" name="' + name + '" placeholder="' + _esc(placeholder || '') + '" value="' + _esc(value) + '" class="form-input" ' + extra + '>';
 }
 
+function _passwordInput(name, placeholder, value, extra) {
+  value = value || '';
+  extra = extra || '';
+  return '<div class="pwd-field-wrap">' +
+    '<input type="password" name="' + name + '" class="form-input pwd-field-input" ' +
+    'placeholder="' + _esc(placeholder || '') + '" value="' + _esc(value) + '" autocomplete="current-password" ' + extra + '>' +
+    '<button type="button" class="pwd-toggle-btn" aria-label="הצג סיסמה" title="הצג">הצג</button>' +
+    '</div>';
+}
+
 function _timeHalfHourOptions() {
   const opts = [];
   for (let h = 0; h < 24; h++) {
@@ -589,10 +599,10 @@ function Views_login(p) {
   const form =
     _formOpen() +
     '<input type="hidden" name="action" value="login">' +
-    '<div class="form-row"><label class="form-label">שם משתמש</label>' +
-    _input('userId', 'רונן שלוש', '', 'text', 'required autofocus') + '</div>' +
+    '<div class="form-row"><label class="form-label">מספר אישי או שם משתמש</label>' +
+    _input('userId', '1234567 / רונן שלוש', '', 'text', 'required autofocus') + '</div>' +
     '<div class="form-row"><label class="form-label">סיסמה</label>' +
-    _input('password', '••••••••', '', 'password', 'required') + '</div>' +
+    _passwordInput('password', '••••••••', '', 'required') + '</div>' +
     _submitBtn('כניסה למערכת', 'btn btn-primary btn-full btn-lg') +
     '</form>';
 
@@ -606,15 +616,6 @@ function Views_login(p) {
     '<div class="login-body">' +
     _flash(p) +
     form +
-    '<hr class="divider">' +
-    '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">// משתמשי דמו</div>' +
-    '<div class="demo-grid">' +
-    '<div class="demo-item"><div class="demo-role">סגל</div><div class="demo-cred">1<br>111</div></div>' +
-    '<div class="demo-item"><div class="demo-role">מפקצ</div><div class="demo-cred">222<br>222</div></div>' +
-    '<div class="demo-item"><div class="demo-role">חניך</div><div class="demo-cred">3332<br>3332</div></div>' +
-    '<div class="demo-item"><div class="demo-role">חונך</div><div class="demo-cred">333<br>333</div></div>' +
-    '<div class="demo-item"><div class="demo-role">מגד</div><div class="demo-cred">1010<br>1010</div></div>' +
-    '</div>' +
     '</div></div></div>';
   return _wrapPage(body, 'התחברות');
 }

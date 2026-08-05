@@ -123,6 +123,21 @@ function Users_create(p) {
   return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש ' + name + ' (' + newId + ') נוצר בהצלחה.' });
 }
 
+/** עדכון / יצירת סיסמה בגיליון Credentials */
+function _usersSetPassword(userId, pass) {
+  pass = String(pass || '').trim();
+  userId = String(userId || '').trim();
+  if (!userId || !pass) return;
+  const row = _findRowIndex('Credentials', userId);
+  if (row >= 0) {
+    _sheet('Credentials').getRange(row, 2).setValue(pass);
+    _cachePatchRow('Credentials', row, { 2: pass });
+  } else {
+    _append('Credentials', [userId, pass]);
+    _cacheInvalidate('Credentials');
+  }
+}
+
 /** תשובה קלה אחרי כתיבה — HTML מעודכן של שני טאבי המשתמשים */
 function _usersWriteLightResponse_(sid, info) {
   return {
@@ -469,6 +484,10 @@ function Users_updateProfile(p) {
   // Update role if provided
   if (p.newRole) {
     sh.getRange(row, 3).setValue(Roles_normalize(p.newRole.trim()));
+  }
+  if (p.newPassword !== undefined) {
+    const newPass = String(p.newPassword || '').trim();
+    if (newPass) _usersSetPassword(targetId, newPass);
   }
   _cacheInvalidate('Users');
   UserProfileFields_saveForUser(targetId, p);

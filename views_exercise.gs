@@ -425,6 +425,9 @@ function Views_user(p) {
       '<div class="form-row"><label class="form-label">צוות</label>' +
         _select('newTeamId', teamOpts, target.team_id) +
       '</div>' +
+      '<div class="form-row"><label class="form-label">סיסמה</label>' +
+        _passwordInput('newPassword', 'השאר ריק כדי לא לשנות', '', 'autocomplete="new-password"') +
+      '</div>' +
       '</div>' +
       _extraProfileFields(target) +
       _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
