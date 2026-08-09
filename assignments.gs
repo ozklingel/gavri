@@ -198,48 +198,67 @@ function Assignments_complete(p) {
 }
 
 // ═══════════════════════════════════════
-//  TEAM ASSIGN: מפקד צוות + 2 חניכים לכל תרגיל
+//  TEAM ASSIGN: שיבוץ כל חברי הצוות לתרגיל
 // ═══════════════════════════════════════
+function _assignmentRespForTeamMember(u, traineeIndex) {
+  if (Roles_isCompanyCommander(u.role)) return 'מפקד צוות';
+  if (Roles_isTrainee(u.role)) return 'חניך ' + traineeIndex;
+  if (Roles_isTutor(u.role)) return 'חונך';
+  if (Roles_isDepartmentCommander(u.role)) return 'מ"מ';
+  if (Roles_isUnitCommander(u.role)) return 'מגד';
+  return Roles_label(u.role) || 'משתתף';
+}
+
 function Assignments_assignTeam(exerciseId, teamId, sid) {
   if (!teamId) return { added: 0, skipped: 0, missing: [] };
 
-  const team       = Teams_get(teamId);
-  const members    = Users_byTeam(teamId);
-  const existing   = Assignments_byExercise(exerciseId).map(function(a){ return a.user_id; });
-
-  let commander = null;
+  const team = Teams_get(teamId);
+  let members = Users_byTeam(teamId);
   if (team && team.commander_id) {
-    commander = Users_get(team.commander_id);
-  }
-  if (!commander) {
-    commander = members.find(function(u) { return Roles_isCompanyCommander(u.role); }) || null;
+    const hasCmd = members.some(function(u) { return String(u.id) === String(team.commander_id); });
+    if (!hasCmd) {
+      const cmd = Users_get(team.commander_id);
+      if (cmd) members = members.concat([cmd]);
+    }
   }
 
-  const trainees = members.filter(function(u) { return Roles_isTrainee(u.role); }).slice(0, 2);
-
-  const toAssign = [];
-  if (commander) toAssign.push({ user: commander, resp: 'מפקד צוות' });
-  trainees.forEach(function(t, i){
-    toAssign.push({ user: t, resp: 'חניך ' + (i + 1) });
+  const existing = Assignments_byExercise(exerciseId).map(function(a) { return a.user_id; });
+  const sorted = members.slice().sort(function(a, b) {
+    function rank(u) {
+      if (Roles_isCompanyCommander(u.role)) return 0;
+      if (Roles_isTutor(u.role)) return 1;
+      if (Roles_isDepartmentCommander(u.role)) return 2;
+      if (Roles_isTrainee(u.role)) return 3;
+      return 4;
+    }
+    const dr = rank(a) - rank(b);
+    if (dr !== 0) return dr;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'he');
   });
 
-  let added = 0, skipped = 0;
-  // PERF: collect rows, then batch-append in one Sheets API call
+  let added = 0;
+  let skipped = 0;
+  let traineeNum = 0;
   const newRows = [];
-  toAssign.forEach(function(item){
-    if (existing.indexOf(item.user.id) !== -1) { skipped++; return; }
-    if (HomeConstraints_checkAssignment(item.user.id, exerciseId)) { skipped++; return; }
-    const aid = 'A' + new Date().getTime() + '_' + added;
-    newRows.push(_assignmentRow(aid, exerciseId, item.user.id, 'pending', '', item.resp, '', ''));
+  const baseTs = Date.now();
+
+  sorted.forEach(function(u, i) {
+    if (existing.indexOf(u.id) !== -1) { skipped++; return; }
+    if (HomeConstraints_checkAssignment(u.id, exerciseId)) { skipped++; return; }
+    if (Roles_isTrainee(u.role)) traineeNum++;
+    const resp = Roles_isTrainee(u.role)
+      ? _assignmentRespForTeamMember(u, traineeNum)
+      : _assignmentRespForTeamMember(u, 0);
+    const aid = 'A' + baseTs + '_' + i + '_' + String(u.id).replace(/\W/g, '');
+    newRows.push(_assignmentRow(aid, exerciseId, u.id, 'pending', '', resp, '', ''));
     added++;
   });
   if (newRows.length) _appendBatch('Assignments', newRows);
 
   const missing = [];
-  if (!commander) missing.push('מפקד צוות');
-  if (trainees.length < 2) missing.push('רק ' + trainees.length + ' חניכים זמינים (נדרשים 2)');
+  if (!sorted.length) missing.push('אין חברים בצוות');
 
-  return { added: added, skipped: skipped, missing: missing };
+  return { added: added, skipped: skipped, missing: missing, total: sorted.length };
 }
 
 // Action handler: assign team (admin button)
@@ -254,8 +273,9 @@ function Assignments_assignTeamAction(p) {
   const tName  = team ? team.name : teamId;
   const result = Assignments_assignTeam(exId, teamId, p.sid);
 
-  let msg = 'שובצו ' + result.added + ' חברים מצוות "' + tName + '" (מפקד + עד 2 חניכים).';
-  if (result.skipped) msg += ' ' + result.skipped + ' כבר רשומים.';
+  let msg = 'שובצו ' + result.added + ' מתוך ' + (result.total || result.added) +
+    ' חברי צוות "' + tName + '" לתרגיל.';
+  if (result.skipped) msg += ' ' + result.skipped + ' דולגו (כבר רשומים או מוגבלים).';
   if (result.missing && result.missing.length) {
     msg += ' שים לב: ' + result.missing.join(', ') + '.';
   }

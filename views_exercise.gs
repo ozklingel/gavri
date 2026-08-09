@@ -537,7 +537,7 @@ function _exerciseAssignPanelHtml(p) {
       '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
       '<div class="form-row"><label class="form-label">צוות</label>' + _select('teamId', teamOptions) + '</div>' +
       '<p style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px">' +
-      'ישובצו אוטומטית: מפקד הצוות + 2 החניכים הראשונים. מי שכבר רשום ידולג.</p>' +
+      'כל חברי הצוות ישובצו לתרגיל (מפקד, חניכים, חונכים וכו\'). מי שכבר רשום או מוגבל ידולג.</p>' +
       _submitBtn('🪖 הוסף צוות שלם', 'btn btn-primary') +
       '</form>';
   }
