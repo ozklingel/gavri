@@ -22,6 +22,10 @@ function Users_all() {
 
 var _usersById = null;
 
+function _usersClearDerived() {
+  _usersById = null;
+}
+
 function Users_byIdMap() {
   if (!_rowsCache['Users']) _usersById = null;
   if (_usersById) return _usersById;
@@ -261,6 +265,10 @@ function Teams_all() {
 }
 
 var _teamsById = null;
+
+function _teamsClearDerived() {
+  _teamsById = null;
+}
 
 function Teams_byIdMap() {
   if (!_rowsCache['Teams']) _teamsById = null;

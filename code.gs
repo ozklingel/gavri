@@ -394,6 +394,46 @@ function _cacheWarmAll(force) {
   return { ok: true, sheets: DB_FULL_CACHE_SHEETS.length };
 }
 
+/**
+ * טריגר פשוט — עריכה ידנית בגיליון לא עוברת דרך _cacheInvalidate;
+ * מבטל קאש מיד כדי שהאפליקציה תקרא נתונים עדכניים.
+ */
+function onEdit(e) {
+  if (!e || !e.range) return;
+  let name;
+  try {
+    name = e.range.getSheet().getName();
+  } catch (err) {
+    return;
+  }
+  if (DB_SHEET_NAMES.indexOf(name) === -1) return;
+  _cacheInvalidate(name);
+}
+
+/** הרצה מעורך Apps Script — רענון מיידי אחרי עריכה ידנית (למשל team_id ב-Users). */
+function refreshDbCacheNow() {
+  return _cacheForceReloadSheets(['Users', 'Teams']);
+}
+
+/** API — מנהל: רענון קאש DB מהאפליקציה (אחרי עריכה ישירה בגיליון). */
+function apiRefreshDbCache(sid, sheetsJson) {
+  const s = String(sid || '').trim();
+  if (!s) throw new Error('חסר session');
+  const user = Auth_current({ sid: s });
+  if (!Roles_isAdmin(user.role)) throw new Error('אין הרשאה');
+  let names = null;
+  if (sheetsJson) {
+    try {
+      const parsed = JSON.parse(String(sheetsJson));
+      if (Array.isArray(parsed) && parsed.length) names = parsed.map(String);
+    } catch (e0) { /* default full user sheets */ }
+  }
+  if (!names) names = ['Users', 'Teams'];
+  const out = _cacheForceReloadSheets(names);
+  _cacheFlush();
+  return out;
+}
+
 /** מוחק קאש של גיליונות וקורא אותם מחדש מה-Spreadsheet (batch — SS אחד). */
 function _cacheForceReloadSheets(names) {
   const list = names && names.length ? names : DB_FULL_CACHE_SHEETS;
@@ -478,6 +518,12 @@ function _cacheNotifyDerived(name) {
   }
   if (name === 'Assignments') {
     if (typeof _assignmentsClearDerived === 'function') _assignmentsClearDerived();
+  }
+  if (name === 'Users') {
+    if (typeof _usersClearDerived === 'function') _usersClearDerived();
+  }
+  if (name === 'Teams') {
+    if (typeof _teamsClearDerived === 'function') _teamsClearDerived();
   }
 }
 
