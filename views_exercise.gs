@@ -187,7 +187,7 @@ s += _confirmDelete(
 
   // Participants
   const parts = archiveView ? Assignments_byExerciseAny(ex.id) : Assignments_byExercise(ex.id);
-  let pHtml = '<div class="card">' +
+  let pHtml = '<div class="card" id="exercise-participants-card">' +
     '<div class="card-header"><span class="card-title">👥 משתתפים (' + parts.length + ')</span></div>';
 
   if (!parts.length) {
@@ -463,6 +463,7 @@ function _exerciseEditPanelHtml(p) {
     '<input type="hidden" name="action" value="editExercise">' +
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
     '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
+    '<input type="hidden" name="origTeamId" value="' + _esc(exTeamId) + '">' +
     '<input type="hidden" name="shift_procedure" value="">' +
     '<input type="hidden" name="shift_anchor" value="">' +
     '<div class="form-row"><label class="form-label">שם התרגיל</label>' + _input('title', '', ex.title, 'text', 'required') + '</div>' +

@@ -4844,11 +4844,26 @@ body {
           if (action === 'deleteExercisesBulk') {
             currentRoute = normalizeRoute('exercises', { tab: 'list' });
           }
+          if (action === 'editExercise' && params && params.id) {
+            currentRoute = normalizeRoute('exercise', { id: String(params.id) });
+          }
           if (action === 'autoAssignAll' || action === 'autoAssignGroup' ||
               action === 'clearAllAssignments' || action === 'clearAssignGroup') {
             currentRoute = normalizeRoute('assign', {});
           }
           applyResult(result, { skipPrime: true });
+          if (action === 'editExercise' && result && result.body) {
+            var teamChanged = String(params.teamId || '') !== String(params.origTeamId || '');
+            setTimeout(function() {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              if (teamChanged) {
+                setTimeout(function() {
+                  var partsCard = document.getElementById('exercise-participants-card');
+                  if (partsCard) partsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 450);
+              }
+            }, 60);
+          }
           if (action === 'generateTimeline' || action === 'addDetail' || action === 'updateDetail' || action === 'deleteDetail') {
             setTimeout(function() {
               var card = document.getElementById('exercise-procedure-card');

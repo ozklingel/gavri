@@ -867,6 +867,7 @@ function Exercises_edit(p) {
     p.end_time            || ''
   ]]);
   const teamId = String(p.teamId || p.team_id || '').trim();
+  const prevTeamId = String(ex.team_id || '').trim();
   if (Exercises_teamColIndex() >= 0) Exercises_setTeamId(p.id, teamId);
   _cacheInvalidate('Exercises');
 
@@ -874,6 +875,24 @@ function Exercises_edit(p) {
   if (_parseBool(p.shift_procedure) && ex) {
     const shifted = Exercises_shiftDetailsForScheduleChange(p.id, ex, p);
     if (shifted) info += ' לוז נוה"ק עודכן (' + shifted + ' רשומות).';
+  }
+
+  if (teamId && teamId !== prevTeamId) {
+    const result = Assignments_assignTeam(p.id, teamId, p.sid);
+    const team = Teams_get(teamId);
+    const tName = team ? team.name : teamId;
+    info += ' צוות «' + tName + '»: ';
+    if (result.added > 0) {
+      info += result.added + ' משתתפים נוספו.';
+    } else {
+      info += 'כל חברי הצוות כבר משובצים.';
+    }
+    if (result.skipped > 0 && result.added > 0) {
+      info += ' (' + result.skipped + ' דולגו.)';
+    }
+    if (result.missing && result.missing.length) {
+      info += ' ' + result.missing.join(', ') + '.';
+    }
   }
 
   return Views_exercise({ sid: p.sid, id: p.id, info: info });
