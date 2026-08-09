@@ -258,6 +258,8 @@ function Assignments_assignTeam(exerciseId, teamId, sid) {
   const missing = [];
   if (!sorted.length) missing.push('אין חברים בצוות');
 
+  Exercises_setTeamId(exerciseId, teamId);
+
   return { added: added, skipped: skipped, missing: missing, total: sorted.length };
 }
 

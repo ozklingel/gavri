@@ -525,9 +525,55 @@ function Exercises_activeIdSet() {
   return set;
 }
 
+function Exercises_teamColIndex() {
+  const idx = _colIndex('Exercises', 'team_id');
+  return idx >= 0 ? idx : -1;
+}
+
+function Exercises_setTeamId(exerciseId, teamId) {
+  const id = String(exerciseId || '').trim();
+  const col = Exercises_teamColIndex();
+  if (!id || col < 0) return;
+  const row = _findRowIndex('Exercises', id);
+  if (row < 0) return;
+  const val = String(teamId || '');
+  _sheet('Exercises').getRange(row, col + 1).setValue(val);
+  _cachePatchRow('Exercises', row, { [col + 1]: val });
+}
+
+function Exercises_teamName(ex, inferredMap) {
+  if (!ex) return '—';
+  let tid = String(ex.team_id || '').trim();
+  if (!tid && inferredMap) tid = String(inferredMap[ex.id] || '').trim();
+  if (!tid) return '—';
+  const team = Teams_get(tid);
+  return team ? team.name : tid;
+}
+
+/** צוות דומיננטי מתוך שיבוצים — לתרגילים ישנים ללא team_id בגיליון */
+function Exercises_inferTeamIdByExercise() {
+  const counts = {};
+  const users = Users_byIdMap();
+  Assignments_all().forEach(function(a) {
+    const u = users[a.user_id];
+    if (!u || !u.team_id) return;
+    const exId = String(a.exercise_id);
+    if (!counts[exId]) counts[exId] = {};
+    counts[exId][u.team_id] = (counts[exId][u.team_id] || 0) + 1;
+  });
+  const out = {};
+  Object.keys(counts).forEach(function(exId) {
+    const tc = counts[exId];
+    const keys = Object.keys(tc).sort(function(a, b) { return tc[b] - tc[a]; });
+    out[exId] = keys[0] || '';
+  });
+  return out;
+}
+
 function Exercises_all(includeArchived) {
   const activeSid = includeArchived ? null : Series_getActiveId();
   const seriesCol = Series_exerciseColIndex();
+  const teamCol = Exercises_teamColIndex();
   return _rows('Exercises').data.map(r => ({
     id:          String(r[0]),
     title:       String(r[1]),
@@ -548,7 +594,8 @@ function Exercises_all(includeArchived) {
     battalion_commander: r[10] == null ? '' : String(r[10]),
     series_force_slot:   r[13] == null ? '' : String(r[13]),
     field_force_id:      r[14] == null ? '' : String(r[14]),
-    series_id:           r[seriesCol] == null ? '' : String(r[seriesCol])
+    series_id:           r[seriesCol] == null ? '' : String(r[seriesCol]),
+    team_id:             teamCol >= 0 && r[teamCol] != null ? String(r[teamCol]) : ''
   })).filter(function(e) {
     if (includeArchived) return true;
     if (!activeSid) return !e.series_id;
@@ -744,6 +791,8 @@ function Exercises_create(p) {
     startTime, endTime
   ]);
 
+  if (teamId) Exercises_setTeamId(id, teamId);
+
   Series_ensureMigrated();
   const seriesId = Series_getActiveId();
   if (seriesId) Series_assignExercisesToSeries([id], seriesId);
@@ -762,7 +811,8 @@ function Exercises_create(p) {
     const result = Assignments_assignTeam(id, teamId, p.sid);
     const team   = Teams_get(teamId);
     const tName  = team ? team.name : teamId;
-    if (result.added > 0)   info += ' ' + result.added + ' חיילים מצוות "' + tName + '" נוספו אוטומטית.';
+    info += ' צוות: «' + tName + '».';
+    if (result.added > 0)   info += ' ' + result.added + ' חיילים נוספו אוטומטית.';
     if (result.skipped > 0) info += ' (' + result.skipped + ' כבר משתתפים.)';
   }
 
@@ -816,6 +866,8 @@ function Exercises_edit(p) {
     p.start_time          || '',
     p.end_time            || ''
   ]]);
+  const teamId = String(p.teamId || p.team_id || '').trim();
+  if (Exercises_teamColIndex() >= 0) Exercises_setTeamId(p.id, teamId);
   _cacheInvalidate('Exercises');
 
   let info = 'התרגיל עודכן בהצלחה.';
@@ -888,6 +940,7 @@ function Exercises_duplicate(p) {
     orig.partner_battalion, orig.camp, orig.battalion_commander,
     orig.rawStartTime || '', orig.rawEndTime || '',
     orig.series_force_slot || '', orig.field_force_id || '']);
+  if (orig.team_id) Exercises_setTeamId(newId, orig.team_id);
 
   // PERF: batch-append all detail rows at once
   const details = Exercises_details(orig.id);

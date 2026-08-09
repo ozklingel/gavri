@@ -414,6 +414,8 @@ function _timelineSidePanelHtml(user, sid, viewCtx, bounds, weekBlocks) {
     _select('partner_battalion', _fieldForceSelectOptions(''), '', 'required') + '</div>' +
     '<div class="form-row"><label class="form-label">מחנה / מגנן</label>' +
     _select('camp', _fireZoneSelectOptions(''), '', 'required') + '</div>' +
+    '<div class="form-row"><label class="form-label">צוות</label>' +
+    _select('teamId', _teamSelectOptions('')) + '</div>' +
     _submitBtn('צור תרגיל', 'btn btn-primary btn-full btn-sm') +
     '</form></div>';
 

@@ -691,6 +691,7 @@ function setupSheets() {
   ensureColumn('Exercises', 'series_force_slot');
   ensureColumn('Exercises', 'field_force_id');
   ensureColumn('Exercises', 'series_id');
+  ensureColumn('Exercises', 'team_id');
   ensure('ExerciseDetails',  ['id','exercise_id','time','location','description']);
   ensure('Series', ['id','label','start_date','end_date','status','created_at','created_by','exercise_count','assignment_count','detail_count','battalion_config_json','build_params_json']);
   ensure('SystemLog', ['id','timestamp','user_id','action','entity_type','entity_id','details_json']);

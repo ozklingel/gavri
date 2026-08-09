@@ -84,6 +84,7 @@ function _exercisesListModuleHtml(user, sid, exs) {
   const isAdmin = Roles_hasAdminAccess(user.role);
   if (!exs) exs = Exercises_all();
   const mpCounts = Assignments_mpCountByExercise();
+  const inferredTeams = Exercises_inferTeamIdByExercise();
 
   let s = '<div class="card card-list-scroll"><div class="card-header"><div class="card-title">📋 כל התרגילים</div></div>';
 
@@ -92,17 +93,19 @@ function _exercisesListModuleHtml(user, sid, exs) {
   } else {
     let tableHtml = '<table class="tbl bulk-select-table"><thead><tr>' +
       (isAdmin ? _bulkSelectHeader() : '') +
-      '<th>שם</th><th>סוג</th><th>מפים</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
+      '<th>שם</th><th>צוות</th><th>סוג</th><th>מפים</th><th>התחלה</th><th>סיום</th><th style="text-align:left">פעולות</th>' +
       '</tr></thead><tbody>';
 
     exs.forEach(function(e) {
       const mpN = mpCounts[e.id] || 0;
+      const teamLabel = Exercises_teamName(e, inferredTeams);
       tableHtml += '<tr>' +
         (isAdmin ? _bulkSelectCell(e.id) : '') +
         '<td>' +
           '<div class="ex-title">' + _exerciseLink(e.id, e.title) + '</div>' +
           '<div class="mono" style="font-size:10px;opacity:0.6">' + e.id + '</div>' +
         '</td>' +
+        '<td>' + (teamLabel !== '—' ? _esc(teamLabel) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td>' + (e.exercise_type ? _badge(e.exercise_type, 'muted') : '—') + '</td>' +
         '<td style="text-align:center">' +
           (mpN ? '<span class="badge badge-green">' + mpN + '</span>' : '<span style="color:var(--muted)">0</span>') +
@@ -263,6 +266,11 @@ function _exercisesSidebarModuleHtml(user, sid, openSet) {
       '<div class="form-row">' +
         '<label class="form-label">מפקד אחראי גדוד</label>' +
         '<input type="text" name="battalion_commander" class="form-input" placeholder="מפקד אחראי גדוד">' +
+      '</div>' +
+
+      '<div class="form-row">' +
+        '<label class="form-label">צוות</label>' +
+        _select('teamId', _teamSelectOptions('')) +
       '</div>' +
 
       _submitBtn('צור תרגיל', 'btn btn-primary btn-full') +

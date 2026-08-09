@@ -26,6 +26,7 @@ function Views_exercise(p) {
   const openSet = _parseOpenSections(p);
   const exParams = { id: ex.id };
   if (archiveView) exParams.archive = '1';
+  const inferredTeams = Exercises_inferTeamIdByExercise();
 
   let s = _topbar(user, sid) + '<div class="page">';
   s += _flash(p);
@@ -74,6 +75,8 @@ s += _confirmDelete(
     '<b>' + _esc(ex.act || '—') + '</b></div>' +
     '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">סוג תרגיל</span><br>' +
     '<b>' + _esc(ex.exercise_type || '—') + '</b></div>' +
+    '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">צוות</span><br>' +
+    '<b>' + _esc(Exercises_teamName(ex, inferredTeams)) + '</b></div>' +
     '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">גדוד שת״פ</span><br>' +
     '<b>' + _esc(ex.partner_battalion || '—') + '</b></div>' +
     '<div><span style="color:var(--muted);font-family:var(--mono);font-size:11px">מחנה / מגנן</span><br>' +
@@ -448,6 +451,8 @@ function _exerciseEditPanelHtml(p) {
   const ex = Exercises_get(exId);
   if (!ex) return '<div class="empty">תרגיל לא נמצא</div>';
   const sid = user.id;
+  const inferredTeams = Exercises_inferTeamIdByExercise();
+  const exTeamId = ex.team_id || inferredTeams[ex.id] || '';
   const procCount = Exercises_details(ex.id).length;
   return '<div class="card"><div class="card-body">' +
     '<form class="spa-form exercise-edit-form" data-orig-start-date="' + _esc(ex.rawStartDate || '') + '"' +
@@ -485,6 +490,8 @@ function _exerciseEditPanelHtml(p) {
       _select('camp', _fireZoneSelectOptions(ex.camp), ex.camp, 'required') + '</div>' +
     '</div>' +
     '<div class="form-row"><label class="form-label">מפקד אחראי גדוד</label>' + _input('battalion_commander', 'מפקד אחראי גדוד', ex.battalion_commander) + '</div>' +
+    '<div class="form-row"><label class="form-label">צוות</label>' +
+      _select('teamId', _teamSelectOptions(exTeamId), exTeamId) + '</div>' +
     _submitBtn('💾 שמור שינויים', 'btn btn-primary') +
     '</form></div></div>';
 }
@@ -496,6 +503,8 @@ function _exerciseAssignPanelHtml(p) {
   const ex = Exercises_get(exId);
   if (!ex) return '<div class="empty">תרגיל לא נמצא</div>';
   const sid = user.id;
+  const inferredTeams = Exercises_inferTeamIdByExercise();
+  const exTeamId = ex.team_id || inferredTeams[ex.id] || '';
   const parts = Assignments_byExercise(exId);
   const allUsers = Users_all();
   const allTeams = Teams_all();
@@ -535,7 +544,8 @@ function _exerciseAssignPanelHtml(p) {
       '<input type="hidden" name="action" value="assignTeam">' +
       '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
       '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-      '<div class="form-row"><label class="form-label">צוות</label>' + _select('teamId', teamOptions) + '</div>' +
+      '<div class="form-row"><label class="form-label">צוות</label>' +
+        _select('teamId', teamOptions, exTeamId) + '</div>' +
       '<p style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px">' +
       'כל חברי הצוות ישובצו לתרגיל (מפקד, חניכים, חונכים וכו\'). מי שכבר רשום או מוגבל ידולג.</p>' +
       _submitBtn('🪖 הוסף צוות שלם', 'btn btn-primary') +

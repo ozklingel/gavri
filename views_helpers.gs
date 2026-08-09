@@ -189,6 +189,16 @@ function _dateInput(name, value) {
     '</div>';
 }
 
+function _teamSelectOptions(selectedId, includeEmpty) {
+  const teams = Teams_all();
+  const opts = includeEmpty !== false ? [['', '— ללא צוות —']] : [];
+  teams.forEach(function(t) {
+    const cnt = Users_byTeam(t.id).length;
+    opts.push([t.id, t.name + (cnt ? ' (' + cnt + ' חברים)' : '')]);
+  });
+  return opts;
+}
+
 function _select(name, options, selected, extraAttrs) {
   // options: array of [value, label]
   let s = '<select name="' + name + '" class="form-select"' + (extraAttrs ? ' ' + extraAttrs : '') + '>';
