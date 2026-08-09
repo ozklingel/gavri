@@ -219,6 +219,7 @@ function _exercisesSidebarModuleHtml(user, sid, openSet) {
     _formOpen() +
       '<input type="hidden" name="action" value="createExercise">' +
       '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
+      '<input type="hidden" name="from" value="exercises">' +
 
       '<div class="form-row">' +
         '<label class="form-label">שם התרגיל</label>' +

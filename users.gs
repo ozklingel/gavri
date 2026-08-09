@@ -124,7 +124,7 @@ function Users_create(p) {
   ]);
   _append('Credentials', [newId, pass]);
 
-  return Views_users({ sid: p.sid, tab: 'users', info: 'המשתמש ' + name + ' (' + newId + ') נוצר בהצלחה.' });
+  return _usersWriteLightResponse_(p.sid, 'המשתמש ' + name + ' (' + newId + ') נוצר בהצלחה.');
 }
 
 /** עדכון / יצירת סיסמה בגיליון Credentials */

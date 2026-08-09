@@ -827,7 +827,17 @@ function Exercises_create(p) {
     });
   }
 
-  return Views_exercise({ sid: p.sid, id: id, info: info });
+  if (String(p.from || '').trim() === 'exercises') {
+    return Views_exercises({
+      sid: p.sid,
+      tab: 'list',
+      info: info
+    });
+  }
+
+  const out = Views_exercise({ sid: p.sid, id: id, info: info });
+  out.exerciseId = id;
+  return out;
 }
 
 // PERF: write all 9 changed columns in a single setValues() call
@@ -893,6 +903,7 @@ function Exercises_edit(p) {
     if (result.missing && result.missing.length) {
       info += ' ' + result.missing.join(', ') + '.';
     }
+    _cacheInvalidate('Assignments');
   }
 
   return Views_exercise({ sid: p.sid, id: p.id, info: info });

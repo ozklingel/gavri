@@ -4841,8 +4841,25 @@ body {
             refreshUsersPageAfterWrite(result, 'users');
             return;
           }
+          if (action === 'createUser' && result.ok && !result.body) {
+            refreshUsersPageAfterWrite(result, 'users');
+            return;
+          }
           if (action === 'deleteExercisesBulk') {
             currentRoute = normalizeRoute('exercises', { tab: 'list' });
+          }
+          if (action === 'createExercise' && params) {
+            if (params.from === 'exercises') {
+              currentRoute = normalizeRoute('exercises', { tab: 'list' });
+            } else if (params.from === 'timeline') {
+              currentRoute = normalizeRoute('timeline', {
+                week: params.week != null ? String(params.week) : '0',
+                range: params.range != null ? String(params.range) : 'week',
+                pos: params.pos != null ? String(params.pos) : undefined
+              });
+            } else if (result && result.exerciseId) {
+              currentRoute = normalizeRoute('exercise', { id: String(result.exerciseId) });
+            }
           }
           if (action === 'editExercise' && params && params.id) {
             currentRoute = normalizeRoute('exercise', { id: String(params.id) });
@@ -4852,10 +4869,19 @@ body {
             currentRoute = normalizeRoute('assign', {});
           }
           applyResult(result, { skipPrime: true });
-          if (action === 'editExercise' && result && result.body) {
-            var teamChanged = String(params.teamId || '') !== String(params.origTeamId || '');
+          if (action === 'createExercise' && result && result.body && params && params.from === 'exercises') {
+            storeClientPage(normalizeRoute('exercises', { tab: 'list' }), result);
             setTimeout(function() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 60);
+          }
+          if (action === 'editExercise' && result && result.body && params && params.id) {
+            var exRoute = normalizeRoute('exercise', { id: String(params.id) });
+            currentRoute = exRoute;
+            storeClientPage(exRoute, result);
+            setTimeout(function() {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              var teamChanged = String(params.teamId || '') !== String(params.origTeamId || '');
               if (teamChanged) {
                 setTimeout(function() {
                   var partsCard = document.getElementById('exercise-participants-card');

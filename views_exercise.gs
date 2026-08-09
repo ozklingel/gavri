@@ -463,6 +463,7 @@ function _exerciseEditPanelHtml(p) {
     '<input type="hidden" name="action" value="editExercise">' +
     '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
     '<input type="hidden" name="id" value="' + _esc(ex.id) + '">' +
+    '<input type="hidden" name="from" value="exercise">' +
     '<input type="hidden" name="origTeamId" value="' + _esc(exTeamId) + '">' +
     '<input type="hidden" name="shift_procedure" value="">' +
     '<input type="hidden" name="shift_anchor" value="">' +
