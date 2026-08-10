@@ -292,9 +292,13 @@ function _timelineFieldForcesTabHtml() {
     list = '<ul class="timeline-forces-list">';
     items.forEach(function(item) {
       const title = item.force_name || item.role || item.id;
+      const qtyText = FieldForces_quantityText(item);
       list += '<li class="timeline-forces-item">' +
         '<a href="#" class="timeline-forces-name" data-spa-page="fieldForce"' +
         _spaParamsAttr({ id: item.id }) + ' title="' + _esc(title) + '">' + _esc(title) + '</a>';
+      if (qtyText) {
+        list += '<span class="timeline-forces-meta">' + _esc(qtyText) + '</span>';
+      }
       if (item.role && item.role !== title) {
         list += '<span class="timeline-forces-meta">' + _esc(item.role) + '</span>';
       }

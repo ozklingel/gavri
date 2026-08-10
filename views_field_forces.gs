@@ -1,5 +1,16 @@
 // views_field_forces.gs — כוחות בשטח pages
 
+function _fieldForceQuantityFieldsHtml(qty, unit) {
+  return '<div class="form-grid">' +
+    '<div class="form-row"><label class="form-label">כמות כוחות</label>' +
+    _input('force_qty', '1', qty != null && qty !== '' ? String(qty) : '1', 'number', 'min="1" max="99"') + '</div>' +
+    '<div class="form-row"><label class="form-label">סוג כמות כוחות</label>' +
+    _select('force_qty_unit', FieldForces_qtyUnitOptions(), unit || '') + '</div>' +
+    '</div>' +
+    '<p style="font-size:11px;color:var(--muted);margin:-4px 0 10px;line-height:1.45">' +
+    'לדוגמה: <b>2</b> + <b>פלוגות</b> → «2 פלוגות». השאר «ללא» אם לא רלוונטי.</p>';
+}
+
 function Views_fieldForces(p) {
   const user = Auth_current(p);
   if (!user) return Views_login({ error: 'נדרשת התחברות.' });
@@ -18,13 +29,15 @@ function Views_fieldForces(p) {
     s += '<div class="empty">אין כוחות בשטח</div>';
   } else {
     s += '<div class="card-body" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr>' +
-      '<th>שם הכוח</th><th>תפקיד</th><th>שם מפקד</th><th>מקום מחנה</th><th>סוג כוח</th>' +
+      '<th>שם הכוח</th><th>כמות</th><th>תפקיד</th><th>שם מפקד</th><th>מקום מחנה</th><th>סוג כוח</th>' +
       (isAdmin ? '<th>פעולות</th>' : '') +
       '</tr></thead><tbody>';
     items.forEach(function(item) {
+      const qtyText = FieldForces_quantityText(item);
       s += '<tr>' +
         '<td><a href="#" data-spa-page="fieldForce"' + _spaParamsAttr({ id: item.id }) +
           ' style="color:var(--blue);text-decoration:underline"><b>' + _esc(item.force_name || item.role) + '</b></a></td>' +
+        '<td>' + (qtyText ? _badge(qtyText, 'blue') : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td>' + _esc(item.role) + '</td>' +
         '<td>' + _esc(item.commander_name) + '</td>' +
         '<td>' + _esc(item.camp_location) + '</td>' +
@@ -61,6 +74,7 @@ function Views_fieldForces(p) {
         ['חשן', 'חשן'],
         ['900', '900']
       ], '', 'required') + '</div>' +
+      _fieldForceQuantityFieldsHtml('', '') +
       _submitBtn('צור כוח', 'btn btn-primary btn-full') +
       '</form></div></div>';
     s += '<div style="margin-top:12px">' +
@@ -81,9 +95,13 @@ function Views_fieldForce(p) {
   const item = FieldForces_get(id);
   if (!item) return Views_error('הרשומה לא נמצאה.', p);
 
+  const qtyText = FieldForces_quantityText(item);
+
   let s = _topbar(user, sid) + '<div class="page">' + _flash(p);
   s += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">' +
-    '<div class="page-title" style="margin:0">⚔ ' + _esc(item.force_name || item.role) + '</div>' +
+    '<div class="page-title" style="margin:0">⚔ ' + _esc(item.force_name || item.role) +
+    (qtyText ? ' <span style="font-size:14px;color:var(--muted);font-weight:normal">(' + _esc(qtyText) + ')</span>' : '') +
+    '</div>' +
     '<div style="display:flex;gap:6px">' +
     _a('page=fieldForces', '← רשימה', 'btn btn-ghost btn-sm') +
     '</div></div>';
@@ -92,6 +110,8 @@ function Views_fieldForce(p) {
     '<div class="card-body"><table class="tbl"><tbody>' +
     '<tr><td style="width:140px;color:var(--muted)">מזהה</td><td class="mono">' + _esc(item.id) + '</td></tr>' +
     '<tr><td style="color:var(--muted)">שם הכוח</td><td><b>' + _esc(item.force_name) + '</b></td></tr>' +
+    '<tr><td style="color:var(--muted)">כמות כוחות</td><td>' +
+    (qtyText ? _badge(qtyText, 'blue') : '<span style="color:var(--muted)">—</span>') + '</td></tr>' +
     '<tr><td style="color:var(--muted)">תפקיד</td><td>' + _esc(item.role) + '</td></tr>' +
     '<tr><td style="color:var(--muted)">שם מפקד</td><td>' + _esc(item.commander_name) + '</td></tr>' +
     '<tr><td style="color:var(--muted)">מקום מחנה</td><td>' + _esc(item.camp_location) + '</td></tr>' +
@@ -122,6 +142,7 @@ function Views_fieldForce(p) {
         ['900', '900']
       ], item.force_type, 'required') + '</div>' +
       '</div>' +
+      _fieldForceQuantityFieldsHtml(item.force_qty, item.force_qty_unit) +
       _submitBtn('שמור שינויים', 'btn btn-primary') +
       '</form></div></div>';
   }

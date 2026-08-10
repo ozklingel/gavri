@@ -701,6 +701,8 @@ function setupSheets() {
   ensureColumn('Assignments', 'tutor');
   ensure('FieldForces', ['id','role','commander_name','camp_location','force_type','force_name']);
   ensureColumn('FieldForces', 'force_name');
+  ensureColumn('FieldForces', 'force_qty');
+  ensureColumn('FieldForces', 'force_qty_unit');
   ensure('FireZones', ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night']);
   ensure('HomeConstraints', ['id','user_id','start_date','start_time','end_date','end_time','notes','status','approval_tier','supervisor_id','approved_by','approved_at','rejection_note','created_at']);
   ensure('TimelineBlocks', ['id','label','start_date','end_date','start_time','end_time','lane','created_by']);
@@ -739,7 +741,7 @@ function resetTrainingTables() {
     Exercises: ['id','title','description','created_by','start_date','end_date','act','exercise_type','partner_battalion','camp','battalion_commander'],
     ExerciseDetails: ['id','exercise_id','time','location','description'],
     Assignments: ['id','exercise_id','user_id','status','score','responsibility','feedback','tutor'],
-    FieldForces: ['id','role','commander_name','camp_location','force_type','force_name'],
+    FieldForces: ['id','role','commander_name','camp_location','force_type','force_name','force_qty','force_qty_unit'],
     FireZones: ['id','name','advancement','attack','defense','dry_wet_day','dry_wet_night'],
     HomeConstraints: ['id','user_id','start_date','start_time','end_date','end_time','notes','status','approval_tier','supervisor_id','approved_by','approved_at','rejection_note','created_at']
   };

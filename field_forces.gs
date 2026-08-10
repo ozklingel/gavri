@@ -1,5 +1,51 @@
 // field_forces.gs — כוחות בשטח CRUD
 
+function FieldForces_qtyUnitOptions() {
+  return [
+    ['', '— ללא —'],
+    ['פלוגה', 'פלוגות'],
+    ['מחלקה', 'מחלקות'],
+    ['גדוד', 'גדודים'],
+    ['כיתה', 'כיתות'],
+    ['יחידה', 'יחידות'],
+    ['מרכז', 'מרכזים']
+  ];
+}
+
+function FieldForces_qtyUnitPlural_(singular) {
+  const map = {
+    'פלוגה': 'פלוגות',
+    'מחלקה': 'מחלקות',
+    'גדוד': 'גדודים',
+    'כיתה': 'כיתות',
+    'יחידה': 'יחידות',
+    'מרכז': 'מרכזים'
+  };
+  return map[String(singular || '').trim()] || String(singular || '').trim();
+}
+
+/** טקסט תצוגה: «2 פלוגות», «מחלקה אחת» */
+function FieldForces_quantityText(f) {
+  if (!f) return '';
+  const unit = String(f.force_qty_unit || '').trim();
+  if (!unit) return '';
+  let n = parseInt(f.force_qty, 10);
+  if (isNaN(n) || n < 1) n = 1;
+  if (n === 1) return unit + ' אחת';
+  return n + ' ' + FieldForces_qtyUnitPlural_(unit);
+}
+
+function FieldForces_parseQuantity_(p) {
+  const unit = String(p.force_qty_unit || '').trim();
+  if (!unit) return { force_qty: '', force_qty_unit: '' };
+  let n = parseInt(p.force_qty, 10);
+  if (isNaN(n) || n < 1) n = 1;
+  if (n > 99) throw new Error('כמות הכוחות חייבת להיות בין 1 ל-99.');
+  const allowed = FieldForces_qtyUnitOptions().map(function(o) { return o[0]; }).filter(Boolean);
+  if (allowed.indexOf(unit) === -1) throw new Error('יחידת כמות לא חוקית.');
+  return { force_qty: String(n), force_qty_unit: unit };
+}
+
 function FieldForces_all() {
   return _rows('FieldForces').data.map(function(r) {
     return {
@@ -8,7 +54,9 @@ function FieldForces_all() {
       commander_name: String(r[2] || ''),
       camp_location:  String(r[3] || ''),
       force_type:     String(r[4] || ''),
-      force_name:     String(r[5] || '')
+      force_name:     String(r[5] || ''),
+      force_qty:      r[6] == null ? '' : String(r[6]),
+      force_qty_unit: r[7] == null ? '' : String(r[7])
     };
   });
 }
@@ -20,7 +68,10 @@ function FieldForces_get(id) {
 /** שם הכוח — לבחירה בתרגיל כגדוד שת״פ */
 function FieldForces_displayLabel(f) {
   if (!f) return '';
-  return String(f.force_name || '').trim();
+  const name = String(f.force_name || '').trim();
+  const qty = FieldForces_quantityText(f);
+  if (qty) return name ? (name + ' · ' + qty) : qty;
+  return name;
 }
 
 function FieldForces_displayLabels() {
@@ -49,7 +100,7 @@ function FieldForces_battalionSelectOptions() {
   items.forEach(function(f) {
     const label = FieldForces_displayLabel(f);
     const ft = String(f.force_type || '').trim();
-    opts.push([f.id, label + (ft ? ' · ' + ft : '')]);
+    opts.push([f.id, label + (ft && label.indexOf(ft) === -1 ? ' · ' + ft : '')]);
   });
   return opts;
 }
@@ -68,8 +119,9 @@ function FieldForces_create(p) {
   if (!forceType)     throw new Error('חובה להזין סוג כוח.');
   if (!forceName)     throw new Error('חובה להזין שם הכוח.');
 
+  const qty = FieldForces_parseQuantity_(p);
   const id = 'FF' + new Date().getTime();
-  _append('FieldForces', [id, role, commanderName, campLocation, forceType, forceName]);
+  _append('FieldForces', [id, role, commanderName, campLocation, forceType, forceName, qty.force_qty, qty.force_qty_unit]);
   return Views_fieldForces({ sid: p.sid, info: 'כוח בשטח נוצר (' + id + ').' });
 }
 
@@ -91,8 +143,9 @@ function FieldForces_update(p) {
     throw new Error('כל השדות חובה.');
   }
 
-  _sheet('FieldForces').getRange(row, 2, 1, 5).setValues([[
-    role, commanderName, campLocation, forceType, forceName
+  const qty = FieldForces_parseQuantity_(p);
+  _sheet('FieldForces').getRange(row, 2, 1, 7).setValues([[
+    role, commanderName, campLocation, forceType, forceName, qty.force_qty, qty.force_qty_unit
   ]]);
   _cacheInvalidate('FieldForces');
   return Views_fieldForce({ sid: p.sid, id: id, info: 'הרשומה עודכנה.' });
