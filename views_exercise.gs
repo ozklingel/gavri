@@ -204,8 +204,7 @@ s += _confirmDelete(
       const u = Users_get(a.user_id);
       pHtml += '<tr data-assignment-id="' + _esc(a.id) + '" data-exercise-id="' + _esc(ex.id) + '">' +
         '<td>' + (u ? _userLink(u.id, u.name, sidQ) : '<b>' + _esc(a.user_id) + '</b>') + '</td>' +
-        '<td><input type="text" name="responsibility" list="respList" placeholder="בחר או הקלד..." value="' +
-        _esc(a.responsibility) + '" class="form-input" style="min-width:140px"></td>' +
+        '<td>' + _responsibilitySelect('responsibility', a.responsibility, 'style="min-width:160px"') + '</td>' +
         '<td>' + _select('tutor', tutorOpts, a.tutor || '') + '</td>' +
         '<td><select name="status" class="form-select">' +
         '<option value="pending"' + (a.status === 'pending' ? ' selected' : '') + '>◌ ממתין</option>' +
@@ -303,7 +302,6 @@ s += _confirmDelete(
 
   // ── Admin-only panels ──
   if (Roles_hasAdminAccess(user.role)) {
-    s += _respDatalistHtml('respList');
     s += '<div class="expandable-stack" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">';
     s += _expandablePanel('exercise', exParams, 'edit', '✏ עריכת פרטי תרגיל',
       _exerciseEditPanelHtml(Object.assign({}, p, { id: ex.id })), openSet);
@@ -527,7 +525,7 @@ function _exerciseAssignPanelHtml(p) {
       '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
       '<div class="form-row"><label class="form-label">חייל</label>' + _select('userId', userOptions) + '</div>' +
       '<div class="form-row"><label class="form-label">תפקיד</label>' +
-      '<input name="responsibility" list="respList" placeholder="בחר או הקלד..." class="form-input" required>' +
+      _responsibilitySelect('responsibility', '', 'required') +
       '</div>' +
       _submitBtn('➤ הקצה חייל', 'btn btn-primary') +
       '</form>';
@@ -555,8 +553,7 @@ function _exerciseAssignPanelHtml(p) {
   }
 
   const exIdSafe = _esc(ex.id);
-  return _respDatalistHtml('respList') +
-    '<div class="card">' +
+  return '<div class="card">' +
     '<div class="dp-tabs" style="display:flex;border-bottom:1px solid var(--border)">' +
     '<div class="dp-tab dp-tab-active" data-target="dp-indiv-' + exIdSafe + '" style="padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer">👤 חייל בודד</div>' +
     '<div class="dp-tab" data-target="dp-team-' + exIdSafe + '" style="padding:8px 16px;font-family:var(--mono);font-size:12px;color:var(--muted);cursor:pointer">🪖 צוות שלם</div>' +

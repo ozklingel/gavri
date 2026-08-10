@@ -259,9 +259,28 @@ function Users_updateRole(p) {
 // ── Teams ──
 
 function Teams_all() {
-  return _rows('Teams').data.map(r => ({
-    id: String(r[0]), name: String(r[1]), commander_id: String(r[2] || '')
-  }));
+  const seenIds = {};
+  const seenNames = {};
+  const out = [];
+  _rows('Teams').data.forEach(function(r) {
+    const id = String(r[0] || '').trim();
+    if (!id || seenIds[id]) return;
+    seenIds[id] = true;
+    const name = String(r[1] || '').trim();
+    const nameKey = _teamsNormName_(name);
+    if (nameKey && seenNames[nameKey]) return;
+    if (nameKey) seenNames[nameKey] = id;
+    out.push({
+      id: id,
+      name: name,
+      commander_id: String(r[2] || '')
+    });
+  });
+  return out;
+}
+
+function _teamsNormName_(name) {
+  return String(name || '').replace(/״/g, '"').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 var _teamsById = null;
@@ -319,6 +338,9 @@ function Teams_create(p) {
   Auth_requireRole(p, ['admin']);
   const name = (p.teamName || '').trim();
   if (!name) throw new Error('נא להזין שם צוות.');
+  const nameKey = _teamsNormName_(name);
+  const dup = Teams_all().some(function(t) { return _teamsNormName_(t.name) === nameKey; });
+  if (dup) throw new Error('צוות בשם «' + name + '» כבר קיים במערכת.');
   const id = _nextTeamId();
   _append('Teams', [id, name, '']);
   return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.' });
@@ -400,6 +422,11 @@ function Teams_rename(p) {
   const name   = (p.teamName || '').trim();
   if (!teamId) throw new Error('חסר מזהה צוות.');
   if (!name)   throw new Error('נא להזין שם חדש.');
+  const nameKey = _teamsNormName_(name);
+  const dup = Teams_all().some(function(t) {
+    return t.id !== teamId && _teamsNormName_(t.name) === nameKey;
+  });
+  if (dup) throw new Error('צוות בשם «' + name + '» כבר קיים במערכת.');
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
   _sheet('Teams').getRange(row, 2).setValue(name);

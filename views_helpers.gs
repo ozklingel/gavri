@@ -344,21 +344,46 @@ function _exerciseLink(exerciseId, title) {
 }
 
 function _assignmentRespOptions() {
-  return [
+  const raw = [
+    'מנהל התרגיל (מפקץ / מחט)',
     'מפ חיר א', 'סמפ חיר א', 'חונך מפ א', 'מפ חיר ב', 'סמפ חיר ב', 'חונך מפ ב',
     'מפ מסייעת', 'סמפ מסייעת', 'חונך מפ מסייעת',
     'מפ חהן', 'סמפ חהן', 'חנוך מפ חהן',
     'מפ חשן', 'סמפ חשן', 'חונך מפ חשן',
-    'מנהל התרגיל (מפקץ / מחט)', 'רען ק בטיחות (מלי)', 'קמבץ מנהל תרגיל (קמפ)',
+    'רען ק בטיחות (מלי)', 'קמבץ מנהל תרגיל (קמפ)',
     'בקר שטח וצלם (ארזים)', 'מטיס רחפן תחקור (ארזים)', 'מפעיל מגנט (בגירה)',
     'מנהל לחימה (ארזים)', 'מסח (מרהש - מלי)', 'קלח (ארזים)',
     'ע קלח (השלמה חיילית לוגיסטיקה)', 'קמן (ארזים)', 'מדריכת שוב (מח שוב מלפק)',
     'מפקד אחראי גדוד',
     'מגד (חניך קמג)', 'מפקד מכלול מבצעים (חניך קמג)', 'קמבץ גדוד (חניך קמפ)',
     'מ חפק מגד רגלי (ממ מגדוד שתפ)', 'קשא (השלמה חיילית)', 'קשרג (השלמה חילית)',
-    'קמן (השלמה חיילית)', 'קסג (השלמה חיילית)', 'קמן (השלמה חיילית)',
-    'קשרג (השלמה חיילית)', 'מ מכלול מנהלה (חניך קמפ)', 'חונך מפ חלג'
+    'קמן (השלמה חיילית)', 'קסג (השלמה חיילית)',
+    'קשרג (השלמה חיילית)', 'מ מכלול מנהלה (חניך קמפ)', 'חונך מפ חלג',
+    'מפקד צוות', 'חניך', 'חונך', 'ממ', 'מגד', 'משתתף'
   ];
+  const seen = {};
+  const out = [];
+  raw.forEach(function(r) {
+    const key = String(r || '').trim();
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    out.push(key);
+  });
+  return out;
+}
+
+function _responsibilitySelect(name, selected, extraAttrs) {
+  const managerCanon = 'מנהל התרגיל (מפקץ / מחט)';
+  const opts = [['', '— בחר תפקיד —'], [managerCanon, 'מנהל תרגיל']];
+  _assignmentRespOptions().forEach(function(r) {
+    if (r === managerCanon) return;
+    opts.push([r, r]);
+  });
+  const sel = String(selected || '').trim();
+  if (sel && !opts.some(function(o) { return o[0] === sel; })) {
+    opts.push([sel, sel]);
+  }
+  return _select(name, opts, sel, extraAttrs);
 }
 
 function _respDatalistHtml(listId) {

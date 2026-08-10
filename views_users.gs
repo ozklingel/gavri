@@ -232,13 +232,17 @@ function _teamsTab(sid, openSet) {
     teams.forEach(function(t) {
       const members = membersByTeam[t.id] || [];
       const cmd = t.commander_id ? userById[t.commander_id] : null;
+      const memberIds = {};
+      members.forEach(function(m) { memberIds[m.id] = true; });
+      if (t.commander_id) memberIds[t.commander_id] = true;
+      const memberCount = Object.keys(memberIds).length;
       s += '<div class="card" style="margin:10px;border:1px solid var(--border)"><div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +
         '<b>' + _esc(t.name) + '</b> <span class="mono" style="font-size:11px;color:var(--muted)">' + t.id + '</span>' +
         _confirmDelete('action=deleteTeam&teamId=' + encodeURIComponent(t.id), 'למחוק את הצוות ' + t.name + '?') +
         '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">מפקד: ' +
-        (cmd ? _userLink(cmd.id, cmd.name, '') : '—') + ' · ' + members.length + ' חברים</div>' +
+        (cmd ? _userLink(cmd.id, cmd.name, '') : '—') + ' · ' + memberCount + ' חברים</div>' +
         _formOpen('form-inline') +
         '<input type="hidden" name="action" value="renameTeam">' +
         '<input type="hidden" name="teamId" value="' + _esc(t.id) + '">' +
@@ -253,6 +257,7 @@ function _teamsTab(sid, openSet) {
       if (members.length) {
         s += '<ul style="margin:8px 0 0;padding:0;list-style:none">';
         members.forEach(function(m) {
+          if (t.commander_id && String(m.id) === String(t.commander_id)) return;
           let sub = '';
           if (Roles_isTrainee(m.role) && m.military_affiliation) {
             sub = ' <span style="font-size:10px;color:var(--muted)">' + _esc(m.military_affiliation) + '</span>';
