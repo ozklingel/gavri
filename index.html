@@ -3887,18 +3887,20 @@ body {
         MapimModules.invalidateModule('users.tab.users');
         MapimModules.invalidateModule('users.tab.teams');
       }
+      invalidateClientRoutes(['users', 'user', 'dashboard', 'assign', 'teamMatrix']);
       storeUsersModulesFromResult(result);
       if (result && result.usersIndex) {
         storeUsersIndex(result.usersIndex);
-      } else {
-        refreshUsersIndex();
       }
+
       if (currentRoute && currentRoute.page === 'users') {
         if (result && result.info) showUsersPageFlash(result.info);
-        if (!applyUsersModulesFromResult(result)) {
-          reloadUsersTabModule('users', { force: true });
-          reloadUsersTabModule('teams', { force: true });
-        }
+        applyUsersModulesFromResult(result);
+        reloadUsersTabModule('users', { force: true });
+        reloadUsersTabModule('teams', { force: true });
+        setTimeout(function() {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 60);
         finishBootUi();
         loading = false;
         return true;
@@ -4738,6 +4740,7 @@ body {
     /** פעולות עם תשובה קלה — רק מודול/נתיב, בלי החלפת דף מלא */
     var LIGHT_ACTIONS = {
       importUsers: true,
+      createUser: true,
       deleteUser: true,
       deleteUsersBulk: true
     };
@@ -4816,8 +4819,8 @@ body {
             invalidateClientRoutes([currentRoute.page]);
           }
           if (action === 'importUsers' || action === 'createUser' || action === 'deleteUser' || action === 'deleteUsersBulk') {
-            currentRoute = normalizeRoute('users', { tab: 'users' });
-            refreshUsersIndex();
+            var usersTab = (currentRoute && currentRoute.page === 'users' && currentRoute.params && currentRoute.params.tab) || 'users';
+            currentRoute = normalizeRoute('users', { tab: usersTab });
           }
           if (action === 'importUsers' && result.ok && !result.body) {
             if (window.MapimModules && MapimModules.invalidateModule) {
@@ -4837,12 +4840,10 @@ body {
             navigate('users', { tab: 'users' });
             return;
           }
-          if ((action === 'deleteUser' || action === 'deleteUsersBulk') && result.ok && !result.body) {
-            refreshUsersPageAfterWrite(result, 'users');
-            return;
-          }
-          if (action === 'createUser' && result.ok && !result.body) {
-            refreshUsersPageAfterWrite(result, 'users');
+          if ((action === 'deleteUser' || action === 'deleteUsersBulk' || action === 'createUser') &&
+              result && result.ok && !result.body) {
+            var activeUsersTab = (currentRoute && currentRoute.params && currentRoute.params.tab) || 'users';
+            refreshUsersPageAfterWrite(result, activeUsersTab);
             return;
           }
           if (action === 'deleteExercisesBulk') {
