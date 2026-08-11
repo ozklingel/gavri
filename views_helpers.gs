@@ -190,10 +190,14 @@ function _dateInput(name, value) {
 }
 
 function _teamSelectOptions(selectedId, includeEmpty) {
-  const teams = Teams_all();
+  const teams = Teams_allSorted();
+  const counts = {};
+  Users_all().forEach(function(u) {
+    if (u.team_id) counts[String(u.team_id)] = (counts[String(u.team_id)] || 0) + 1;
+  });
   const opts = includeEmpty !== false ? [['', '— ללא צוות —']] : [];
   teams.forEach(function(t) {
-    const cnt = Users_byTeam(t.id).length;
+    const cnt = counts[t.id] || 0;
     opts.push([t.id, t.name + (cnt ? ' (' + cnt + ' חברים)' : '')]);
   });
   return opts;

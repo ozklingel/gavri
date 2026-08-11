@@ -258,8 +258,31 @@ function Users_updateRole(p) {
 
 // ── Teams ──
 
-function Teams_all() {
-  return Teams_allRows_();
+function Teams_compareByName_(a, b) {
+  return String((a && a.name) || '').localeCompare(String((b && b.name) || ''), 'he');
+}
+
+function Teams_allSorted() {
+  return Teams_all().slice().sort(Teams_compareByName_);
+}
+
+/** צוות אחד לכל מספר/שם — מעדיף «צוות N» על «N» (תצוגה בדף הבית) */
+function Teams_allForDisplay_() {
+  const all = Teams_allRows_();
+  const byKey = {};
+  all.forEach(function(t) {
+    const num = _teamsExtractNumber_(t.name);
+    const key = num ? ('n:' + num) : ('s:' + _teamsNormName_(t.name));
+    const prev = byKey[key];
+    if (!prev) {
+      byKey[key] = t;
+      return;
+    }
+    if (Teams_isNumericOnlyName_(prev.name) && !Teams_isNumericOnlyName_(t.name)) {
+      byKey[key] = t;
+    }
+  });
+  return Object.keys(byKey).map(function(k) { return byKey[k]; }).sort(Teams_compareByName_);
 }
 
 /** כל שורות הצוותים מהגיליון (ללא הסתרת כפילויות לפי שם) */
@@ -277,6 +300,10 @@ function Teams_allRows_() {
     });
   });
   return out;
+}
+
+function Teams_all() {
+  return Teams_allRows_();
 }
 
 function _teamsNormName_(name) {

@@ -18,7 +18,7 @@ function Views_users(p) {
 }
 
 function _usersPageTabsShell(sid, activeTab, openSet) {
-  const teams = Teams_all();
+  const teams = Teams_allSorted();
   const allUsers = Users_all();
   const baseUsers = { tab: 'users' };
   const baseTeams = { tab: 'teams' };
@@ -208,7 +208,7 @@ function _teamsAutoSplitForm(unassignedTrainees, freeCommanders, previewTeams) {
 
 function _teamsTab(sid, openSet) {
   const allUsers = Users_all();
-  const teams = Teams_all();
+  const teams = Teams_allSorted();
   const userById = Users_byIdMap();
   const membersByTeam = {};
   const unassigned = [];

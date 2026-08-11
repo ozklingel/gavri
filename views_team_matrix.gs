@@ -49,8 +49,7 @@ function _teamMatrixExerciseMeta(ex) {
 }
 
 function _teamMatrixAllowedTeams(user) {
-  const all = Teams_all();
-  // צפייה בכל הצוותים — כמו צפייה בכל התרגילים/שיבוצים (לכל ישות מחוברת)
+  const all = Teams_allForDisplay_();
   if (Roles_canSeeAllExercises(user.role)) {
     return all;
   }
@@ -58,7 +57,9 @@ function _teamMatrixAllowedTeams(user) {
     return all.filter(function(t) { return String(t.commander_id) === String(user.id); });
   }
   if (user.team_id) {
-    const t = Teams_get(user.team_id);
+    const t = Teams_get(user.team_id) || Teams_allRows_().find(function(x) {
+      return x.id === String(user.team_id);
+    });
     return t ? [t] : [];
   }
   return [];
@@ -66,39 +67,50 @@ function _teamMatrixAllowedTeams(user) {
 
 function _teamMatrixBuildPayload(user) {
   const teams = _teamMatrixAllowedTeams(user);
+  const teamIdSet = {};
+  teams.forEach(function(t) { teamIdSet[t.id] = true; });
+
   const membersByTeam = {};
+  const userTeamMap = {};
+  teams.forEach(function(t) { membersByTeam[t.id] = []; });
+
+  Users_all().forEach(function(u) {
+    const tid = String(u.team_id || '');
+    if (!tid || !teamIdSet[tid]) return;
+    membersByTeam[tid].push(u);
+    userTeamMap[u.id] = tid;
+  });
+  teams.forEach(function(t) {
+    membersByTeam[t.id].sort(function(a, b) {
+      return String(a.name).localeCompare(String(b.name), 'he');
+    });
+  });
+
   const teamExercises = {};
   const cells = {};
-
   teams.forEach(function(t) {
-    membersByTeam[t.id] = Users_byTeam(t.id)
-      .sort(function(a, b) { return String(a.name).localeCompare(String(b.name), 'he'); });
     teamExercises[t.id] = [];
     cells[t.id] = {};
   });
 
-  const exById = {};
-  Exercises_all().forEach(function(e) { exById[e.id] = e; });
+  const neededExIds = {};
+  Assignments_all().forEach(function(a) {
+    const teamId = userTeamMap[a.user_id];
+    if (!teamId) return;
 
-  const exMeta = {};
-  Object.keys(exById).forEach(function(exId) {
-    exMeta[exId] = _teamMatrixExerciseMeta(exById[exId]);
+    if (!cells[teamId][a.user_id]) cells[teamId][a.user_id] = {};
+    cells[teamId][a.user_id][a.exercise_id] = String(a.responsibility || '');
+
+    if (teamExercises[teamId].indexOf(a.exercise_id) === -1) {
+      teamExercises[teamId].push(a.exercise_id);
+      neededExIds[a.exercise_id] = true;
+    }
   });
 
-  Assignments_all().forEach(function(a) {
-    teams.forEach(function(t) {
-      const members = membersByTeam[t.id] || [];
-      const memberIds = {};
-      members.forEach(function(m) { memberIds[m.id] = true; });
-      if (!memberIds[a.user_id]) return;
-
-      if (!cells[t.id][a.user_id]) cells[t.id][a.user_id] = {};
-      cells[t.id][a.user_id][a.exercise_id] = String(a.responsibility || '');
-
-      if (teamExercises[t.id].indexOf(a.exercise_id) === -1) {
-        teamExercises[t.id].push(a.exercise_id);
-      }
-    });
+  const exMeta = {};
+  Exercises_all().forEach(function(e) {
+    if (!neededExIds[e.id]) return;
+    exMeta[e.id] = _teamMatrixExerciseMeta(e);
   });
 
   teams.forEach(function(t) {
