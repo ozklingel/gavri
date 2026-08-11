@@ -259,20 +259,20 @@ function Users_updateRole(p) {
 // ── Teams ──
 
 function Teams_all() {
+  return Teams_allRows_();
+}
+
+/** כל שורות הצוותים מהגיליון (ללא הסתרת כפילויות לפי שם) */
+function Teams_allRows_() {
   const seenIds = {};
-  const seenNames = {};
   const out = [];
   _rows('Teams').data.forEach(function(r) {
     const id = String(r[0] || '').trim();
     if (!id || seenIds[id]) return;
     seenIds[id] = true;
-    const name = String(r[1] || '').trim();
-    const nameKey = _teamsNormName_(name);
-    if (nameKey && seenNames[nameKey]) return;
-    if (nameKey) seenNames[nameKey] = id;
     out.push({
       id: id,
-      name: name,
+      name: String(r[1] || '').trim(),
       commander_id: String(r[2] || '')
     });
   });
@@ -281,6 +281,129 @@ function Teams_all() {
 
 function _teamsNormName_(name) {
   return String(name || '').replace(/״/g, '"').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/** מספר צוות משם: «1», «צוות 1», «team 2» */
+function _teamsExtractNumber_(name) {
+  const s = String(name || '').trim();
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  const m = s.match(/(?:צוות|team)\s*(\d{1,2})\b/i);
+  if (m) return parseInt(m[1], 10);
+  return null;
+}
+
+function Teams_isNumericOnlyName_(name) {
+  return /^\d+$/.test(String(name || '').trim());
+}
+
+function Teams_findByExactName_(name) {
+  const key = _teamsNormName_(name);
+  if (!key) return null;
+  const all = Teams_allRows_();
+  for (let i = 0; i < all.length; i++) {
+    if (_teamsNormName_(all[i].name) === key) return all[i];
+  }
+  return null;
+}
+
+function Teams_findNumericOnlyByNumber_(n) {
+  const num = parseInt(n, 10);
+  if (isNaN(num)) return null;
+  const all = Teams_allRows_();
+  for (let i = 0; i < all.length; i++) {
+    if (Teams_isNumericOnlyName_(all[i].name) && parseInt(all[i].name, 10) === num) return all[i];
+  }
+  return null;
+}
+
+/** יעד מועדף לפי מספר — «צוות N» (לא צוות ששמו רק «N») */
+function Teams_findPreferredByNumber_(n) {
+  const num = parseInt(n, 10);
+  if (isNaN(num) || num < 1) return null;
+  const want = 'צוות ' + num;
+  const wantKey = _teamsNormName_(want);
+  const all = Teams_allRows_();
+  let best = null;
+  for (let i = 0; i < all.length; i++) {
+    const t = all[i];
+    if (Teams_isNumericOnlyName_(t.name)) continue;
+    if (_teamsNormName_(t.name) === wantKey) return t;
+    if (_teamsExtractNumber_(t.name) === num && !best) best = t;
+  }
+  return best;
+}
+
+function Teams_memberCount_(teamId) {
+  return Users_all().filter(function(u) { return String(u.team_id) === String(teamId); }).length;
+}
+
+function Teams_isEmpty_(team) {
+  if (!team) return true;
+  if (Teams_memberCount_(team.id) > 0) return false;
+  if (!team.commander_id) return true;
+  const cmd = Users_get(team.commander_id);
+  return !(cmd && String(cmd.team_id) === String(team.id));
+}
+
+/** מיזוג fromId → toId: העברת חברים, מפקד (אם חסר), מחיקת צוות מקור */
+function Teams_merge_(fromId, toId, sid, infoMsg) {
+  fromId = String(fromId || '').trim();
+  toId = String(toId || '').trim();
+  if (!fromId || !toId) throw new Error('חסרים מזהי צוות למיזוג.');
+  if (fromId === toId) throw new Error('לא ניתן למזג צוות לעצמו.');
+
+  const fromRow = _findRowIndex('Teams', fromId);
+  const toRow = _findRowIndex('Teams', toId);
+  if (fromRow < 0) throw new Error('צוות המקור לא נמצא.');
+  if (toRow < 0) throw new Error('צוות היעד לא נמצא.');
+
+  const fromTeam = Teams_allRows_().find(function(t) { return t.id === fromId; });
+  const toTeam = Teams_allRows_().find(function(t) { return t.id === toId; });
+  let moved = 0;
+
+  const usersSh = _sheet('Users');
+  _rows('Users').data.forEach(function(r, i) {
+    if (String(r[3]) === fromId) {
+      usersSh.getRange(i + 2, 4).setValue(toId);
+      moved++;
+    }
+  });
+
+  const teamsSh = _sheet('Teams');
+  if (fromTeam && fromTeam.commander_id && toTeam && !toTeam.commander_id) {
+    teamsSh.getRange(toRow, 3).setValue(fromTeam.commander_id);
+  }
+
+  teamsSh.deleteRow(fromRow);
+  _cacheInvalidate('Teams');
+  _cacheInvalidate('Users');
+
+  const msg = infoMsg || ('אוחדו ' + moved + ' חברים מצוות «' + (fromTeam ? fromTeam.name : fromId) +
+    '» ל«' + (toTeam ? toTeam.name : toId) + '».');
+  if (sid) {
+    return _usersWriteLightResponse_(sid, msg);
+  }
+  return { ok: true, info: msg, moved: moved, fromId: fromId, toId: toId };
+}
+
+function Teams_deleteEmptyCore_(teamIds) {
+  const ids = (teamIds || []).slice().sort(function(a, b) {
+    const ra = _findRowIndex('Teams', a);
+    const rb = _findRowIndex('Teams', b);
+    return rb - ra;
+  });
+  let deleted = 0;
+  const teamsSh = _sheet('Teams');
+  ids.forEach(function(id) {
+    const t = Teams_allRows_().find(function(x) { return x.id === id; });
+    if (!t || !Teams_isEmpty_(t)) return;
+    const row = _findRowIndex('Teams', id);
+    if (row < 0) return;
+    teamsSh.deleteRow(row);
+    deleted++;
+  });
+  if (deleted) _cacheInvalidate('Teams');
+  return deleted;
 }
 
 var _teamsById = null;
@@ -339,11 +462,26 @@ function Teams_create(p) {
   const name = (p.teamName || '').trim();
   if (!name) throw new Error('נא להזין שם צוות.');
   const nameKey = _teamsNormName_(name);
-  const dup = Teams_all().some(function(t) { return _teamsNormName_(t.name) === nameKey; });
-  if (dup) throw new Error('צוות בשם «' + name + '» כבר קיים במערכת.');
+
+  const exact = Teams_findByExactName_(name);
+  if (exact) throw new Error('צוות בשם «' + name + '» כבר קיים במערכת (' + exact.id + ').');
+
+  const num = _teamsExtractNumber_(name);
+  if (num) {
+    const numericOnly = Teams_findNumericOnlyByNumber_(num);
+    if (numericOnly && Teams_isNumericOnlyName_(numericOnly.name) &&
+        _teamsNormName_(name) !== _teamsNormName_(numericOnly.name)) {
+      return Teams_rename({ sid: p.sid, teamId: numericOnly.id, teamName: name });
+    }
+    const preferred = Teams_findPreferredByNumber_(num);
+    if (preferred && _teamsNormName_(preferred.name) === nameKey) {
+      throw new Error('צוות «' + preferred.name + '» כבר קיים (' + preferred.id + ').');
+    }
+  }
+
   const id = _nextTeamId();
   _append('Teams', [id, name, '']);
-  return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.' });
+  return _usersWriteLightResponse_(p.sid, 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.');
 }
 
 // Auto-split unassigned trainees into teams of 10 (+ 1–2 commanders each)
@@ -422,16 +560,34 @@ function Teams_rename(p) {
   const name   = (p.teamName || '').trim();
   if (!teamId) throw new Error('חסר מזהה צוות.');
   if (!name)   throw new Error('נא להזין שם חדש.');
-  const nameKey = _teamsNormName_(name);
-  const dup = Teams_all().some(function(t) {
-    return t.id !== teamId && _teamsNormName_(t.name) === nameKey;
-  });
-  if (dup) throw new Error('צוות בשם «' + name + '» כבר קיים במערכת.');
+
   const row = _findRowIndex('Teams', teamId);
   if (row < 0) throw new Error('הצוות לא נמצא.');
+
+  const current = Teams_allRows_().find(function(t) { return t.id === teamId; });
+  if (current && _teamsNormName_(current.name) === _teamsNormName_(name)) {
+    return _usersWriteLightResponse_(p.sid, 'שם הצוות כבר «' + name + '».');
+  }
+
+  const existing = Teams_findByExactName_(name);
+  if (existing && existing.id !== teamId) {
+    return Teams_merge_(teamId, existing.id, p.sid,
+      'צוות «' + (current ? current.name : teamId) + '» אוחד ל«' + name + '» (' + existing.id + ').');
+  }
+
+  const num = _teamsExtractNumber_(name);
+  if (num) {
+    const preferred = Teams_findPreferredByNumber_(num);
+    if (preferred && preferred.id !== teamId &&
+        _teamsNormName_(preferred.name) !== _teamsNormName_(current ? current.name : '')) {
+      return Teams_merge_(teamId, preferred.id, p.sid,
+        'צוות «' + (current ? current.name : teamId) + '» אוחד ל«' + preferred.name + '».');
+    }
+  }
+
   _sheet('Teams').getRange(row, 2).setValue(name);
   _cacheInvalidate('Teams');
-  return Views_users({ sid: p.sid, tab: 'teams', info: 'שם הצוות עודכן ל"' + name + '".' });
+  return _usersWriteLightResponse_(p.sid, 'שם הצוות עודכן ל«' + name + '».');
 }
 
 function Teams_delete(p) {
