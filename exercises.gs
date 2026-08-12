@@ -972,20 +972,29 @@ function Exercises_duplicate(p) {
     orig.series_force_slot || '', orig.field_force_id || '']);
   if (orig.team_id) Exercises_setTeamId(newId, orig.team_id);
 
-  // PERF: batch-append all detail rows at once
+  Series_ensureMigrated();
+  const seriesId = Series_getActiveId();
+  if (seriesId) Series_assignExercisesToSeries([newId], seriesId);
+
   const details = Exercises_details(orig.id);
   if (details.length) {
-    const detailRows = details.map(function(d) {
-      return ['D' + new Date().getTime() + '_' + d.id, newId, d.time, d.location, d.description];
+    const baseTs = Date.now();
+    const detailRows = details.map(function(d, i) {
+      return ['D' + baseTs + '_' + i, newId, d.time, d.location, d.description];
     });
     _appendBatch('ExerciseDetails', detailRows);
   }
 
-  return Views_exercise({
+  _cacheInvalidate('Exercises');
+  _cacheInvalidate('ExerciseDetails');
+
+  const out = Views_exercise({
     sid: p.sid,
     id: newId,
     info: 'התרגיל «' + orig.title + '» שוכפל בהצלחה.'
   });
+  out.exerciseId = newId;
+  return out;
 }
 
 function Exercises_addDetail(p) {

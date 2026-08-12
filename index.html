@@ -3647,6 +3647,7 @@ body {
     var MFA_KEY = 'mapim_mfa_token';
     var loading = false;
     var reqId = 0;
+    var actionInFlight = false;
     var initialBoot = true;
     var splashBoot = true;
     var currentRoute = null;
@@ -3723,6 +3724,20 @@ body {
         splashBoot = false;
         MapimLoader.hideSplash();
       }
+      document.querySelectorAll('form.spa-form[data-submitting="1"]').forEach(function(form) {
+        form.removeAttribute('data-submitting');
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function(btn) {
+          btn.disabled = false;
+        });
+      });
+    }
+
+    function resetSpaFormSubmit(form) {
+      if (!form) return;
+      form.removeAttribute('data-submitting');
+      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function(btn) {
+        btn.disabled = false;
+      });
     }
 
     function parseSpaParams(el) {
@@ -4797,6 +4812,8 @@ body {
     };
 
     function runAction(action, params) {
+      if (actionInFlight) return;
+      actionInFlight = true;
       var myReq = ++reqId;
       loading = true;
       var isLight = !!LIGHT_ACTIONS[action];
@@ -4808,6 +4825,7 @@ body {
       google.script.run
         .withSuccessHandler(function(result) {
           if (myReq !== reqId) return;
+          actionInFlight = false;
           var isAuthEntry = action === 'login' || action === 'verifyMfa';
           if (isAuthEntry) {
             invalidateClientPageCache();
@@ -4866,6 +4884,9 @@ body {
               currentRoute = normalizeRoute('exercise', { id: String(result.exerciseId) });
             }
           }
+          if (action === 'duplicateExercise' && result && result.exerciseId) {
+            currentRoute = normalizeRoute('exercise', { id: String(result.exerciseId) });
+          }
           if (action === 'editExercise' && params && params.id) {
             currentRoute = normalizeRoute('exercise', { id: String(params.id) });
           }
@@ -4895,6 +4916,13 @@ body {
               }
             }, 60);
           }
+          if (action === 'duplicateExercise' && result && result.body && result.exerciseId) {
+            var dupRoute = normalizeRoute('exercise', { id: String(result.exerciseId) });
+            storeClientPage(dupRoute, result);
+            setTimeout(function() {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 60);
+          }
           if (action === 'generateTimeline' || action === 'addDetail' || action === 'updateDetail' || action === 'deleteDetail') {
             setTimeout(function() {
               var card = document.getElementById('exercise-procedure-card');
@@ -4904,6 +4932,7 @@ body {
         })
         .withFailureHandler(function(err) {
           if (myReq !== reqId) return;
+          actionInFlight = false;
           fail(err);
         })
         .apiRunAction(getSid(), action, JSON.stringify(params || {}));
@@ -5039,6 +5068,11 @@ body {
       var form = e.target;
       if (!form || !form.classList || !form.classList.contains('spa-form')) return;
       e.preventDefault();
+      if (form.getAttribute('data-submitting') === '1' || actionInFlight) return;
+      form.setAttribute('data-submitting', '1');
+      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function(btn) {
+        btn.disabled = true;
+      });
       var data = formToObject(form);
       var action = data.action;
       delete data.action;
@@ -5047,12 +5081,16 @@ body {
         var storedMfa = getMfaToken();
         if (storedMfa) data.mfaToken = storedMfa;
       }
-      if (!action) return;
+      if (!action) {
+        resetSpaFormSubmit(form);
+        return;
+      }
       runAction(action, data);
     }, true);
 
     return {
       navigate: navigate, runAction: runAction, goBack: goBack, canGoBack: canGoBack,
+      isActionInFlight: function() { return !!actionInFlight; },
       goForward: goForward, canGoForward: canGoForward,
       getSid: getSid, setSid: setSid, userLinkHtml: userLinkHtml, whatsappLinkHtml: whatsappLinkHtml,
       exerciseLinkHtml: exerciseLinkHtml,
@@ -5632,6 +5670,7 @@ body {
       alert('בחר תרגיל לשיכפול');
       return false;
     }
+    if (window.MapimSpa && MapimSpa.isActionInFlight && MapimSpa.isActionInFlight()) return false;
     var opt = sel.options[sel.selectedIndex];
     var title = (opt && opt.textContent) ? opt.textContent.trim() : sel.value;
     if (!confirm('לשכפל את התרגיל «' + title + '»?\nייווצר עותק עם ציר הזמן, ללא הקצאות.')) return false;
@@ -5643,6 +5682,7 @@ body {
   function confirmDelete(el) {
     const msg = el.dataset.confirm || 'בטוח שרוצים למחוק?';
     if (!confirm(msg)) return false;
+    if (window.MapimSpa && MapimSpa.isActionInFlight && MapimSpa.isActionInFlight()) return false;
     el.textContent = '⏳...';
     el.style.pointerEvents = 'none';
     if (el.dataset.spaAction) {
