@@ -488,27 +488,35 @@ function Teams_create(p) {
   Auth_requireRole(p, ['admin']);
   const name = (p.teamName || '').trim();
   if (!name) throw new Error('נא להזין שם צוות.');
-  const nameKey = _teamsNormName_(name);
 
-  const exact = Teams_findByExactName_(name);
-  if (exact) throw new Error('צוות בשם «' + name + '» כבר קיים במערכת (' + exact.id + ').');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const nameKey = _teamsNormName_(name);
 
-  const num = _teamsExtractNumber_(name);
-  if (num) {
-    const numericOnly = Teams_findNumericOnlyByNumber_(num);
-    if (numericOnly && Teams_isNumericOnlyName_(numericOnly.name) &&
-        _teamsNormName_(name) !== _teamsNormName_(numericOnly.name)) {
-      return Teams_rename({ sid: p.sid, teamId: numericOnly.id, teamName: name });
+    const exact = Teams_findByExactName_(name);
+    if (exact) throw new Error('צוות בשם «' + name + '» כבר קיים במערכת (' + exact.id + ').');
+
+    const num = _teamsExtractNumber_(name);
+    if (num) {
+      const numericOnly = Teams_findNumericOnlyByNumber_(num);
+      if (numericOnly && Teams_isNumericOnlyName_(numericOnly.name) &&
+          _teamsNormName_(name) !== _teamsNormName_(numericOnly.name)) {
+        return Teams_rename({ sid: p.sid, teamId: numericOnly.id, teamName: name });
+      }
+      const preferred = Teams_findPreferredByNumber_(num);
+      if (preferred && _teamsNormName_(preferred.name) === nameKey) {
+        throw new Error('צוות «' + preferred.name + '» כבר קיים (' + preferred.id + ').');
+      }
     }
-    const preferred = Teams_findPreferredByNumber_(num);
-    if (preferred && _teamsNormName_(preferred.name) === nameKey) {
-      throw new Error('צוות «' + preferred.name + '» כבר קיים (' + preferred.id + ').');
-    }
+
+    const id = _nextTeamId();
+    _append('Teams', [id, name, '']);
+    _cacheInvalidate('Teams');
+    return _usersWriteLightResponse_(p.sid, 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.');
+  } finally {
+    lock.releaseLock();
   }
-
-  const id = _nextTeamId();
-  _append('Teams', [id, name, '']);
-  return _usersWriteLightResponse_(p.sid, 'הצוות "' + name + '" (' + id + ') נוצר בהצלחה.');
 }
 
 // Auto-split unassigned trainees into teams of 10 (+ 1–2 commanders each)
@@ -621,21 +629,30 @@ function Teams_delete(p) {
   Auth_requireRole(p, ['admin']);
   const teamId = (p.teamId || '').trim();
   if (!teamId) throw new Error('חסר מזהה צוות.');
-  const row = _findRowIndex('Teams', teamId);
-  if (row < 0) throw new Error('הצוות לא נמצא.');
-  _sheet('Teams').deleteRow(row);
-  _cacheInvalidate('Teams');
 
-  const usersSh = _sheet('Users');
-  const { data } = _rows('Users');
-  data.forEach((r, i) => {
-    if (String(r[3]) === teamId) {
-      usersSh.getRange(i + 2, 4).setValue('');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const row = _findRowIndex('Teams', teamId);
+    if (row < 0) {
+      return _usersWriteLightResponse_(p.sid, 'הצוות כבר נמחק.');
     }
-  });
-  _cacheInvalidate('Users');
+    _sheet('Teams').deleteRow(row);
+    _cacheInvalidate('Teams');
 
-  return Views_users({ sid: p.sid, tab: 'teams', info: 'הצוות נמחק וחברים הוסרו ממנו.' });
+    const usersSh = _sheet('Users');
+    const { data } = _rows('Users');
+    data.forEach((r, i) => {
+      if (String(r[3]) === teamId) {
+        usersSh.getRange(i + 2, 4).setValue('');
+      }
+    });
+    _cacheInvalidate('Users');
+
+    return _usersWriteLightResponse_(p.sid, 'הצוות נמחק וחברים הוסרו ממנו.');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function Teams_setCommander(p) {

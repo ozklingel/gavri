@@ -4759,7 +4759,8 @@ body {
       deleteUser: true,
       deleteUsersBulk: true,
       createTeam: true,
-      renameTeam: true
+      renameTeam: true,
+      deleteTeam: true
     };
 
     var routesByAction = {
@@ -4862,7 +4863,7 @@ body {
             return;
           }
           if ((action === 'deleteUser' || action === 'deleteUsersBulk' || action === 'createUser' ||
-               action === 'createTeam' || action === 'renameTeam') &&
+               action === 'createTeam' || action === 'renameTeam' || action === 'deleteTeam') &&
               result && result.ok && !result.body) {
             var activeUsersTab = (currentRoute && currentRoute.params && currentRoute.params.tab) || 'users';
             refreshUsersPageAfterWrite(result, activeUsersTab);
