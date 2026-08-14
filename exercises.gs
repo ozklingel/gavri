@@ -12,7 +12,12 @@ function _fmtDate(val) {
   if (val instanceof Date) {
     d = val;
   } else {
-    d = new Date(val);
+    const ymdOnly = String(val).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymdOnly) {
+      d = new Date(+ymdOnly[1], +ymdOnly[2] - 1, +ymdOnly[3], 12, 0, 0);
+    } else {
+      d = new Date(val);
+    }
   }
   if (isNaN(d.getTime())) return String(val);
   if (d.getFullYear() < 1900) return '';
@@ -316,7 +321,17 @@ function _ymdFromCellValue(val) {
   const s = String(val).trim();
   if (!s) return '';
 
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  // ISO datetime (JSON cache מ-Date של Sheets) — תאריך לוח שנה מקומי, לא UTC
+  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime()) && d.getFullYear() >= 1900) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+  }
+
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) {
     if (+iso[1] < 1900) return '';
     return iso[1] + '-' + iso[2] + '-' + iso[3];
@@ -526,8 +541,7 @@ function Exercises_activeIdSet() {
 }
 
 function Exercises_teamColIndex() {
-  const idx = _colIndex('Exercises', 'team_id');
-  return idx >= 0 ? idx : -1;
+  return Exercises_colIndex_('team_id');
 }
 
 function Exercises_setTeamId(exerciseId, teamId) {
@@ -572,31 +586,43 @@ function Exercises_inferTeamIdByExercise() {
 
 function Exercises_all(includeArchived) {
   const activeSid = includeArchived ? null : Series_getActiveId();
-  const seriesCol = Series_exerciseColIndex();
-  const teamCol = Exercises_teamColIndex();
-  return _rows('Exercises').data.map(r => ({
-    id:          String(r[0]),
-    title:       String(r[1]),
-    description: String(r[2]),
-    created_by:  String(r[3]),
-    start_date:    _fmtExerciseStartDisplay({ rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawStartTime: _rawTime(r[11]) }),
-    end_date:      _fmtExerciseEndDisplay({ rawEndDate: _rawDate(r[5]), rawStartDate: _rawDate(r[4]), rawDate: _rawDate(r[4]), rawEndTime: _rawTime(r[12]) }),
-    rawStartDate:  _rawDate(r[4]),
-    rawEndDate:    _rawDate(r[5]),
-    rawStartTime:  _rawTime(r[11]),
-    rawEndTime:    _rawTime(r[12]),
-    date:          _fmtDate(r[4]),
-    rawDate:       _rawDate(r[4]),
-    act:                 r[6]  == null ? '' : String(r[6]),
-    exercise_type:       r[7]  == null ? '' : String(r[7]),
-    partner_battalion:   r[8]  == null ? '' : String(r[8]),
-    camp:                r[9]  == null ? '' : String(r[9]),
-    battalion_commander: r[10] == null ? '' : String(r[10]),
-    series_force_slot:   r[13] == null ? '' : String(r[13]),
-    field_force_id:      r[14] == null ? '' : String(r[14]),
-    series_id:           r[seriesCol] == null ? '' : String(r[seriesCol]),
-    team_id:             teamCol >= 0 && r[teamCol] != null ? String(r[teamCol]) : ''
-  })).filter(function(e) {
+  const seriesCol = Exercises_colIndex_('series_id');
+  const teamCol = Exercises_colIndex_('team_id');
+  return _rows('Exercises').data.map(r => {
+    const rawStartDate = _rawDate(Exercises_cell_(r, 'start_date'));
+    const rawEndDate = _rawDate(Exercises_cell_(r, 'end_date'));
+    const rawStartTime = _rawTime(Exercises_cell_(r, 'start_time'));
+    const rawEndTime = _rawTime(Exercises_cell_(r, 'end_time'));
+    const exBase = { rawStartDate: rawStartDate, rawDate: rawStartDate, rawStartTime: rawStartTime };
+    return {
+      id:          String(r[0]),
+      title:       String(r[1]),
+      description: String(r[2]),
+      created_by:  String(r[3]),
+      start_date:    _fmtExerciseStartDisplay(exBase),
+      end_date:      _fmtExerciseEndDisplay({
+        rawEndDate: rawEndDate,
+        rawStartDate: rawStartDate,
+        rawDate: rawStartDate,
+        rawEndTime: rawEndTime
+      }),
+      rawStartDate:  rawStartDate,
+      rawEndDate:    rawEndDate,
+      rawStartTime:  rawStartTime,
+      rawEndTime:    rawEndTime,
+      date:          _fmtDate(rawStartDate || Exercises_cell_(r, 'start_date')),
+      rawDate:       rawStartDate,
+      act:                 Exercises_cell_(r, 'act') == null ? '' : String(Exercises_cell_(r, 'act')),
+      exercise_type:       Exercises_cell_(r, 'exercise_type') == null ? '' : String(Exercises_cell_(r, 'exercise_type')),
+      partner_battalion:   Exercises_cell_(r, 'partner_battalion') == null ? '' : String(Exercises_cell_(r, 'partner_battalion')),
+      camp:                Exercises_cell_(r, 'camp') == null ? '' : String(Exercises_cell_(r, 'camp')),
+      battalion_commander: Exercises_cell_(r, 'battalion_commander') == null ? '' : String(Exercises_cell_(r, 'battalion_commander')),
+      series_force_slot:   Exercises_cell_(r, 'series_force_slot') == null ? '' : String(Exercises_cell_(r, 'series_force_slot')),
+      field_force_id:      Exercises_cell_(r, 'field_force_id') == null ? '' : String(Exercises_cell_(r, 'field_force_id')),
+      series_id:           seriesCol >= 0 && r[seriesCol] != null ? String(r[seriesCol]) : '',
+      team_id:             teamCol >= 0 && r[teamCol] != null ? String(r[teamCol]) : ''
+    };
+  }).filter(function(e) {
     if (includeArchived) return true;
     if (!activeSid) return !e.series_id;
     return e.series_id === activeSid;
@@ -605,10 +631,45 @@ function Exercises_all(includeArchived) {
 
 var _exercisesById = null;
 var _exerciseDetailsByExId = null;
+var _exercisesColIndices = null;
+
+function Exercises_clearColIndices_() {
+  _exercisesColIndices = null;
+}
+
+function Exercises_colIndex_(name) {
+  if (!_exercisesColIndices) {
+    const h = _rows('Exercises').header.map(String);
+    _exercisesColIndices = {};
+    h.forEach(function(col, i) { _exercisesColIndices[col] = i; });
+  }
+  const i = _exercisesColIndices[name];
+  return i != null ? i : -1;
+}
+
+function Exercises_cell_(r, name) {
+  const i = Exercises_colIndex_(name);
+  return i >= 0 ? r[i] : null;
+}
+
+/** כתיבת שדות לפי שם עמודה (לא לפי אינדקס קשיח) */
+function Exercises_writeFields_(row, fields) {
+  const sh = _sheet('Exercises');
+  const patch = {};
+  Object.keys(fields || {}).forEach(function(name) {
+    const col = Exercises_colIndex_(name);
+    if (col < 0) return;
+    const sheetCol = col + 1;
+    sh.getRange(row, sheetCol).setValue(fields[name]);
+    patch[sheetCol] = fields[name];
+  });
+  if (Object.keys(patch).length) _cachePatchRow('Exercises', row, patch);
+}
 
 function _exercisesClearDerived() {
   _exercisesById = null;
   _exerciseDetailsByExId = null;
+  Exercises_clearColIndices_();
 }
 
 function Exercises_byIdMap() {
@@ -848,8 +909,13 @@ function Exercises_edit(p) {
   const ex = Exercises_get(p.id);
 
   const title = String(p.title || '').trim();
-  const startMs = Exercise_msFromYmdHm(p.start_date, p.start_time);
-  const endMs = Exercise_msFromYmdHm(p.end_date, p.end_time);
+  const startDate = _ymdFromCellValue(p.start_date) || String(p.start_date || '').trim();
+  const endDate = _ymdFromCellValue(p.end_date) || String(p.end_date || '').trim();
+  const startTime = _rawTime(p.start_time) || String(p.start_time || '').trim();
+  const endTime = _rawTime(p.end_time) || String(p.end_time || '').trim();
+
+  const startMs = Exercise_msFromYmdHm(startDate, startTime);
+  const endMs = Exercise_msFromYmdHm(endDate, endTime);
   const slotErr = Exercise_validateNameAgainstTimes(title, startMs, endMs);
   if (slotErr) throw new Error(slotErr);
   const dayErr = Exercise_validateBlockedWeekdays(startMs, endMs);
@@ -857,29 +923,23 @@ function Exercises_edit(p) {
 
   const validated = Exercises_validateCampAndPartner(p);
 
-  const sh = _sheet('Exercises');
-  // Columns 2-11 (title, description, -, start_date, end_date, act, exercise_type, partner_battalion, camp, battalion_commander)
-  // We skip col 4 (created_by). Write cols 2,3 then 5-11 individually isn't much worse,
-  // but we can do it in two range writes:
-  sh.getRange(row, 2, 1, 2).setValues([[
-    p.title       || '',
-    p.description || ''
-  ]]);
-  sh.getRange(row, 5, 1, 9).setValues([[
-    p.start_date          || '',
-    p.end_date            || '',
-    p.act                 || '',
-    p.exercise_type       || '',
-    validated.partner_battalion,
-    validated.camp,
-    p.battalion_commander || '',
-    p.start_time          || '',
-    p.end_time            || ''
-  ]]);
+  Exercises_writeFields_(row, {
+    title: p.title || '',
+    description: p.description || '',
+    start_date: startDate,
+    end_date: endDate,
+    act: p.act || '',
+    exercise_type: p.exercise_type || '',
+    partner_battalion: validated.partner_battalion,
+    camp: validated.camp,
+    battalion_commander: p.battalion_commander || '',
+    start_time: startTime,
+    end_time: endTime
+  });
   const teamId = String(p.teamId || p.team_id || '').trim();
   const prevTeamId = String(ex.team_id || '').trim();
   if (Exercises_teamColIndex() >= 0) Exercises_setTeamId(p.id, teamId);
-  _cacheInvalidate('Exercises');
+  _exercisesClearDerived();
 
   let info = 'התרגיל עודכן בהצלחה.';
   if (_parseBool(p.shift_procedure) && ex) {
@@ -918,27 +978,25 @@ function Exercises_updateTimes(p) {
   if (row < 0) throw new Error('התרגיל לא נמצא.');
 
   const ex = Exercises_get(id);
-  const startMs = Exercise_msFromYmdHm(p.start_date, p.start_time);
-  const endMs = Exercise_msFromYmdHm(p.end_date, p.end_time);
+  const startDate = _ymdFromCellValue(p.start_date) || String(p.start_date || '').trim();
+  const endDate = _ymdFromCellValue(p.end_date) || String(p.end_date || '').trim();
+  const startTime = _rawTime(p.start_time) || String(p.start_time != null ? p.start_time : '').trim();
+  const endTime = _rawTime(p.end_time) || String(p.end_time != null ? p.end_time : '').trim();
+
+  const startMs = Exercise_msFromYmdHm(startDate, startTime);
+  const endMs = Exercise_msFromYmdHm(endDate, endTime);
   const slotErr = Exercise_validateNameAgainstTimes(ex ? ex.title : '', startMs, endMs);
   if (slotErr) throw new Error(slotErr);
   const dayErr = Exercise_validateBlockedWeekdays(startMs, endMs);
   if (dayErr) throw new Error(dayErr);
 
-  const sh = _sheet('Exercises');
-  const startDate = String(p.start_date || '').trim();
-  const endDate = String(p.end_date || '').trim();
-  const startTime = String(p.start_time != null ? p.start_time : '').trim();
-  const endTime = String(p.end_time != null ? p.end_time : '').trim();
-  // batch writes — 2 קריאות במקום 4
-  sh.getRange(row, 5, 1, 2).setValues([[startDate, endDate]]);
-  sh.getRange(row, 12, 1, 2).setValues([[startTime, endTime]]);
-  _cachePatchRow('Exercises', row, {
-    5: startDate,
-    6: endDate,
-    12: startTime,
-    13: endTime
+  Exercises_writeFields_(row, {
+    start_date: startDate,
+    end_date: endDate,
+    start_time: startTime,
+    end_time: endTime
   });
+  _exercisesClearDerived();
 
   let shiftInfo = '';
   if (_parseBool(p.shift_procedure) && ex) {
@@ -1164,4 +1222,12 @@ function Exercises_deleteBulk(p) {
     tab: 'list',
     info: 'נמחקו ' + r.deleted + ' תרגילים יחד עם השיבוצים וציר הזמן שלהם.'
   });
+}
+
+/** הרצה חד-פעמית מעורך Apps Script — מרענן קאש תרגילים אחרי תיקון תאריכים */
+function refreshExercisesCacheOnce() {
+  _cacheInvalidate('Exercises');
+  _exercisesClearDerived();
+  const n = Exercises_all(true).length;
+  return { ok: true, info: 'קאש תרגילים רוענן (' + n + ' רשומות).' };
 }

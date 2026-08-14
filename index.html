@@ -3896,6 +3896,34 @@ body {
       });
     }
 
+    function mergeRouteOpenParams(baseParams) {
+      var out = Object.assign({}, baseParams || {});
+      if (currentRoute && currentRoute.params) {
+        if (currentRoute.params.open) out.open = currentRoute.params.open;
+        if (currentRoute.params.archive) out.archive = currentRoute.params.archive;
+        if (currentRoute.params.tab) out.tab = currentRoute.params.tab;
+      }
+      return out;
+    }
+
+    /** החלפת דף במקום — רענון מיידי אחרי עריכת תרגיל / משתמש */
+    function refreshInPlacePage(result, route) {
+      if (!result || result.body == null) return false;
+      route = normalizeRoute(route.page, route.params || {});
+      currentRoute = route;
+      var app = document.getElementById('app-content');
+      if (app) {
+        app.innerHTML = result.body;
+        runScripts(app);
+        afterRender();
+      }
+      if (result.title) document.title = result.title;
+      storeClientPage(route, result);
+      finishBootUi();
+      loading = false;
+      return true;
+    }
+
     function refreshUsersPageAfterWrite(result, tabId) {
       tabId = tabId || 'users';
       if (window.MapimModules && MapimModules.invalidateModule) {
@@ -4815,6 +4843,11 @@ body {
     function runAction(action, params) {
       if (actionInFlight) return;
       actionInFlight = true;
+      params = params || {};
+      if (currentRoute && currentRoute.params) {
+        if (currentRoute.params.open && !params.open) params.open = currentRoute.params.open;
+        if (currentRoute.params.archive && !params.archive) params.archive = currentRoute.params.archive;
+      }
       var myReq = ++reqId;
       loading = true;
       var isLight = !!LIGHT_ACTIONS[action];
@@ -4889,32 +4922,53 @@ body {
             currentRoute = normalizeRoute('exercise', { id: String(result.exerciseId) });
           }
           if (action === 'editExercise' && params && params.id) {
-            currentRoute = normalizeRoute('exercise', { id: String(params.id) });
+            currentRoute = normalizeRoute('exercise', mergeRouteOpenParams({ id: String(params.id) }));
+          }
+          if (action === 'updateProfile' && params) {
+            var profileTargetId = String(params.targetId || params.id || '').trim();
+            if (profileTargetId && (params.returnTo === 'user' ||
+                (currentRoute && currentRoute.page === 'user'))) {
+              currentRoute = normalizeRoute('user', mergeRouteOpenParams({ id: profileTargetId }));
+            }
           }
           if (action === 'autoAssignAll' || action === 'autoAssignGroup' ||
               action === 'clearAllAssignments' || action === 'clearAssignGroup') {
             currentRoute = normalizeRoute('assign', {});
+          }
+          if (action === 'editExercise' && result && result.body && params && params.id) {
+            var editExRoute = normalizeRoute('exercise', mergeRouteOpenParams({ id: String(params.id) }));
+            if (refreshInPlacePage(result, editExRoute)) {
+              setTimeout(function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                var teamChanged = String(params.teamId || '') !== String(params.origTeamId || '');
+                if (teamChanged) {
+                  setTimeout(function() {
+                    var partsCard = document.getElementById('exercise-participants-card');
+                    if (partsCard) partsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 450);
+                }
+              }, 60);
+              return;
+            }
+          }
+          if (action === 'updateProfile' && result && result.body && params) {
+            var updTargetId = String(params.targetId || params.id || '').trim();
+            if (updTargetId && (params.returnTo === 'user' ||
+                (currentRoute && currentRoute.page === 'user'))) {
+              var userProfRoute = normalizeRoute('user', mergeRouteOpenParams({ id: updTargetId }));
+              if (refreshInPlacePage(result, userProfRoute)) {
+                setTimeout(function() {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }, 60);
+                return;
+              }
+            }
           }
           applyResult(result, { skipPrime: true });
           if (action === 'createExercise' && result && result.body && params && params.from === 'exercises') {
             storeClientPage(normalizeRoute('exercises', { tab: 'list' }), result);
             setTimeout(function() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
-            }, 60);
-          }
-          if (action === 'editExercise' && result && result.body && params && params.id) {
-            var exRoute = normalizeRoute('exercise', { id: String(params.id) });
-            currentRoute = exRoute;
-            storeClientPage(exRoute, result);
-            setTimeout(function() {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-              var teamChanged = String(params.teamId || '') !== String(params.origTeamId || '');
-              if (teamChanged) {
-                setTimeout(function() {
-                  var partsCard = document.getElementById('exercise-participants-card');
-                  if (partsCard) partsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 450);
-              }
             }, 60);
           }
           if (action === 'duplicateExercise' && result && result.body && result.exerciseId) {
@@ -5087,7 +5141,7 @@ body {
         return;
       }
       runAction(action, data);
-    }, true);
+    }, false);
 
     return {
       navigate: navigate, runAction: runAction, goBack: goBack, canGoBack: canGoBack,
@@ -6177,7 +6231,7 @@ body {
         if ((!startChanged && !endChanged) || procCount <= 0) return;
 
         e.preventDefault();
-        e.stopImmediatePropagation();
+        e.stopPropagation();
         var yes = confirm(
           'שינית את זמני התרגיל.\n\nלעדכן את לוז נוהל הקרב בהתאם (הזזת כל האירועים באותו הפרש)?'
         );

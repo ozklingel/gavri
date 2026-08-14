@@ -89,6 +89,10 @@ function Series_getActiveId() {
 }
 
 function Series_exerciseColIndex() {
+  if (typeof Exercises_colIndex_ === 'function') {
+    const idx = Exercises_colIndex_('series_id');
+    if (idx >= 0) return idx;
+  }
   const idx = _colIndex('Exercises', 'series_id');
   return idx >= 0 ? idx : 15;
 }

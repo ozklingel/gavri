@@ -248,7 +248,7 @@ function _readSheetFromSpreadsheet(name, ssOpt) {
   }
   // One getValues() for the whole sheet — never row-by-row / cell-by-cell.
   const values = sh.getDataRange().getValues();
-  return { header: values[0], data: values.slice(1) };
+  return _normalizeSheetCacheResult({ header: values[0], data: values.slice(1) });
 }
 
 /**
@@ -324,8 +324,49 @@ function _getScriptCacheRows(name) {
   try { return JSON.parse(json); } catch (e2) { return null; }
 }
 
+function _normalizeTimeCellForCache(val) {
+  if (val == null || val === '') return val;
+  if (typeof _rawTime === 'function') return _rawTime(val);
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return String(val.getHours()).padStart(2, '0') + ':' + String(val.getMinutes()).padStart(2, '0');
+  }
+  return val;
+}
+
+/** מנרמל תאריכים/שעות לפני שמירה ב-Script Cache — מונע סטיית UTC (יום קודם/הבא) */
+function _normalizeSheetCacheResult(result) {
+  if (!result || !result.header || !result.data || !result.data.length) return result;
+  const headers = result.header.map(String);
+  const dateCols = [];
+  const timeCols = [];
+  headers.forEach(function(h, i) {
+    const hl = h.toLowerCase();
+    if (hl.indexOf('date') !== -1) dateCols.push(i);
+    else if (hl.indexOf('time') !== -1) timeCols.push(i);
+  });
+  if (!dateCols.length && !timeCols.length) return result;
+  const ymdFn = typeof _ymdFromCellValue === 'function' ? _ymdFromCellValue : null;
+  result.data = result.data.map(function(row) {
+    const r = row.slice();
+    dateCols.forEach(function(i) {
+      if (r[i] == null || r[i] === '') return;
+      if (ymdFn) {
+        const norm = ymdFn(r[i]);
+        if (norm) r[i] = norm;
+      }
+    });
+    timeCols.forEach(function(i) {
+      if (r[i] == null || r[i] === '') return;
+      r[i] = _normalizeTimeCellForCache(r[i]);
+    });
+    return r;
+  });
+  return result;
+}
+
 function _putScriptCacheRows(name, result) {
   const cache = CacheService.getScriptCache();
+  result = _normalizeSheetCacheResult(result);
   let json;
   try {
     json = JSON.stringify(result);

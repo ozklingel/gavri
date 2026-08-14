@@ -712,19 +712,34 @@ function Users_updateProfile(p) {
     (p.email                || '').trim()
   ]]);
 
+  const patch = {
+    5: (p.unit_affiliation     || '').trim(),
+    6: (p.service_type         || '').trim(),
+    7: (p.military_affiliation || '').trim(),
+    8: (p.unit_classification  || '').trim(),
+    9: (p.target_role          || '').trim(),
+    10: (p.phone                || '').trim(),
+    11: (p.email                || '').trim()
+  };
+
   // Update team if provided
   if (p.newTeamId !== undefined) {
     sh.getRange(row, 4).setValue((p.newTeamId || '').trim());
+    patch[4] = (p.newTeamId || '').trim();
   }
   // Update role if provided
   if (p.newRole) {
-    sh.getRange(row, 3).setValue(Roles_normalize(p.newRole.trim()));
+    const roleVal = Roles_normalize(p.newRole.trim());
+    sh.getRange(row, 3).setValue(roleVal);
+    patch[3] = roleVal;
   }
+  _cachePatchRow('Users', row, patch);
+  _usersClearDerived();
+
   if (p.newPassword !== undefined) {
     const newPass = String(p.newPassword || '').trim();
     if (newPass) _usersSetPassword(targetId, newPass);
   }
-  _cacheInvalidate('Users');
   UserProfileFields_saveForUser(targetId, p);
 
   if (p.returnTo === 'user') {
