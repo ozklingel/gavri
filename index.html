@@ -3924,6 +3924,19 @@ body {
       return true;
     }
 
+    /** רענון מיידי של לוח השיבוץ אחרי איפוס / שיבוץ אוטומטי */
+    function refreshAssignPageAfterWrite(result) {
+      if (!result || result.body == null) return false;
+      if (window.MapimModules && MapimModules.invalidateModule) {
+        MapimModules.invalidateModule('assign.main');
+        MapimModules.invalidateModule('assign.section.conflicts');
+        MapimModules.invalidateModule('assign.section.least');
+      }
+      invalidateClientRoutes(['assign', 'dashboard', 'exercises', 'exercise', 'statistics', 'exerciseMatrix', 'teamMatrix', 'timeline']);
+      var assignRoute = normalizeRoute('assign', mergeRouteOpenParams({}));
+      return refreshInPlacePage(result, assignRoute);
+    }
+
     function refreshUsersPageAfterWrite(result, tabId) {
       tabId = tabId || 'users';
       if (window.MapimModules && MapimModules.invalidateModule) {
@@ -4933,7 +4946,13 @@ body {
           }
           if (action === 'autoAssignAll' || action === 'autoAssignGroup' ||
               action === 'clearAllAssignments' || action === 'clearAssignGroup') {
-            currentRoute = normalizeRoute('assign', {});
+            currentRoute = normalizeRoute('assign', mergeRouteOpenParams({}));
+            if (refreshAssignPageAfterWrite(result)) {
+              setTimeout(function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }, 60);
+              return;
+            }
           }
           if (action === 'editExercise' && result && result.body && params && params.id) {
             var editExRoute = normalizeRoute('exercise', mergeRouteOpenParams({ id: String(params.id) }));

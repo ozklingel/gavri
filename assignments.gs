@@ -865,24 +865,28 @@ function Assignments_clearAll(p) {
   if (groupMeta) {
     Users_all().forEach(function(usr) { userById[String(usr.id)] = usr; });
   }
-  let removed = 0;
+  const rowsToDelete = [];
   for (let i = data.length - 1; i >= 0; i--) {
     if (!activeEx[String(data[i][1])]) continue;
     if (groupMeta) {
       const assigned = userById[String(data[i][2])];
       if (!assigned || Roles_normalize(assigned.role) !== groupMeta.role) continue;
     }
-    sh.deleteRow(i + 2);
-    removed++;
+    rowsToDelete.push(i + 2);
   }
-  _assignmentsInvalidate();
+  rowsToDelete.sort(function(a, b) { return b - a; });
+  rowsToDelete.forEach(function(sheetRow) {
+    sh.deleteRow(sheetRow);
+    _cachePatchDeleteRow('Assignments', sheetRow);
+  });
+  _assignmentsClearDerived();
   SystemLog_write({
     user_id: u.id,
     action: groupMeta ? 'assignments.clearGroup' : 'assignments.clearAll',
     entity_type: 'assignments',
     entity_id: groupMeta ? groupMeta.key : '',
     details: {
-      removed: removed,
+      removed: rowsToDelete.length,
       scope: 'active_series_only',
       group: groupMeta ? groupMeta.key : 'all'
     }
@@ -890,7 +894,7 @@ function Assignments_clearAll(p) {
   const label = groupMeta ? ('קבוצת «' + groupMeta.label + '»') : 'הסדרה הפעילה';
   return Views_assign({
     sid: p.sid,
-    info: '🗑 שיבוצי ' + label + ' נוקו (' + removed + ').'
+    info: '🗑 שיבוצי ' + label + ' נוקו (' + rowsToDelete.length + ').'
   });
 }
 
