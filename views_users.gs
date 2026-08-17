@@ -149,6 +149,9 @@ function _usersTab(sid, openSet) {
   if (!users.length) {
     s += '<div class="empty">אין משתמשים</div>';
   } else {
+    s += '<div class="list-scroll-toolbar" style="padding:8px 12px;border-bottom:1px solid var(--border)">' +
+      '<input type="search" id="usersPageSearch" class="form-input" placeholder="חיפוש שם / מספר אישי…" autocomplete="off" style="max-width:320px">' +
+      '</div>';
     const groups = {};
     users.forEach(function(u) {
       const key = _usersAffiliationGroupKey(u);

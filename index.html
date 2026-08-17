@@ -4267,7 +4267,29 @@ body {
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
       if (typeof initDatePickers === 'function') initDatePickers();
       if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
+      if (slot.getAttribute('data-spa-module') === 'users.tab.users' &&
+          typeof initUsersPageSearch === 'function') initUsersPageSearch();
     }
+
+    function initUsersPageSearch() {
+      var input = document.getElementById('usersPageSearch');
+      if (!input) return;
+      if (input._usersSearchBound) return;
+      input._usersSearchBound = true;
+      input.addEventListener('input', function() {
+        var q = String(input.value || '').trim().toLowerCase();
+        document.querySelectorAll('.page-users .users-group-stack .collapsible').forEach(function(panel) {
+          var visible = 0;
+          panel.querySelectorAll('.bulk-select-table tbody tr').forEach(function(tr) {
+            var show = !q || (tr.textContent || '').toLowerCase().indexOf(q) !== -1;
+            tr.hidden = !show;
+            if (show) visible++;
+          });
+          panel.hidden = !!q && visible === 0;
+        });
+      });
+    }
+    window.initUsersPageSearch = initUsersPageSearch;
 
     function afterRender() {
       if (typeof initCollapsibles === 'function') initCollapsibles();
@@ -4279,6 +4301,7 @@ body {
       if (typeof initDashboardUserSearch === 'function') initDashboardUserSearch();
       if (typeof initDashboardTabs === 'function') initDashboardTabs();
       if (typeof initUsersTabs === 'function') initUsersTabs();
+      if (typeof initUsersPageSearch === 'function') initUsersPageSearch();
       if (typeof initConflictsTabs === 'function') initConflictsTabs();
       if (typeof initAllExerciseCalendars === 'function') initAllExerciseCalendars();
       if (typeof initDashboardProcedurePeek === 'function') initDashboardProcedurePeek();
