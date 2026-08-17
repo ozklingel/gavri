@@ -923,7 +923,15 @@ function Assignments_update(p) {
     _cachePatchRow('Assignments', row, { 5: newScore });
     _assignmentsClearDerived();
     if (inline) {
-      return { ok: true, info: 'הציון נשמר.', assignmentId: aid, exerciseId: exId || assignment.exercise_id };
+      const out = Views_exercise({
+        sid: p.sid,
+        id: exId || assignment.exercise_id,
+        info: 'הציון נשמר.'
+      });
+      out.ok = true;
+      out.assignmentId = aid;
+      out.exerciseId = exId || assignment.exercise_id;
+      return out;
     }
     return Views_exercise({ sid: p.sid, id: exId || assignment.exercise_id, info: 'הציון נשמר.' });
   }
@@ -947,12 +955,15 @@ function Assignments_update(p) {
   _assignmentsClearDerived();
 
   if (inline) {
-    return {
-      ok: true,
-      info: 'פרטי המשתתף עודכנו בהצלחה.',
-      assignmentId: aid,
-      exerciseId: exId || assignment.exercise_id
-    };
+    const out = Views_exercise({
+      sid: p.sid,
+      id: exId || assignment.exercise_id,
+      info: 'פרטי המשתתף עודכנו בהצלחה.'
+    });
+    out.ok = true;
+    out.assignmentId = aid;
+    out.exerciseId = exId || assignment.exercise_id;
+    return out;
   }
 
   return Views_exercise({

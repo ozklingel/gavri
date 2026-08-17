@@ -515,19 +515,24 @@ function _exerciseAssignPanelHtml(p) {
   if (!available.length) {
     indivForm = '<div class="empty">כל המשתמשים כבר הוקצו</div>';
   } else {
-    const userOptions = available.map(function(u) {
-      return [u.id, u.id + ' — ' + u.name + ' (' + _roleHe(u.role) + ')'];
-    });
+    const availJson = JSON.stringify(available.map(function(u) {
+      return { id: u.id, name: u.name, role: _roleHe(u.role) };
+    }));
     indivForm =
-      _formOpen() +
+      _formOpen('exercise-assign-form') +
       '<input type="hidden" name="action" value="assign">' +
       '<input type="hidden" name="sid" value="' + _esc(sid) + '">' +
       '<input type="hidden" name="exerciseId" value="' + _esc(ex.id) + '">' +
-      '<div class="form-row"><label class="form-label">חייל</label>' + _select('userId', userOptions) + '</div>' +
+      '<input type="hidden" name="userId" id="exAssignUserId" value="">' +
+      '<div class="form-row"><label class="form-label">חייל</label>' +
+      '<input type="search" id="exAssignUserSearch" class="form-input" placeholder="חיפוש שם / מספר אישי…" autocomplete="off">' +
+      '<div id="exAssignUserResults" hidden style="margin-top:4px;max-height:180px;overflow:auto;border:1px solid var(--border);border-radius:4px;background:var(--bg2)"></div>' +
+      '</div>' +
       '<div class="form-row"><label class="form-label">תפקיד</label>' +
       _responsibilitySelect('responsibility', '', 'required') +
       '</div>' +
       _submitBtn('➤ הקצה חייל', 'btn btn-primary') +
+      '<script type="application/json" id="exAssignUsersData">' + availJson + '</script>' +
       '</form>';
   }
 

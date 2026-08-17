@@ -3937,6 +3937,17 @@ body {
       return refreshInPlacePage(result, assignRoute);
     }
 
+    function refreshExercisePageAfterWrite(result, route) {
+      if (!result || result.body == null) return false;
+      if (window.MapimModules && MapimModules.invalidateModule) {
+        MapimModules.invalidateModule('exercise.panel.assign');
+        MapimModules.invalidateModule('exercise.panel.edit');
+      }
+      invalidateClientRoutes(['exercise', 'assign', 'dashboard', 'exercises', 'statistics', 'exerciseMatrix', 'teamMatrix', 'timeline']);
+      route = normalizeRoute(route.page, route.params || {});
+      return refreshInPlacePage(result, route);
+    }
+
     function refreshUsersPageAfterWrite(result, tabId) {
       tabId = tabId || 'users';
       if (window.MapimModules && MapimModules.invalidateModule) {
@@ -4269,6 +4280,8 @@ body {
       if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
       if (slot.getAttribute('data-spa-module') === 'users.tab.users' &&
           typeof initUsersPageSearch === 'function') initUsersPageSearch();
+      if (slot.getAttribute('data-spa-module') === 'exercise.panel.assign' &&
+          typeof initExerciseAssignSearch === 'function') initExerciseAssignSearch();
     }
 
     function initUsersPageSearch() {
@@ -4291,6 +4304,77 @@ body {
     }
     window.initUsersPageSearch = initUsersPageSearch;
 
+    function initExerciseAssignSearch() {
+      var input = document.getElementById('exAssignUserSearch');
+      var hidden = document.getElementById('exAssignUserId');
+      var results = document.getElementById('exAssignUserResults');
+      if (!input || !hidden || !results || input._exAssignBound) return;
+      input._exAssignBound = true;
+      var users = [];
+      var dataEl = document.getElementById('exAssignUsersData');
+      if (dataEl) {
+        try { users = JSON.parse(dataEl.textContent || '[]'); } catch (e0) { users = []; }
+      }
+      var form = input.closest('form');
+      if (form && !form._exAssignValid) {
+        form._exAssignValid = true;
+        form.addEventListener('submit', function(e) {
+          if (!hidden.value) {
+            e.preventDefault();
+            e.stopPropagation();
+            alert('בחר משתמש מהרשימה');
+          }
+        }, true);
+      }
+      function hideResults() {
+        results.hidden = true;
+        results.innerHTML = '';
+      }
+      function esc(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+      function pickUser(u) {
+        hidden.value = u.id;
+        input.value = u.id + ' — ' + u.name + ' (' + u.role + ')';
+        hideResults();
+      }
+      input.addEventListener('input', function() {
+        hidden.value = '';
+        var q = String(input.value || '').trim().toLowerCase();
+        if (!q) { hideResults(); return; }
+        var matches = users.filter(function(u) {
+          return String(u.id || '').toLowerCase().indexOf(q) !== -1 ||
+            String(u.name || '').toLowerCase().indexOf(q) !== -1 ||
+            String(u.role || '').toLowerCase().indexOf(q) !== -1;
+        }).slice(0, 12);
+        if (!matches.length) {
+          results.innerHTML = '<div style="padding:8px 10px;font-size:12px;color:var(--muted)">לא נמצא</div>';
+          results.hidden = false;
+          return;
+        }
+        results.innerHTML = matches.map(function(u) {
+          return '<button type="button" class="ex-assign-pick" data-id="' + esc(u.id) + '" ' +
+            'style="display:block;width:100%;text-align:right;padding:8px 10px;border:none;border-bottom:1px solid var(--border);' +
+            'background:transparent;cursor:pointer;color:var(--text1);font-family:var(--mono);font-size:12px">' +
+            esc(u.id + ' — ' + u.name + ' (' + u.role + ')') + '</button>';
+        }).join('');
+        results.hidden = false;
+        results.querySelectorAll('.ex-assign-pick').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var id = btn.getAttribute('data-id');
+            var u = users.find(function(x) { return String(x.id) === String(id); });
+            if (u) pickUser(u);
+          });
+        });
+      });
+      document.addEventListener('click', function(e) {
+        if (!results.contains(e.target) && e.target !== input) hideResults();
+      });
+    }
+    window.initExerciseAssignSearch = initExerciseAssignSearch;
+
     function afterRender() {
       if (typeof initCollapsibles === 'function') initCollapsibles();
       if (typeof initDatePickers === 'function') initDatePickers();
@@ -4308,6 +4392,7 @@ body {
       if (typeof initTimeWheelPickers === 'function') initTimeWheelPickers();
       if (typeof initExerciseProcedurePanel === 'function') initExerciseProcedurePanel();
       if (typeof initExerciseEditShiftPrompt === 'function') initExerciseEditShiftPrompt();
+      if (typeof initExerciseAssignSearch === 'function') initExerciseAssignSearch();
       if (typeof initActionButtonTooltips === 'function') initActionButtonTooltips();
       if (typeof initBulkSelectTables === 'function') initBulkSelectTables();
       if (window.MapimModules && MapimModules.load) MapimModules.load();
@@ -4979,7 +5064,7 @@ body {
           }
           if (action === 'editExercise' && result && result.body && params && params.id) {
             var editExRoute = normalizeRoute('exercise', mergeRouteOpenParams({ id: String(params.id) }));
-            if (refreshInPlacePage(result, editExRoute)) {
+            if (refreshExercisePageAfterWrite(result, editExRoute)) {
               setTimeout(function() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 var teamChanged = String(params.teamId || '') !== String(params.origTeamId || '');
@@ -4989,6 +5074,18 @@ body {
                     if (partsCard) partsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }, 450);
                 }
+              }, 60);
+              return;
+            }
+          }
+          if ((action === 'assign' || action === 'assignTeam' || action === 'removeAssignment') &&
+              result && result.body && params && (params.exerciseId || params.id)) {
+            var assignExId = String(params.exerciseId || params.id);
+            var assignExRoute = normalizeRoute('exercise', mergeRouteOpenParams({ id: assignExId, open: 'assign' }));
+            if (refreshExercisePageAfterWrite(result, assignExRoute)) {
+              setTimeout(function() {
+                var partsCard = document.getElementById('exercise-participants-card');
+                if (partsCard) partsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }, 60);
               return;
             }
@@ -5212,11 +5309,12 @@ body {
       reloadUsersTabModule: reloadUsersTabModule,
       activateTabModuleSlot: activateTabModuleSlot,
       refreshUsersPageAfterWrite: refreshUsersPageAfterWrite,
+      refreshExercisePageAfterWrite: refreshExercisePageAfterWrite,
       boot: boot, applyResult: applyResult, showLoader: MapimLoader.show, hideLoader: MapimLoader.hide
     };
   })();
 
-  // Save participant row — optimistic UI (אין המתנה לרינדור דף מלא)
+  // Save participant row — refresh exercise page after update
   function spaSaveAssignmentRow(btn) {
     if (!btn || !window.MapimSpa) return;
     var row = btn.closest('tr');
@@ -5237,34 +5335,33 @@ body {
     btn.disabled = true;
     var prevText = btn.textContent;
     btn.textContent = 'שומר...';
+    if (window.MapimSpa.showLoader) MapimSpa.showLoader('// SAVING...');
 
     google.script.run
       .withSuccessHandler(function(res) {
+        if (window.MapimSpa.hideLoader) MapimSpa.hideLoader();
         btn.disabled = false;
         btn.textContent = prevText;
         if (!res || res.ok === false) {
           alert((res && res.error) || 'שגיאה בשמירה');
           return;
         }
-        // optimistic: מסמנים הצלחה בלי רינדור מחדש של כל הדף
+        var exId = (res && res.exerciseId) || exerciseId;
+        if (res && res.body && MapimSpa.refreshExercisePageAfterWrite && exId) {
+          var exRoute = { page: 'exercise', params: { id: String(exId) } };
+          if (MapimSpa.refreshExercisePageAfterWrite(res, exRoute)) {
+            setTimeout(function() {
+              var card = document.getElementById('exercise-participants-card');
+              if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 60);
+            return;
+          }
+        }
         btn.textContent = '✓ נשמר';
         setTimeout(function() { btn.textContent = prevText; }, 1200);
-        if (window.MapimSpa && MapimSpa.invalidateRoutes) {
-          MapimSpa.invalidateRoutes(['dashboard', 'assign', 'exercise', 'statistics']);
-        }
-        var flash = document.getElementById('spa-inline-flash');
-        if (!flash) {
-          flash = document.createElement('div');
-          flash.id = 'spa-inline-flash';
-          flash.className = 'flash flash-ok';
-          flash.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:9999;padding:10px 14px;';
-          document.body.appendChild(flash);
-        }
-        flash.textContent = (res && res.info) || 'נשמר';
-        flash.hidden = false;
-        setTimeout(function() { flash.hidden = true; }, 2000);
       })
       .withFailureHandler(function(err) {
+        if (window.MapimSpa.hideLoader) MapimSpa.hideLoader();
         btn.disabled = false;
         btn.textContent = prevText;
         alert(err && err.message ? err.message : String(err));
